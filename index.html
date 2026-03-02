@@ -222,7 +222,7 @@
       display: flex; align-items: center; gap: 12px;
     }
     #panel-header-text { flex: 1; min-width: 0; }
-    #panel-header-text .title { font-size: 1.05rem; font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; }
+    #panel-header-text .title { font-size: 1.05rem; font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #panel-header-text small { display: block; font-weight: 400; font-size: 0.78rem; opacity: 0.9; margin-top: 3px; }
 
     #refresh-badge {
@@ -251,7 +251,7 @@
     }
     #sensor-tabs::-webkit-scrollbar { display: none; }
     .s-tab {
-      flex: 1; min-width: 100px; padding: 12px 8px;
+      flex: 0 0 auto; min-width: unset; padding: 12px 14px;
       font-size: 0.8rem; font-weight: 600; text-align: center;
       cursor: pointer; color: var(--text-muted); border: none; border-bottom: 3px solid transparent;
       background: none; white-space: nowrap; transition: color .2s;
@@ -270,6 +270,11 @@
     .placeholder p { font-size: 0.9rem; line-height: 1.5; font-weight: 500; }
 
     .stat-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 16px; }
+    @media (max-width: 360px) {
+      .stat-row { grid-template-columns: repeat(2,1fr); }
+      .stat-card .val { font-size: 0.92rem; }
+      .stat-card .lbl { font-size: 0.6rem; }
+    }
     .stat-card {
       background: #fff; border-radius: var(--radius-md); padding: 10px 6px;
       text-align: center; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.03);
