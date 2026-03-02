@@ -196,17 +196,28 @@
     #app { display: flex; flex-direction: column; height: 100vh; position: relative; background: transparent; }
     #map { position: absolute; inset: 0; z-index: 0; }
 
-    /* ── PANNELLO DATI (TOP) ── */
+    /* ── PANNELLO DATI (FULLSCREEN) ── */
     #panel {
-      width: 100%; height: 500px; max-height: 65vh; flex-shrink: 0; background: var(--bg-panel);
-      position: relative; z-index: 5;
-      display: flex; flex-direction: column;
-      box-shadow: 0 4px 16px rgba(0,0,0,.1);
-      overflow: hidden; z-index: 3; transition: height 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
-      order: 1; border-bottom: 1px solid #e2e8f0;
-     
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      top: 0;
+      width: 100%;
+      height: auto;
+      max-height: none;
+      background: var(--bg-panel);
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 -4px 24px rgba(0,0,0,.14);
+      overflow: hidden;
+      transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+                  opacity   0.35s ease;
     }
-    #panel.hidden-desktop { height: 0; border-bottom: none; }
+    #panel.hidden-desktop {
+      transform: translateY(100%);
+      opacity: 0;
+      pointer-events: none;
+    }
     /* ── PANNELLO ARPAV: colori verde acqua indipendenti dal tema ── */
     #panel-header { background: #0e8a8a !important; }
     .s-tab:hover { color: #0e8a8a !important; }
@@ -606,9 +617,18 @@ const markerRefs = {};
 // ── PANNELLO UI ───────────────────────────────────────────────────────────────
 function showBadge(show) { document.getElementById('refresh-badge').classList.toggle('visible', show); }
 
+function updatePanelTop() {
+  const bar   = document.getElementById('allerta-bar');
+  const panel = document.getElementById('panel');
+  const barH  = bar.classList.contains('visible') ? bar.offsetHeight : 0;
+  panel.style.top = barH + 'px';
+}
+
 function openPanel() {
+  updatePanelTop();
   const p = document.getElementById('panel');
   p.classList.remove('hidden-desktop');
+  document.querySelector('.fab-container').style.visibility = 'hidden';
   if (currentId !== null) showBadge(true);
   setTimeout(() => map.invalidateSize(), 350);
 }
@@ -617,6 +637,7 @@ function closePanel() {
   const p = document.getElementById('panel');
   showBadge(false);
   p.classList.add('hidden-desktop');
+  document.querySelector('.fab-container').style.visibility = '';
   if (currentId !== null)
   setTimeout(() => map.invalidateSize(), 350);
   
@@ -1545,6 +1566,7 @@ async function loadAllerta() {
     const bar = document.getElementById('allerta-bar');
     bar.classList.add('visible');
     bar.style.background = allertaBgColor(d.idr, d.idro, d.temp);
+    updatePanelTop();
 
     ['idr','idro','temp'].forEach(k => {
       const el = document.getElementById('bar-bollino-' + k);
@@ -1578,5 +1600,4 @@ setInterval(loadAllerta, 10 * 60 * 1000);
 </script>
 </body>
 </html>
-
 
