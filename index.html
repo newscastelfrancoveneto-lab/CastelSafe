@@ -1129,7 +1129,7 @@ function decodeXml(buf) {
 
 async function fetchText(url) {
   try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    const r = await fetch(url, { signal: AbortSignal.timeout(5000), cache: 'no-store' });
     if (r.ok) return decodeXml(await r.arrayBuffer());
   } catch {}
   const proxies = [
