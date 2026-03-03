@@ -120,12 +120,25 @@
 	}
 
 	.close-side-panel {
-	  background: none;
+	  background: rgba(255,255,255,.15);
 	  border: none;
-	  color: white;
+	  border-radius: 50%;
+	  width: 40px;
+	  height: 40px;
+	  color: #fff;
 	  font-size: 1.2rem;
 	  cursor: pointer;
+	  flex-shrink: 0;
+	  display: flex;
+	  align-items: center;
+	  justify-content: center;
+	  transition: background .2s, transform .2s;
 	}
+	.close-side-panel:hover {
+	  background: rgba(255,255,255,.3);
+	  transform: scale(1.05);
+	}
+
 
 	.notifications-list {
 	  display: flex;
@@ -503,16 +516,17 @@
     <div id="info-box" class="modal-box">
       <button class="modal-close-btn" onclick="document.getElementById('info-modal').classList.remove('open')">✕</button>
       <h2>Informazioni sull'app</h2>
-      <h3><span class="info-area-badge" style="background:#166534">Attesa</span> Area di attesa</h3>
+	  <h3>Aree di protezione civile</h3>
+	  <h3><span class="info-area-badge" style="background:#166534">Area di attesa</span> </h3>
       <p>Punto di raccolta sicuro per la popolazione in caso di evacuazione. Recati qui <strong>immediatamente</strong> se ricevi un'allerta di evacuazione. Rimani in attesa di istruzioni.</p>
-      <h3><span class="info-area-badge" style="background:#991b1b">Ricovero</span> Area di ricovero</h3>
+      <h3><span class="info-area-badge" style="background:#991b1b">Area di ricovero</span> </h3>
       <p>Struttura attrezzata per ospitare la popolazione evacuata. Raggiungi quest'area solo se indicato dalle autorità.</p>
-      <h3><span class="info-area-badge" style="background:#a16207">Ammassamento</span> Area di ammassamento</h3>
+      <h3><span class="info-area-badge" style="background:#a16207">Area di ammassamento</span> </h3>
       <p>Zona riservata ai soccorritori e ai mezzi di emergenza. <strong>Non accessibile alla popolazione.</strong></p>
-      <h3>📡 Dati idrometrici ARPAV</h3>
-      <p>Livelli e precipitazioni forniti da <strong>ARPAV</strong>, aggiornati ogni 30 min.<br><a href="https://www.arpa.veneto.it/dati-ambientali/dati-in-diretta/meteo-idro-nivo/pannello-meteo-segnalazioni" target="_blank">→ Dati in diretta ARPAV</a></p>
+      <h3>📡 Stazioni sensori ARPAV</h3>
+      <p>Livelli dei corsi d'acqua, precipitazioni e altri dati ambientali forniti da <strong>ARPAV</strong>, aggiornati ogni 30 min.<br><a href="https://www.arpa.veneto.it/dati-ambientali/dati-in-diretta/meteo-idro-nivo/pannello-meteo-segnalazioni" target="_blank">→ Dati in diretta ARPAV</a></p>
       <h3>🗺️ Dati geografici</h3>
-      <p>Corsi d'acqua e aree estratti da <a href="https://www.openstreetmap.org" target="_blank">OpenStreetMap</a> tramite Overpass.</p>
+      <p>Corsi d'acqua e aree di protezione civile estratti da <a href="https://www.openstreetmap.org" target="_blank">OpenStreetMap</a> </p>
     </div>
   </div>
 
