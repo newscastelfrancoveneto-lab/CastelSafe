@@ -655,12 +655,16 @@ function updatePanelTop() {
 }
 
 function openPanel() {
-  updatePanelTop();
-  const p = document.getElementById('panel');
-  p.classList.remove('hidden-desktop');
-  document.querySelector('.fab-container').style.visibility = 'hidden';
-  if (currentId !== null) showBadge(true);
-  setTimeout(() => map.invalidateSize(), 350);
+    updatePanelTop();
+    const p = document.getElementById('panel');
+    p.classList.remove('hidden-desktop');
+    document.querySelector('.fab-container').style.visibility = 'hidden';
+    
+    if (currentId != null) {
+        showBadge(true);
+        scheduleRefresh();  
+    }
+    setTimeout(() => map.invalidateSize(), 350);
 }
 
 function closePanel() {
