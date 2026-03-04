@@ -1201,34 +1201,46 @@ function decodeXml(buf) {
   return text;
 }
 
+const PROXIES = [
+    'https://api.allorigins.win/raw?url=',
+    'https://corsproxy.io/?',
+    'https://api.codetabs.com/v1/proxy?quest='
+];
+
 const xmlCache = {};
 
 async function fetchText(url) {
+    // 1. Cache in-memory
     const cacheKey = url.split('?')[0];
     const cached = xmlCache[cacheKey];
     if (cached && (Date.now() - cached.ts) < (29 * 60 * 1000)) return cached.data;
 
     const urlCacheBust = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
 
+    // 2. Fetch diretto (quasi sempre fallisce per CORS, timeout breve)
     const directFetch = fetch(url, { signal: AbortSignal.timeout(1500), cache: 'no-store' })
-        .then(r => r.ok ? r.arrayBuffer() : Promise.reject())
+        .then(r => r.ok ? r.arrayBuffer() : Promise.reject(new Error('HTTP ' + r.status)))
         .then(buf => decodeXml(buf));
 
+    // 3. Proxy in sequenza (PROXIES ora è definito)
     const proxyFetch = (async () => {
-        for (const px of proxies) {
+        for (const px of PROXIES) {
             try {
                 const r2 = await fetch(px + encodeURIComponent(urlCacheBust), {
-                    signal: AbortSignal.timeout(10000), cache: 'no-store'
+                    signal: AbortSignal.timeout(10000),
+                    cache: 'no-store'
                 });
                 if (r2.ok) return decodeXml(await r2.arrayBuffer());
             } catch {}
         }
-        throw new Error('Failed to fetch');
+        throw new Error('All proxies failed');
     })();
 
-    // ✅ await del risultato, poi salva in cache, poi restituisce
+    // 4. Vince il primo che risponde
     const result = await Promise.any([directFetch, proxyFetch]);
-    xmlCache[cacheKey] = { ts: Date.now(), data: result };
+
+    // 5. Salva in cache solo se risultato valido
+    if (result) xmlCache[cacheKey] = { ts: Date.now(), data: result };
     return result;
 }
 
