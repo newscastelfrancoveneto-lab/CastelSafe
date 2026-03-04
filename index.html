@@ -641,6 +641,7 @@ const API_BASE = 'https://replica-searching-attempt-graduate.trycloudflare.com';
 
 let activeChart = null, currentId = null, currentSensors = [];
 let currentStnRef = null, nextRefresh = null;
+let timerRunning = false;
 const markerRefs = {};
 
 // ── PANNELLO UI ───────────────────────────────────────────────────────────────
@@ -1609,77 +1610,31 @@ function scheduleRefresh() {
   nextRefresh = next;
   tickCountdown();
 }
+
 async function tickCountdown() {
-    if (!timerRunning || !currentStnRef) {
-        return;
-    }
+    if (!timerRunning || !currentStnRef) return;
 
-    const badge = document.getElementById('refresh-badge');
     const label = document.getElementById('countdown-label');
+    if (!label) return;
 
-    if (!badge || !label) {
-        return;
-    }
-
-    if (!nextRefresh) {
-        // fallback: se per qualche motivo non è impostato
-        const interval = currentStnRef?.refreshInterval ?? 30; // minuti
-        nextRefresh = getNextRefresh(interval);
-    }
-
-    const now = Date.now();
-    let rem = Math.max(0, Math.floor((nextRefresh - now) / 1000));
+    const rem = Math.max(0, Math.floor((nextRefresh - Date.now()) / 1000));
 
     if (rem <= 0) {
-        // tempo scaduto -> tenta il refresh dei dati
         label.textContent = 'Aggiornamento...';
-
         try {
-            if (currentId && currentStnRef) {
-                // ricarica la stazione selezionata in modo silenzioso
-                await loadStation(currentStnRef, true);
-            }
-
-            // controlla se l’ultimo dato è troppo vecchio
-            let isStale = false;
-            const latestRow = document.querySelector('.data-table tr.latest td:nth-child(1)');
-            if (latestRow) {
-                const txt = latestRow.textContent?.trim();
-                if (txt) {
-                    const dt = new Date(txt.replace(' ', 'T') + ':00');
-                    if (!isNaN(dt.getTime())) {
-                        const ageMin = (now - dt.getTime()) / 60000;
-                        // se più vecchio di 2 intervalli, considera i dati “stale”
-                        const interval = currentStnRef?.refreshInterval ?? 30;
-                        if (ageMin > interval * 2) {
-                            isStale = true;
-                        }
-                    }
-                }
-            }
-
-            if (isStale) {
-                // se i dati sono vecchi, riprova tra 1 minuto
-                nextRefresh = Date.now() + 60 * 1000;
-            } else {
-                // altrimenti programma il prossimo slot basato sull'intervallo della stazione
-                const interval = currentStnRef?.refreshInterval ?? 30; // minuti
-                nextRefresh = getNextRefresh(interval);
-            }
+            if (currentStnRef) await loadStation(currentStnRef, true);
         } catch (e) {
-            console.error('Errore durante il refresh automatico:', e);
-            // in caso di errore, tenta di nuovo tra 1 minuto
-            nextRefresh = Date.now() + 60 * 1000;
+            console.error('Errore refresh automatico:', e);
         }
-
-        // riparti sempre il countdown dopo il refresh
-        setTimeout(tickCountdown, 1000);
+        const interval = currentStnRef?.refreshInterval ?? 30;
+        nextRefresh = getNextRefresh(interval);
+        setTimeout(tickCountdown, 1000);  // ← riavvia sempre il loop
     } else {
-        // countdown normale
         label.textContent = formatCountdown(rem);
         setTimeout(tickCountdown, 1000);
     }
 }
+
 
 
 // ── NOTIFICHE PUSH ────────────────────────────────────────────────────────────
