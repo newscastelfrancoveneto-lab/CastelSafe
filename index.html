@@ -842,9 +842,20 @@ const OVERPASS_ENDPOINTS = [
 ];
 
 async function overpassFetch(query) {
-  const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(query);
-  return fetch(proxyUrl, {signal: AbortSignal.timeout(25000)})
-    .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)));
+  // Overpass API natively supports CORS, so we don't need the proxy.
+  // Using the primary endpoint from your OVERPASS_ENDPOINTS list:
+  const endpoint = 'https://overpass-api.de/api/interpreter';
+  
+  return fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    // The query must be passed in the body under the 'data' parameter
+    body: 'data=' + encodeURIComponent(query),
+    signal: AbortSignal.timeout(25000)
+  })
+  .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)));
 }
 
 
