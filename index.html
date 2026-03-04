@@ -258,6 +258,8 @@
     }
     #refresh-badge.visible { display: flex; }
     #refresh-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: #6ee7b7; animation: pulse 2s infinite; }
+    #refresh-badge.waiting .dot { background: #fbbf24; animation: pulse 1s infinite; }
+    #refresh-badge.waiting { background: rgba(15,23,42,.25); }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
     #btn-close-panel {
@@ -605,7 +607,7 @@ const STATIONS = [
   { id: 653, osmNodeId: '1.2984421539e+10', name: 'Avenale', subtitle: 'Castelfranco Veneto',
     lat: 45.6747453, lon: 11.9285348,
     xmlUrl: 'https://meteo.arpa.veneto.it/meteo/dati_meteo/xml/0653.xml',
-    refreshInterval: 10,
+    refreshInterval: 30,
     soglie: { s1: 1.5, s2: 1.8, s3: 2.1 } },
 
   { id: 102, osmNodeId: 1.2984403717e+10, name: 'Castelfranco Veneto', subtitle: 'Staz. meteorologica',
@@ -643,6 +645,8 @@ const API_BASE = 'https://replica-searching-attempt-graduate.trycloudflare.com';
 let activeChart = null, currentId = null, currentSensors = [];
 let currentStnRef = null, nextRefresh = null;
 let timerRunning = false;
+let waitingForFreshData = false;
+const stationLastTimestamp = {};
 const markerRefs = {};
 
 // ── PANNELLO UI ───────────────────────────────────────────────────────────────
@@ -1376,10 +1380,11 @@ function scheduleStaleRetry(stn, sensors) {
 }
 
 
-async function loadStation(stn, silent = false) {
+async function loadStation(stn, options = false) {
+  const opts = typeof options === 'boolean' ? { silent: options } : (options || {});
+  const silent = !!opts.silent;
   currentId = stn.id;
   currentStnRef = stn;
-  scheduleRefresh();
   setActiveMarker(stn.id);
   document.getElementById('panel-title').textContent = stn.name;
   document.getElementById('panel-subtitle').textContent = `${stn.subtitle} — Staz. ${stn.id}`;
@@ -1394,18 +1399,34 @@ async function loadStation(stn, silent = false) {
     const xml = await fetchText(xmlUrl);
     const sensors = parseXML(xml, stn.id);
     if (sensors?.length > 0) {
-		currentSensors = sensors;
-		renderTabs(stn, sensors);
-		if (silent) scheduleStaleRetry(stn, sensors);
-		return;
-	}
+      const latestTs = getLatestSensorTimestamp(sensors);
+      const hasNewData = !opts.waitForNewData || !opts.minTimestamp || (latestTs && latestTs > opts.minTimestamp);
+      if (hasNewData) {
+        currentSensors = sensors;
+        stationLastTimestamp[stn.id] = latestTs;
+        renderTabs(stn, sensors);
+      }
+      if (silent && !opts.waitForNewData) scheduleStaleRetry(stn, sensors);
+      return { ok: true, hasNewData, latestTs };
+    }
   } catch (_) {}
   try {
     const csv = await fetchText(`${CSV_BASE}${String(stn.id).padStart(4, '0')}.csv`);
     const rows = parseCSV(csv);
-    if (rows?.length > 0) { currentSensors = [{ type: 'LIVIDRO', paramnm: 'Livello idrometrico', unitnm: 'm', rows }]; renderTabs(stn, currentSensors); return; }
-  } catch (e) { showError(e.message); return; }
-  showError('Nessun dato disponibile per la stazione #' + stn.id);
+    if (rows?.length > 0) {
+      const fallbackSensors = [{ type: 'LIVIDRO', paramnm: 'Livello idrometrico', unitnm: 'm', rows }];
+      const latestTs = getLatestSensorTimestamp(fallbackSensors);
+      const hasNewData = !opts.waitForNewData || !opts.minTimestamp || (latestTs && latestTs > opts.minTimestamp);
+      if (hasNewData) {
+        currentSensors = fallbackSensors;
+        stationLastTimestamp[stn.id] = latestTs;
+        renderTabs(stn, currentSensors);
+      }
+      return { ok: true, hasNewData, latestTs };
+    }
+  } catch (e) { if (!silent) showError(e.message); return { ok: false, hasNewData: false }; }
+  if (!silent) showError('Nessun dato disponibile per la stazione #' + stn.id);
+  return { ok: false, hasNewData: false };
 }
 
 function parseXML(xmlText, stationId) {
@@ -1707,32 +1728,19 @@ function showError(msg) {
 }
 
 // ── AUTO-REFRESH ──────────────────────────────────────────────────────────────
-function getNextHalfHour() {
-  const halfMs = 30 * 60 * 1000;
-  const margin = 30 * 1000;
-  const now = Date.now();
-  // Calcola la mezza-ora tonda PRECEDENTE (non la prossima)
-  const prevBoundary = Math.floor(now / halfMs) * halfMs;
-  const candidate = prevBoundary + margin; // es. se ora è 8:31 → candidate = 8:33
-  if (candidate > now) {
-    return candidate; // 8:33 è ancora nel futuro → spara lì
-  }
-  // 8:33 è già passata → prossima è 9:03
-  return prevBoundary + halfMs + margin;
-}
+function getNextHalfHourBoundary() {
+  const now = new Date();
+  const next = new Date(now);
+  next.setSeconds(0, 0);
 
-function getNextRefresh(intervalMin) {
-    const intervalMs = intervalMin * 60 * 1000;  // es. 10 min = 600000 ms
-    const now = Date.now();
-    
-    // Slot tondo precedente (es. 10:10, 10:20...)
-    const prevSlot = Math.floor(now / intervalMs) * intervalMs;
-    const candidate = prevSlot + 30 * 1000;  // +30s per refresh
-    
-    if (candidate > now) {
-        return candidate;
-    }
-    return prevSlot + intervalMs + 30 * 1000;  // prossimo slot
+  const minutes = now.getMinutes();
+  if (minutes < 30) {
+    next.setMinutes(30);
+  } else {
+    next.setHours(next.getHours() + 1);
+    next.setMinutes(0);
+  }
+  return next.getTime();
 }
 
 function formatCountdown(ms) {
@@ -1742,39 +1750,78 @@ function formatCountdown(ms) {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
-	
-  function scheduleRefresh() {
-  const interval = currentStnRef?.refreshInterval ?? 30;
-  const next = getNextRefresh(interval);
-  nextRefresh = next;
+function setBadgeWaitingState(isWaiting) {
+  const badge = document.getElementById('refresh-badge');
+  if (!badge) return;
+  badge.classList.toggle('waiting', isWaiting);
+}
+
+function scheduleRefresh() {
+  nextRefresh = getNextHalfHourBoundary();
   timerRunning = true;
+  waitingForFreshData = false;
+  setBadgeWaitingState(false);
   tickCountdown();
 }
 
-async function tickCountdown() {
-    if (!timerRunning || !currentStnRef) return;
-
-    const label = document.getElementById('countdown-label');
-    if (!label) return;
-
-    const rem = Math.max(0, Math.floor((nextRefresh - Date.now()) / 1000));
-
-    if (rem <= 0) {
-        label.textContent = 'Aggiornamento...';
-        try {
-            if (currentStnRef) await loadStation(currentStnRef, true);
-        } catch (e) {
-            console.error('Errore refresh automatico:', e);
-        }
-        const interval = currentStnRef?.refreshInterval ?? 30;
-        nextRefresh = getNextRefresh(interval);
-        setTimeout(tickCountdown, 1000);  // ← riavvia sempre il loop
-    } else {
-        label.textContent = formatCountdown(rem);
-        setTimeout(tickCountdown, 1000);
-    }
+function getLatestSensorTimestamp(sensors) {
+  return (sensors ?? [])
+    .flatMap(sensor => sensor.rows ?? [])
+    .map(row => row.dt)
+    .filter(Boolean)
+    .sort()
+    .at(-1) || null;
 }
 
+async function pollUntilFreshData(stn, previousTimestamp) {
+  while (timerRunning && currentStnRef?.id === stn.id) {
+    try {
+      const result = await loadStation(stn, { silent: true, waitForNewData: true, minTimestamp: previousTimestamp });
+      if (result?.ok && result.hasNewData) return true;
+    } catch (err) {
+      console.error('Errore polling dati ARPAV:', err);
+    }
+    await new Promise(resolve => setTimeout(resolve, 60 * 1000));
+  }
+  return false;
+}
+
+async function tickCountdown() {
+  if (!timerRunning || !currentStnRef) return;
+
+  const label = document.getElementById('countdown-label');
+  if (!label) return;
+
+  const rem = Math.max(0, Math.floor((nextRefresh - Date.now()) / 1000));
+
+  if (rem <= 0) {
+    if (!waitingForFreshData) {
+      waitingForFreshData = true;
+      setBadgeWaitingState(true);
+      label.textContent = 'In caricamento...';
+
+      const stn = currentStnRef;
+      const previousTimestamp = stationLastTimestamp[stn.id] || null;
+
+      try {
+        const hasFreshData = await pollUntilFreshData(stn, previousTimestamp);
+        if (hasFreshData && currentStnRef?.id === stn.id) {
+          scheduleRefresh();
+          return;
+        }
+      } catch (e) {
+        console.error('Errore refresh automatico:', e);
+      }
+    } else {
+      label.textContent = 'In caricamento...';
+    }
+    setTimeout(tickCountdown, 1000);
+    return;
+  }
+
+  label.textContent = formatCountdown(rem);
+  setTimeout(tickCountdown, 1000);
+}
 
 
 // ── NOTIFICHE PUSH ────────────────────────────────────────────────────────────
