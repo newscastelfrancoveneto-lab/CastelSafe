@@ -1209,37 +1209,53 @@ const PROXIES = [
 
 const xmlCache = {};
 
-async function fetchText(url) {
+async function fetchWithRetry(url, maxRetries = 3, delayMs = 2000) {
     const cacheKey = url.split('?')[0];
     const cached = xmlCache[cacheKey];
     if (cached && (Date.now() - cached.ts) < (29 * 60 * 1000)) return cached.data;
 
-    const urlCacheBust = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
-    let result = null;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        const urlCacheBust = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+        let result = null;
 
-    try {
-        const r = await fetch(url, { signal: AbortSignal.timeout(1500), cache: 'no-store' });
-        if (r.ok) result = decodeXml(await r.arrayBuffer());
-    } catch {}
+        // Fetch diretto
+        try {
+            const r = await fetch(url, { signal: AbortSignal.timeout(1500), cache: 'no-store' });
+            if (r.ok) result = decodeXml(await r.arrayBuffer());
+        } catch {}
 
-    if (!result) {
-        for (const px of PROXIES) {
-            try {
-                const r2 = await fetch(px + encodeURIComponent(urlCacheBust), {
-                    signal: AbortSignal.timeout(12000), cache: 'no-store'
-                });
-                if (r2.ok) {
-                    result = decodeXml(await r2.arrayBuffer());
-                    if (result) break;
-                }
-            } catch {}
+        // Proxy in sequenza
+        if (!result) {
+            for (const px of PROXIES) {
+                try {
+                    const r2 = await fetch(px + encodeURIComponent(urlCacheBust), {
+                        signal: AbortSignal.timeout(12000), cache: 'no-store'
+                    });
+                    if (r2.ok) {
+                        result = decodeXml(await r2.arrayBuffer());
+                        if (result) break;
+                    }
+                } catch {}
+            }
+        }
+
+        if (result) {
+            xmlCache[cacheKey] = { ts: Date.now(), data: result };
+            return result;
+        }
+
+        // Se non è l'ultimo tentativo, aspetta prima di riprovare
+        if (attempt < maxRetries) {
+            console.warn(`[fetchWithRetry] Tentativo ${attempt}/${maxRetries} fallito, riprovo tra ${delayMs}ms...`);
+            await new Promise(res => setTimeout(res, delayMs));
         }
     }
 
-    if (!result) throw new Error('Impossibile caricare i dati ARPAV');
+    throw new Error(`Impossibile caricare i dati ARPAV dopo ${maxRetries} tentativi`);
+}
 
-    xmlCache[cacheKey] = { ts: Date.now(), data: result };
-    return result;
+async function fetchText(url) {
+    return fetchWithRetry(url);
 }
 
 
