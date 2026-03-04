@@ -1164,7 +1164,7 @@ async function initMarkers() {
   loadWaterways();
   loadCPA();
 
-  await Promise.all(STATIONS.map(loadOSMNode));
+  //await Promise.all(STATIONS.map(loadOSMNode));
   STATIONS.forEach(stn => {
     const m = L.marker([stn.lat, stn.lon], { icon: buildIcon(stn, false) }).addTo(map)
       .bindTooltip(
@@ -1205,12 +1205,8 @@ async function fetchText(url) {
     if (r.ok) return decodeXml(await r.arrayBuffer());
   } catch {}
   
-  const proxies = [
-    'https://corsproxy.io/?',
-    'https://api.allorigins.win/raw?url=',
-    'https://api.codetabs.com/v1/proxy?quest=',
-    'https://thingproxy.freeboard.io/fetch/'
-  ];
+  const proxies = ['https://api.allorigins.win/raw?url='];
+
   for (const px of proxies) {
     try {
       const r2 = await fetch(px + encodeURIComponent(urlCacheBust), { // ← usa URL con timestamp
