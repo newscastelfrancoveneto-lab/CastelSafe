@@ -668,6 +668,7 @@ function openPanel() {
 }
 
 function closePanel() {
+  timerRunning = false;
   const p = document.getElementById('panel');
   showBadge(false);
   p.classList.add('hidden-desktop');
@@ -1200,28 +1201,38 @@ function decodeXml(buf) {
   return text;
 }
 
-async function fetchText(url) {
-  // URL con cache-busting per i proxy
-  const urlCacheBust = url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now();
-  
-  try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(5000), cache: 'no-store' });
-    if (r.ok) return decodeXml(await r.arrayBuffer());
-  } catch {}
-  
-  const proxies = ['https://api.allorigins.win/raw?url='];
+const xmlCache = {};
 
-  for (const px of proxies) {
-    try {
-      const r2 = await fetch(px + encodeURIComponent(urlCacheBust), { // ← usa URL con timestamp
-        signal: AbortSignal.timeout(10000),
-        cache: 'no-store'  // ← anche questo
-      });
-      if (r2.ok) return decodeXml(await r2.arrayBuffer());
-    } catch {}
-  }
-  throw new Error('Failed to fetch');
+async function fetchText(url) {
+    const cacheKey = url.split('?')[0];
+    const cached = xmlCache[cacheKey];
+    if (cached && (Date.now() - cached.ts) < (29 * 60 * 1000)) return cached.data;
+
+    const urlCacheBust = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+
+    const directFetch = fetch(url, { signal: AbortSignal.timeout(1500), cache: 'no-store' })
+        .then(r => r.ok ? r.arrayBuffer() : Promise.reject())
+        .then(buf => decodeXml(buf));
+
+    const proxyFetch = (async () => {
+        for (const px of proxies) {
+            try {
+                const r2 = await fetch(px + encodeURIComponent(urlCacheBust), {
+                    signal: AbortSignal.timeout(10000), cache: 'no-store'
+                });
+                if (r2.ok) return decodeXml(await r2.arrayBuffer());
+            } catch {}
+        }
+        throw new Error('Failed to fetch');
+    })();
+
+    // ✅ await del risultato, poi salva in cache, poi restituisce
+    const result = await Promise.any([directFetch, proxyFetch]);
+    xmlCache[cacheKey] = { ts: Date.now(), data: result };
+    return result;
 }
+
+
 
 
 function scheduleStaleRetry(stn, sensors) {
@@ -1619,6 +1630,7 @@ function formatCountdown(ms) {
   const interval = currentStnRef?.refreshInterval ?? 30;
   const next = getNextRefresh(interval);
   nextRefresh = next;
+  timerRunning = true;
   tickCountdown();
 }
 
