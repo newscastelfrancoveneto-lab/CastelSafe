@@ -646,6 +646,8 @@ let activeChart = null, currentId = null, currentSensors = [];
 let currentStnRef = null, nextRefresh = null;
 let timerRunning = false;
 let waitingForFreshData = false;
+let globalRefreshInProgress = false;
+let lastHalfHourRefresh = null;
 const stationLastTimestamp = {};
 const stationRefreshState = {};
 const markerRefs = {};
@@ -1397,12 +1399,14 @@ function scheduleStaleRetry(stn, sensors) {
 async function loadStation(stn, options = false) {
   const opts = typeof options === 'boolean' ? { silent: options } : (options || {});
   const silent = !!opts.silent;
-  currentId = stn.id;
-  currentStnRef = stn;
-  setActiveMarker(stn.id);
-  document.getElementById('panel-title').textContent = stn.name;
-  document.getElementById('panel-subtitle').textContent = `${stn.subtitle} — Staz. ${stn.id}`;
-  showBadge(true);
+  if (!opts.background) {
+    currentId = stn.id;
+    currentStnRef = stn;
+    setActiveMarker(stn.id);
+    document.getElementById('panel-title').textContent = stn.name;
+    document.getElementById('panel-subtitle').textContent = `${stn.subtitle} — Staz. ${stn.id}`;
+    showBadge(true);
+  }
   if (!silent) {
     document.getElementById('sensor-tabs').style.display = 'none';
     document.getElementById('panel-body').innerHTML = '<div class="loading"><div class="spinner"></div>Recupero dati ARPAV...</div>';
@@ -1415,14 +1419,14 @@ async function loadStation(stn, options = false) {
     if (sensors?.length > 0) {
       const latestTs = getLatestSensorTimestamp(sensors);
       const refreshState = getStationRefreshState(stn.id);
-      const hasNewData = !opts.waitForNewData || !opts.minTimestamp || (latestTs && latestTs > opts.minTimestamp);
-      if (refreshState?.waiting && latestTs && latestTs > (refreshState.baselineTimestamp || '')) {
+      const hasNewData = !opts.waitForNewData || !opts.minTimestamp || (latestTs && latestTs >= opts.minTimestamp);
+      if (refreshState?.waiting && latestTs && latestTs >= (refreshState.baselineTimestamp || '')) {
         setStationRefreshState(stn.id, { waiting: false, baselineTimestamp: null });
       }
       if (hasNewData) {
         currentSensors = sensors;
         stationLastTimestamp[stn.id] = latestTs;
-        renderTabs(stn, sensors);
+        if (!opts.background || currentStnRef?.id === stn.id) renderTabs(stn, sensors);
       }
       if (silent && !opts.waitForNewData) scheduleStaleRetry(stn, sensors);
       return { ok: true, hasNewData, latestTs };
@@ -1435,14 +1439,14 @@ async function loadStation(stn, options = false) {
       const fallbackSensors = [{ type: 'LIVIDRO', paramnm: 'Livello idrometrico', unitnm: 'm', rows }];
       const latestTs = getLatestSensorTimestamp(fallbackSensors);
       const refreshState = getStationRefreshState(stn.id);
-      const hasNewData = !opts.waitForNewData || !opts.minTimestamp || (latestTs && latestTs > opts.minTimestamp);
-      if (refreshState?.waiting && latestTs && latestTs > (refreshState.baselineTimestamp || '')) {
+      const hasNewData = !opts.waitForNewData || !opts.minTimestamp || (latestTs && latestTs >= opts.minTimestamp);
+      if (refreshState?.waiting && latestTs && latestTs >= (refreshState.baselineTimestamp || '')) {
         setStationRefreshState(stn.id, { waiting: false, baselineTimestamp: null });
       }
       if (hasNewData) {
         currentSensors = fallbackSensors;
         stationLastTimestamp[stn.id] = latestTs;
-        renderTabs(stn, currentSensors);
+        if (!opts.background || currentStnRef?.id === stn.id) renderTabs(stn, currentSensors);
       }
       return { ok: true, hasNewData, latestTs };
     }
@@ -1772,6 +1776,23 @@ function formatCountdown(ms) {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
+function toArpavTimestamp(ts) {
+  const d = new Date(ts);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  return `${yyyy}${mm}${dd}${hh}${mi}`;
+}
+
+function getCurrentHalfHourBoundary(ts = Date.now()) {
+  const d = new Date(ts);
+  d.setSeconds(0, 0);
+  d.setMinutes(d.getMinutes() < 30 ? 0 : 30);
+  return d.getTime();
+}
+
 function setBadgeWaitingState(isWaiting) {
   const badge = document.getElementById('refresh-badge');
   if (!badge) return;
@@ -1813,19 +1834,6 @@ function getLatestSensorTimestamp(sensors) {
     .at(-1) || null;
 }
 
-async function pollUntilFreshData(stn, previousTimestamp) {
-  while (timerRunning && currentStnRef?.id === stn.id) {
-    try {
-      const result = await loadStation(stn, { silent: true, waitForNewData: true, minTimestamp: previousTimestamp });
-      if (result?.ok && result.hasNewData) return true;
-    } catch (err) {
-      console.error('Errore polling dati ARPAV:', err);
-    }
-    await new Promise(resolve => setTimeout(resolve, 60 * 1000));
-  }
-  return false;
-}
-
 async function tickCountdown() {
   if (!timerRunning || !currentStnRef) return;
 
@@ -1833,6 +1841,20 @@ async function tickCountdown() {
   if (!label) return;
 
   const rem = Math.max(0, Math.floor((nextRefresh - Date.now()) / 1000));
+  const refreshState = getStationRefreshState(currentStnRef.id);
+
+  if (refreshState?.waiting) {
+    waitingForFreshData = true;
+    setBadgeWaitingState(true);
+    label.textContent = 'In aggiornamento...';
+    setTimeout(tickCountdown, 1000);
+    return;
+  }
+
+  if (waitingForFreshData && !refreshState?.waiting) {
+    scheduleRefresh();
+    return;
+  }
 
   if (rem <= 0) {
     if (!waitingForFreshData) {
@@ -1841,22 +1863,13 @@ async function tickCountdown() {
       label.textContent = 'In aggiornamento...';
 
       const stn = currentStnRef;
-      const previousTimestamp = stationLastTimestamp[stn.id] || null;
+      const boundaryTimestamp = toArpavTimestamp(nextRefresh);
       setStationRefreshState(stn.id, {
         waiting: true,
         nextRefresh,
-        baselineTimestamp: previousTimestamp
+        baselineTimestamp: boundaryTimestamp
       });
-
-      try {
-        const hasFreshData = await pollUntilFreshData(stn, previousTimestamp);
-        if (hasFreshData && currentStnRef?.id === stn.id) {
-          scheduleRefresh();
-          return;
-        }
-      } catch (e) {
-        console.error('Errore refresh automatico:', e);
-      }
+      triggerGlobalHalfHourRefresh(nextRefresh);
     } else {
       label.textContent = 'In aggiornamento...';
     }
@@ -1866,6 +1879,55 @@ async function tickCountdown() {
 
   label.textContent = formatCountdown(rem);
   setTimeout(tickCountdown, 1000);
+}
+
+async function triggerGlobalHalfHourRefresh(boundaryTs) {
+  if (globalRefreshInProgress) return;
+  globalRefreshInProgress = true;
+
+  const boundaryTimestamp = toArpavTimestamp(boundaryTs);
+  STATIONS.forEach(stn => {
+    setStationRefreshState(stn.id, {
+      waiting: true,
+      nextRefresh: boundaryTs,
+      baselineTimestamp: boundaryTimestamp
+    });
+  });
+
+  try {
+    while (true) {
+      const results = await Promise.all(STATIONS.map(async stn => {
+        const state = getStationRefreshState(stn.id);
+        if (!state?.waiting) return true;
+        const res = await loadStation(stn, {
+          silent: true,
+          background: true,
+          waitForNewData: true,
+          minTimestamp: state.baselineTimestamp
+        });
+        return !!(res?.ok && res.hasNewData);
+      }));
+      if (results.every(Boolean)) break;
+      await new Promise(resolve => setTimeout(resolve, 60 * 1000));
+    }
+  } catch (e) {
+    console.error('Errore refresh globale ARPAV:', e);
+  } finally {
+    globalRefreshInProgress = false;
+  }
+}
+
+function initGlobalRefreshScheduler() {
+  setInterval(() => {
+    const boundary = getCurrentHalfHourBoundary();
+    if (lastHalfHourRefresh === boundary) return;
+
+    const ageMs = Date.now() - boundary;
+    if (ageMs >= 0 && ageMs < (31 * 60 * 1000)) {
+      lastHalfHourRefresh = boundary;
+      triggerGlobalHalfHourRefresh(boundary);
+    }
+  }, 15000);
 }
 
 
@@ -1929,7 +1991,7 @@ async function subscribeUser() {
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 initMarkers();
-scheduleRefresh();
+initGlobalRefreshScheduler();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
