@@ -849,31 +849,6 @@ const OVERPASS_ENDPOINTS = [
 ];
 
 async function overpassFetch(query) {
-    let lastError = null;
-
-    for (const endpoint of OVERPASS_ENDPOINTS) {
-      try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: 'data=' + encodeURIComponent(query),
-          signal: AbortSignal.timeout(30000)
-        });
-
-        if (!response.ok) {
-          const errorBody = await response.text();
-          throw new Error(`Overpass ${response.status} @ ${endpoint}: ${errorBody}`);
-        }
-
-        return await response.json();
-      } catch (error) {
-        lastError = error;
-        console.warn('Endpoint Overpass non disponibile, provo il successivo:', endpoint, error);
-      }
-    }
-
-    console.error("Errore fetch OSM su tutti gli endpoint:", lastError);
-    throw lastError;
   let lastError = null;
 
   for (const endpoint of OVERPASS_ENDPOINTS) {
@@ -981,7 +956,7 @@ out geom;`;
                 tags['emergency'] === 'staging_area' ||
                 tags['emergency:waiting_area'] === 'yes' ||
                 tags['emergency:camp_area'] === 'yes' ||
-                tags['emergency:staging_area'] === 'rescue'
+                tags['emergency:staging_area'] === 'rescue' ||
                 !!tags['emergency:staging_area']
             ) {
                 cpaFeatures.features.push(f);
