@@ -858,19 +858,22 @@ async function loadOSMData() {
     
 
     // Query unificata: waterways + aree PC in un solo request
-    const query = `
-        (
-          way[waterway~"river|stream|canal|drain|ditch"](rel:45549);
-          relation[waterway~"river|stream|canal|drain|ditch"](rel:45549);
-          way[emergency=waiting_area](rel:45549);
-          relation[emergency=waiting_area](rel:45549);
-          way["emergency"="camp_area"](rel:45549);
-          relation["emergency"="camp_area"](rel:45549);
-          way[emergency=staging_area][rescue=yes](rel:45549);
-          relation[emergency=staging_area][rescue=yes](rel:45549);
-        );
-        out geom;
-    `;
+const query = `[out:json][timeout:25];
+bbox${CVBBOX.s},${CVBBOX.w},${CVBBOX.n},${CVBBOX.e};
+(
+  way["waterway"~"river|stream|canal|drain|ditch"](rel:45549);
+  relation["waterway"~"river|stream|canal|drain|ditch"](rel:45549);
+  way["emergency"="waiting_area"](rel:45549);
+  relation["emergency"="waiting_area"](rel:45549);
+  way["emergency"="camp_area"](rel:45549);
+  relation["emergency"="camp_area"](rel:45549);
+  way["emergency"="staging_area"](rel:45549);
+  way["emergency"="staging_area"]["rescue"="yes"](rel:45549);
+  relation["emergency"="staging_area"](rel:45549);
+  relation["emergency"="staging_area"]["rescue"="yes"](rel:45549);
+);
+out geom;`;
+
 
     try {
         const data = await overpassFetch(query);
