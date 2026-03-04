@@ -857,20 +857,19 @@ async function loadOSMData() {
     if (cachedC) renderCPAGeoJSON(cachedC);
     if (cachedW && cachedC) return;
 
-    const { s, w, n, e } = CVBBOX;
+    
 
     // Query unificata: waterways + aree PC in un solo request
     const query = `
-        [out:json][timeout:25][bbox:${s},${w},${n},${e}];
         (
-          way[waterway~"river|stream|canal|drain|ditch"];
-          relation[waterway~"river|stream|canal|drain|ditch"];
-          way[emergency=waiting_area];
-          relation[emergency=waiting_area];
-          way["emergency"="camp_area"];
-          relation["emergency"="camp_area"];
-          way[emergency=staging_area][rescue=yes];
-          relation[emergency=staging_area][rescue=yes];
+          way[waterway~"river|stream|canal|drain|ditch"](rel:45549);
+          relation[waterway~"river|stream|canal|drain|ditch"](rel:45549);
+          way[emergency=waiting_area](rel:45549);
+          relation[emergency=waiting_area](rel:45549);
+          way["emergency"="camp_area"](rel:45549);
+          relation["emergency"="camp_area"](rel:45549);
+          way[emergency=staging_area][rescue=yes](rel:45549);
+          relation[emergency=staging_area][rescue=yes](rel:45549);
         );
         out geom;
     `;
