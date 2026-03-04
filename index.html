@@ -841,10 +841,11 @@ function renderWaterwayGeoJSON(geojson) {
 }
 
 // Endpoints Overpass di fallback
+// Endpoints Overpass con fallback sequenziale
 const OVERPASS_ENDPOINTS = [
-    'https://overpass-api.de/api/interpreter',
-    'https://overpass.kumi.systems/api/interpreter',
-    'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
 ];
 
 async function overpassFetch(query) {
@@ -873,10 +874,58 @@ async function overpassFetch(query) {
 
     console.error("Errore fetch OSM su tutti gli endpoint:", lastError);
     throw lastError;
+  let lastError = null;
+
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        body: new URLSearchParams({ data: query }).toString(),
+        signal: AbortSignal.timeout(30000)
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`${endpoint} -> HTTP ${response.status}: ${errorBody.slice(0, 180)}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      lastError = error;
+      console.warn('Endpoint Overpass non disponibile:', endpoint, error);
+    }
+  }
+
+  throw lastError || new Error('Nessun endpoint Overpass disponibile');
 }
 
 
-	const CVBBOX = { s: 45.6230, w: 11.8730, n: 45.7020, e: 12.0020 };
+const CVBBOX = { s: 45.6230, w: 11.8730, n: 45.7020, e: 12.0020 };
+
+function buildOverpassQuery(useArea = true) {
+  const selector = useArea
+    ? 'area(3600045549)->.searchArea;'
+    : `[bbox:${CVBBOX.s},${CVBBOX.w},${CVBBOX.n},${CVBBOX.e}];`;
+
+  const areaFilter = useArea ? '(area.searchArea)' : '';
+
+  return `[out:json][timeout:30];
+${selector}
+(
+  way["waterway"~"^(river|stream|canal|drain|ditch)$"]${areaFilter};
+  relation["waterway"~"^(river|stream|canal|drain|ditch)$"]${areaFilter};
+  way["emergency"~"^(waiting_area|camp_area|staging_area)$"]${areaFilter};
+  relation["emergency"~"^(waiting_area|camp_area|staging_area)$"]${areaFilter};
+  way["emergency:waiting_area"="yes"]${areaFilter};
+  way["emergency:camp_area"="yes"]${areaFilter};
+  way["emergency:staging_area"]${areaFilter};
+  relation["emergency:waiting_area"="yes"]${areaFilter};
+  relation["emergency:camp_area"="yes"]${areaFilter};
+  relation["emergency:staging_area"]${areaFilter};
+);
+out geom;`;
+}
 
 async function loadOSMData(forceRefresh = false) {
     // Cache: se entrambi validi, renderizza e torna subito
@@ -907,7 +956,14 @@ out geom;`;
 
 
     try {
-        const data = await overpassFetch(query);
+        let data;
+        try {
+            data = await overpassFetch(buildOverpassQuery(true));
+        } catch (areaErr) {
+            console.warn('Query OSM su area non riuscita, uso fallback bbox:', areaErr);
+            data = await overpassFetch(buildOverpassQuery(false));
+        }
+
         const geojson = osmtogeojson(data);
 
         // Separa waterways da aree PC e renderizza man mano
@@ -926,6 +982,7 @@ out geom;`;
                 tags['emergency:waiting_area'] === 'yes' ||
                 tags['emergency:camp_area'] === 'yes' ||
                 tags['emergency:staging_area'] === 'rescue'
+                !!tags['emergency:staging_area']
             ) {
                 cpaFeatures.features.push(f);
             }
