@@ -953,10 +953,11 @@ out geom;`;
     try {
         let data;
         try {
-            data = await overpassFetch(buildOverpassQuery(true));
-        } catch (areaErr) {
-            console.warn('Query OSM su area non riuscita, uso fallback bbox:', areaErr);
+            // BBOX come primo tentativo: in genere più rapido nel primo caricamento.
             data = await overpassFetch(buildOverpassQuery(false));
+        } catch (bboxErr) {
+            console.warn('Query OSM su bbox non riuscita, uso fallback area:', bboxErr);
+            data = await overpassFetch(buildOverpassQuery(true));
         }
 
         const geojson = osmtogeojson(data);
@@ -989,6 +990,37 @@ out geom;`;
     } catch (e) {
         console.error('Errore caricamento dati OSM:', e);
     }
+}
+
+let osmRefreshBtnRef = null;
+let osmRefreshIconRef = null;
+
+function setOSMRefreshLoading(isLoading) {
+  if (!osmRefreshBtnRef || !osmRefreshIconRef) return;
+  osmRefreshIconRef.classList.toggle('refresh-spinning', isLoading);
+  osmRefreshBtnRef.disabled = isLoading;
+  osmRefreshBtnRef.style.opacity = isLoading ? '0.5' : '1';
+}
+
+async function triggerOSMRefresh({ forceRefresh = false, animate = false } = {}) {
+  if (osmRefreshBtnRef?.disabled) return;
+
+  if (animate) setOSMRefreshLoading(true);
+
+  if (forceRefresh) {
+    localStorage.removeItem('osmcache_waterways'); // legacy cache key
+    localStorage.removeItem('osmcache_cpa'); // legacy cache key
+    localStorage.removeItem(osmCacheKey('waterways'));
+    localStorage.removeItem(osmCacheKey('cpa'));
+  }
+
+  try {
+    await loadOSMData(forceRefresh);
+  } catch (err) {
+    console.error("Errore durante l'aggiornamento dei dati:", err);
+  } finally {
+    if (animate) setOSMRefreshLoading(false);
+  }
 }
 
 
@@ -1171,6 +1203,8 @@ const LayerSwitcher = L.Control.extend({
     const menuBtn = container.querySelector('.toggle-menu-btn');
     const refreshBtn = container.querySelector('#refresh-osm-btn');
     const refreshIcon = container.querySelector('#refresh-icon');
+    osmRefreshBtnRef = refreshBtn;
+    osmRefreshIconRef = refreshIcon;
     const menu = container.querySelector('.layer-control-menu');
 
     // Gestione Apertura Menu
@@ -1183,32 +1217,7 @@ const LayerSwitcher = L.Control.extend({
 	// Gestione Refresh con Animazione e blocco click multipli
 	refreshBtn.addEventListener('click', async (e) => {
 	  e.preventDefault();
-	  
-	  // Se sta già caricando (pulsante disabilitato), ignora il click
-	  if (refreshBtn.disabled) return;
-
-	  // 1. Avvia rotazione e disabilita il pulsante
-	  refreshIcon.classList.add('refresh-spinning');
-	  refreshBtn.disabled = true;
-	  refreshBtn.style.opacity = '0.5'; // Opzionale: feedback visivo aggiuntivo
-	  
-	  // Invalida la cache OSM per forzare ricaricamento fresco
-  localStorage.removeItem('osmcache_waterways'); // legacy cache key
-  localStorage.removeItem('osmcache_cpa'); // legacy cache key
-  localStorage.removeItem(osmCacheKey('waterways'));
-  localStorage.removeItem(osmCacheKey('cpa'));
-
-  try {
-		// 2. Esegue il caricamento dei dati e attende che ENTRAMBI finiscano
-		await loadOSMData(true);
-	  } catch (err) {
-		console.error("Errore durante l'aggiornamento dei dati:", err);
-	  } finally {
-		// 3. Ferma l'animazione e ripristina il pulsante SOLO a dati caricati (o in caso di errore)
-		refreshIcon.classList.remove('refresh-spinning');
-		refreshBtn.disabled = false;
-		refreshBtn.style.opacity = '1';
-	  }
+	  await triggerOSMRefresh({ forceRefresh: true, animate: true });
 });
 
 
@@ -1285,7 +1294,8 @@ async function initMarkers() {
         L.geoJSON(arr[0].geojson, { style: { color: 'var(--primary)', weight: 2, fillOpacity: .03, fillColor: 'var(--primary)', dashArray: '6 6' } }).addTo(map);
     }).catch(() => {});
 
-  loadOSMData(true);
+  // Caricamento automatico: animazione come refresh utente + uso cache per carichi successivi.
+  triggerOSMRefresh({ forceRefresh: false, animate: true });
 
   //await Promise.all(STATIONS.map(loadOSMNode));
   STATIONS.forEach(stn => {
@@ -1846,7 +1856,7 @@ async function tickCountdown() {
   if (refreshState?.waiting) {
     waitingForFreshData = true;
     setBadgeWaitingState(true);
-    label.textContent = 'In aggiornamento...';
+    label.textContent = 'In corso...';
     setTimeout(tickCountdown, 1000);
     return;
   }
@@ -1860,7 +1870,7 @@ async function tickCountdown() {
     if (!waitingForFreshData) {
       waitingForFreshData = true;
       setBadgeWaitingState(true);
-      label.textContent = 'In aggiornamento...';
+      label.textContent = 'In corso...';
 
       const stn = currentStnRef;
       const boundaryTimestamp = toArpavTimestamp(nextRefresh);
@@ -1871,7 +1881,7 @@ async function tickCountdown() {
       });
       triggerGlobalHalfHourRefresh(nextRefresh);
     } else {
-      label.textContent = 'In aggiornamento...';
+      label.textContent = 'In corso...';
     }
     setTimeout(tickCountdown, 1000);
     return;
