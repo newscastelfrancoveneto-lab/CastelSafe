@@ -1590,13 +1590,19 @@ function getNextHalfHour() {
 }
 
 function getNextRefresh(intervalMin) {
-  const intMs  = intervalMin * 60 * 1000;
-  const margin = 30 * 1000; // 30 secondi
-  const now    = Date.now();
-  const prev   = Math.floor(now / intMs) * intMs;
-  const candidate = prev + margin;
-  return candidate > now ? candidate : prev + intMs + margin;
+    const intMs = intervalMin * 60 * 1000;
+    const now = Date.now();
+    // Slot tondo precedente (es. 09:30, 09:40 per interval=10)
+    const prevSlot = Math.floor(now / intMs) * intMs;
+    const candidate = prevSlot + 30 * 1000; // +30s margine
+    
+    if (candidate > now) {
+        return candidate;
+    }
+    // Slot successivo
+    return prevSlot + intMs + 30 * 1000;
 }
+
 
 
 function formatCountdown(ms) { if (ms <= 0) return 'agg...'; const s = Math.floor(ms/1000); return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
