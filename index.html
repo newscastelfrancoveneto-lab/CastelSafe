@@ -869,30 +869,33 @@ const OVERPASS_ENDPOINTS = [
 ];
 
 async function overpassFetch(query) {
-  let lastError = null;
+  const controllers = [];
+  try {
+    const requests = OVERPASS_ENDPOINTS.map(endpoint => {
+      const controller = new AbortController();
+      controllers.push(controller);
 
-  for (const endpoint of OVERPASS_ENDPOINTS) {
-    try {
-      const response = await fetch(endpoint, {
+      return fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
         body: new URLSearchParams({ data: query }).toString(),
-        signal: AbortSignal.timeout(30000)
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12000)])
+      }).then(async response => {
+        if (!response.ok) {
+          const errorBody = await response.text();
+          throw new Error(`${endpoint} -> HTTP ${response.status}: ${errorBody.slice(0, 180)}`);
+        }
+        return response.json();
       });
+    });
 
-      if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`${endpoint} -> HTTP ${response.status}: ${errorBody.slice(0, 180)}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      lastError = error;
-      console.warn('Endpoint Overpass non disponibile:', endpoint, error);
-    }
+    const winner = await Promise.any(requests);
+    return winner;
+  } catch (error) {
+    throw error;
+  } finally {
+    controllers.forEach(c => c.abort());
   }
-
-  throw lastError || new Error('Nessun endpoint Overpass disponibile');
 }
 
 
@@ -929,26 +932,6 @@ async function loadOSMData(forceRefresh = false) {
     if (cachedW) renderWaterwayGeoJSON(cachedW);
     if (cachedC) renderCPAGeoJSON(cachedC);
     if (cachedW && cachedC) return;
-
-    
-
-
-    // Query unificata: waterways + aree PC in un solo request
-const query = `[out:json][timeout:25][bbox:${CVBBOX.s},${CVBBOX.w},${CVBBOX.n},${CVBBOX.e}];
-(
-  way["waterway"~"river|stream|canal|drain|ditch"];
-  relation["waterway"~"river|stream|canal|drain|ditch"];
-  way["emergency"~"waiting_area|camp_area|staging_area"];
-  relation["emergency"~"waiting_area|camp_area|staging_area"];
-  way["emergency:waiting_area"="yes"];
-  relation["emergency:waiting_area"="yes"];
-  way["emergency:camp_area"="yes"];
-  relation["emergency:camp_area"="yes"];
-  way["emergency:staging_area"="rescue"];
-  relation["emergency:staging_area"="rescue"];
-);
-out geom;`;
-
 
     try {
         let data;
@@ -1337,10 +1320,25 @@ const PROXIES = [
 
 const xmlCache = {};
 
-async function fetchText(url, maxRetries = 3, delayMs = 2000) {
+function normalizeArpavTimestamp(ts) {
+  if (!ts) return null;
+  const digits = String(ts).replace(/\D/g, '');
+  if (digits.length < 12) return null;
+  return digits.slice(0, 12);
+}
+
+function isTimestampAtLeast(lhs, rhs) {
+  const left = normalizeArpavTimestamp(lhs);
+  const right = normalizeArpavTimestamp(rhs);
+  if (!left || !right) return false;
+  return left >= right;
+}
+
+async function fetchText(url, maxRetries = 3, delayMs = 2000, options = {}) {
+    const { bypassCache = false } = options;
     const cacheKey = url.split('?')[0];
     const cached = xmlCache[cacheKey];
-    if (cached && (Date.now() - cached.ts) < (29 * 60 * 1000)) return cached.data;
+    if (!bypassCache && cached && (Date.now() - cached.ts) < (29 * 60 * 1000)) return cached.data;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         const urlCacheBust = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
@@ -1424,13 +1422,13 @@ async function loadStation(stn, options = false) {
   }
   try {
     const xmlUrl = stn.xmlUrl ?? XML_URL;
-    const xml = await fetchText(xmlUrl);
+    const xml = await fetchText(xmlUrl, 3, 2000, { bypassCache: opts.waitForNewData });
     const sensors = parseXML(xml, stn.id);
     if (sensors?.length > 0) {
       const latestTs = getLatestSensorTimestamp(sensors);
       const refreshState = getStationRefreshState(stn.id);
-      const hasNewData = !opts.waitForNewData || !opts.minTimestamp || (latestTs && latestTs >= opts.minTimestamp);
-      if (refreshState?.waiting && latestTs && latestTs >= (refreshState.baselineTimestamp || '')) {
+      const hasNewData = !opts.waitForNewData || !opts.minTimestamp || isTimestampAtLeast(latestTs, opts.minTimestamp);
+      if (refreshState?.waiting && isTimestampAtLeast(latestTs, refreshState.baselineTimestamp)) {
         setStationRefreshState(stn.id, { waiting: false, baselineTimestamp: null });
       }
       if (hasNewData) {
@@ -1443,14 +1441,14 @@ async function loadStation(stn, options = false) {
     }
   } catch (_) {}
   try {
-    const csv = await fetchText(`${CSV_BASE}${String(stn.id).padStart(4, '0')}.csv`);
+    const csv = await fetchText(`${CSV_BASE}${String(stn.id).padStart(4, '0')}.csv`, 3, 2000, { bypassCache: opts.waitForNewData });
     const rows = parseCSV(csv);
     if (rows?.length > 0) {
       const fallbackSensors = [{ type: 'LIVIDRO', paramnm: 'Livello idrometrico', unitnm: 'm', rows }];
       const latestTs = getLatestSensorTimestamp(fallbackSensors);
       const refreshState = getStationRefreshState(stn.id);
-      const hasNewData = !opts.waitForNewData || !opts.minTimestamp || (latestTs && latestTs >= opts.minTimestamp);
-      if (refreshState?.waiting && latestTs && latestTs >= (refreshState.baselineTimestamp || '')) {
+      const hasNewData = !opts.waitForNewData || !opts.minTimestamp || isTimestampAtLeast(latestTs, opts.minTimestamp);
+      if (refreshState?.waiting && isTimestampAtLeast(latestTs, refreshState.baselineTimestamp)) {
         setStationRefreshState(stn.id, { waiting: false, baselineTimestamp: null });
       }
       if (hasNewData) {
