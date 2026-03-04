@@ -647,10 +647,24 @@ let currentStnRef = null, nextRefresh = null;
 let timerRunning = false;
 let waitingForFreshData = false;
 const stationLastTimestamp = {};
+const stationRefreshState = {};
 const markerRefs = {};
 
 // ── PANNELLO UI ───────────────────────────────────────────────────────────────
 function showBadge(show) { document.getElementById('refresh-badge').classList.toggle('visible', show); }
+
+function getStationRefreshState(stationId) {
+  if (!stationId) return null;
+  return stationRefreshState[stationId] || null;
+}
+
+function setStationRefreshState(stationId, updates) {
+  if (!stationId) return;
+  stationRefreshState[stationId] = {
+    ...(stationRefreshState[stationId] || {}),
+    ...updates
+  };
+}
 
 function updatePanelTop() {
   const bar   = document.getElementById('allerta-bar');
@@ -667,7 +681,7 @@ function openPanel() {
     
     if (currentId != null) {
         showBadge(true);
-        scheduleRefresh();  
+        resumeRefreshState();
     }
     setTimeout(() => map.invalidateSize(), 350);
 }
@@ -1400,7 +1414,11 @@ async function loadStation(stn, options = false) {
     const sensors = parseXML(xml, stn.id);
     if (sensors?.length > 0) {
       const latestTs = getLatestSensorTimestamp(sensors);
+      const refreshState = getStationRefreshState(stn.id);
       const hasNewData = !opts.waitForNewData || !opts.minTimestamp || (latestTs && latestTs > opts.minTimestamp);
+      if (refreshState?.waiting && latestTs && latestTs > (refreshState.baselineTimestamp || '')) {
+        setStationRefreshState(stn.id, { waiting: false, baselineTimestamp: null });
+      }
       if (hasNewData) {
         currentSensors = sensors;
         stationLastTimestamp[stn.id] = latestTs;
@@ -1416,7 +1434,11 @@ async function loadStation(stn, options = false) {
     if (rows?.length > 0) {
       const fallbackSensors = [{ type: 'LIVIDRO', paramnm: 'Livello idrometrico', unitnm: 'm', rows }];
       const latestTs = getLatestSensorTimestamp(fallbackSensors);
+      const refreshState = getStationRefreshState(stn.id);
       const hasNewData = !opts.waitForNewData || !opts.minTimestamp || (latestTs && latestTs > opts.minTimestamp);
+      if (refreshState?.waiting && latestTs && latestTs > (refreshState.baselineTimestamp || '')) {
+        setStationRefreshState(stn.id, { waiting: false, baselineTimestamp: null });
+      }
       if (hasNewData) {
         currentSensors = fallbackSensors;
         stationLastTimestamp[stn.id] = latestTs;
@@ -1757,11 +1779,29 @@ function setBadgeWaitingState(isWaiting) {
 }
 
 function scheduleRefresh() {
+  if (currentStnRef?.id) {
+    setStationRefreshState(currentStnRef.id, { waiting: false, baselineTimestamp: null });
+  }
   nextRefresh = getNextHalfHourBoundary();
   timerRunning = true;
   waitingForFreshData = false;
   setBadgeWaitingState(false);
   tickCountdown();
+}
+
+function resumeRefreshState() {
+  if (!currentStnRef?.id) return scheduleRefresh();
+
+  const state = getStationRefreshState(currentStnRef.id);
+  if (state?.waiting) {
+    timerRunning = true;
+    waitingForFreshData = true;
+    nextRefresh = state.nextRefresh || getNextHalfHourBoundary();
+    setBadgeWaitingState(true);
+    tickCountdown();
+    return;
+  }
+  scheduleRefresh();
 }
 
 function getLatestSensorTimestamp(sensors) {
@@ -1798,10 +1838,15 @@ async function tickCountdown() {
     if (!waitingForFreshData) {
       waitingForFreshData = true;
       setBadgeWaitingState(true);
-      label.textContent = 'In caricamento...';
+      label.textContent = 'In aggiornamento...';
 
       const stn = currentStnRef;
       const previousTimestamp = stationLastTimestamp[stn.id] || null;
+      setStationRefreshState(stn.id, {
+        waiting: true,
+        nextRefresh,
+        baselineTimestamp: previousTimestamp
+      });
 
       try {
         const hasFreshData = await pollUntilFreshData(stn, previousTimestamp);
@@ -1813,7 +1858,7 @@ async function tickCountdown() {
         console.error('Errore refresh automatico:', e);
       }
     } else {
-      label.textContent = 'In caricamento...';
+      label.textContent = 'In aggiornamento...';
     }
     setTimeout(tickCountdown, 1000);
     return;
