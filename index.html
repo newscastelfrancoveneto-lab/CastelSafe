@@ -1857,31 +1857,6 @@ function refreshVisibleStationTimerState() {
   scheduleRefresh();
 }
 
-function ensureStationBoundaryWaiting(stationId, latestTs) {
-  if (!stationId || !latestTs) return;
-  const boundaryTs = getCurrentHalfHourBoundary();
-  const boundaryStamp = toArpavTimestamp(boundaryTs);
-  if (isTimestampAtLeast(latestTs, boundaryStamp)) return;
-
-  const currentState = getStationRefreshState(stationId) || {};
-  const alreadyWaitingForBoundary = currentState.waiting
-    && currentState.nextRefresh === boundaryTs
-    && normalizeArpavTimestamp(currentState.baselineTimestamp) === normalizeArpavTimestamp(boundaryStamp);
-
-  if (!alreadyWaitingForBoundary) {
-    setStationRefreshState(stationId, {
-      waiting: true,
-      nextRefresh: boundaryTs,
-      baselineTimestamp: boundaryStamp
-    });
-    if (currentStnRef?.id === stationId) refreshVisibleStationTimerState();
-  }
-
-  if (!globalRefreshInProgress) {
-    triggerGlobalHalfHourRefresh(boundaryTs);
-  }
-}
-
 function resumeRefreshState() {
   if (!currentStnRef?.id) return scheduleRefresh();
 
