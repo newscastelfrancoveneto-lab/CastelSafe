@@ -834,23 +834,77 @@ function renderWaterwayGeoJSON(geojson) {
   });
 }
 
-async function loadWaterways() {
-  const cached = osmCacheGet('waterways');
-  if (cached) { renderWaterwayGeoJSON(cached); return; }
+// Endpoints Overpass multipli lanciati in parallelo
+const OVERPASS_ENDPOINTS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
+];
 
-  const { s, w, n, e } = CV_BBOX;
-  const query = `[out:json][timeout:25][bbox:${s},${w},${n},${e}];
-(way["waterway"~"^(river|stream|canal|drain|ditch)$"];
- relation["waterway"~"^(river|stream|canal|drain|ditch)$"];);
-out geom;`;
-  try {
-    const res   = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
-    const data  = await res.json();
-    const geojson = osmtogeojson(data);
-    osmCacheSet('waterways', geojson);
-    renderWaterwayGeoJSON(geojson);
-  } catch (e) { console.error("Errore corsi d'acqua:", e); }
+async function overpassFetch(query) {
+    const attempts = OVERPASS_ENDPOINTS.map(endpoint =>
+        fetch(endpoint, { method: 'POST', body: query, signal: AbortSignal.timeout(25000) })
+            .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+    );
+    return Promise.any(attempts);
 }
+
+async function loadOSMData() {
+    // Cache: se entrambi validi, renderizza e torna subito
+    const cachedW = osmCacheGet('waterways');
+    const cachedC = osmCacheGet('cpa');
+    if (cachedW) renderWaterwayGeoJSON(cachedW);
+    if (cachedC) renderCPAGeoJSON(cachedC);
+    if (cachedW && cachedC) return;
+
+    const { s, w, n, e } = CVBBOX;
+
+    // Query unificata: waterways + aree PC in un solo request
+    const query = `
+        [out:json][timeout:25][bbox:${s},${w},${n},${e}];
+        (
+          way[waterway~"river|stream|canal|drain|ditch"];
+          relation[waterway~"river|stream|canal|drain|ditch"];
+          way[emergency=waiting_area];
+          relation[emergency=waiting_area];
+          way["emergency"="camp_area"];
+          relation["emergency"="camp_area"];
+          way[emergency=staging_area][rescue=yes];
+          relation[emergency=staging_area][rescue=yes];
+        );
+        out geom;
+    `;
+
+    try {
+        const data = await overpassFetch(query);
+        const geojson = osmtogeojson(data);
+
+        // Separa waterways da aree PC e renderizza man mano
+        const waterwayTypes = new Set(['river','stream','canal','drain','ditch']);
+        const waterwayFeatures = { type: 'FeatureCollection', features: [] };
+        const cpaFeatures = { type: 'FeatureCollection', features: [] };
+
+        geojson.features.forEach(f => {
+            const tags = f.properties?.tags || f.properties || {};
+            if (tags.waterway && waterwayTypes.has(tags.waterway)) {
+                waterwayFeatures.features.push(f);
+            } else if (
+                tags['emergency'] === 'waiting_area' ||
+                tags['emergency'] === 'camp_area' ||
+                (tags['emergency'] === 'staging_area')
+            ) {
+                cpaFeatures.features.push(f);
+            }
+        });
+
+        if (!cachedW) { osmCacheSet('waterways', waterwayFeatures); renderWaterwayGeoJSON(waterwayFeatures); }
+        if (!cachedC) { osmCacheSet('cpa', cpaFeatures); renderCPAGeoJSON(cpaFeatures); }
+
+    } catch (e) {
+        console.error('Errore caricamento dati OSM:', e);
+    }
+}
+
 
 // ── AREE PROTEZIONE CIVILE ────────────────────────────────────────────────────
 const CPA_STYLES = {
@@ -880,30 +934,7 @@ function centroid(feature) {
   return `${lat.toFixed(6)},${lon.toFixed(6)}`;
 }
 
-async function loadCPA() {
-  const btn = document.getElementById('btn-load-cpa');
-  const cached = osmCacheGet('cpa');
-  if (cached) { renderCPAGeoJSON(cached); return; }
-  if (btn) btn.textContent = 'Caricamento...';
-  const { s, w, n, e } = CV_BBOX;
-  const query = `[out:json][timeout:15][bbox:${s},${w},${n},${e}];
-(way["emergency:waiting_area"="yes"];relation["emergency:waiting_area"="yes"];
- way["emergency:camp_area"="yes"];relation["emergency:camp_area"="yes"];
- way["emergency:staging_area"="rescue"];relation["emergency:staging_area"="rescue"];);
-out geom;`;
-  try {
-    const res   = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
-    const data  = await res.json();
-    const geojson = osmtogeojson(data);
-    osmCacheSet('cpa', geojson);
-    renderCPAGeoJSON(geojson);
 
-  } catch (e) {
-    console.error('Errore Overpass CPA:', e);
-  } finally {
-    if (btn) btn.textContent = 'Aggiorna Dati';
-  }
-}
 
 function renderCPAGeoJSON(geojson) {
   Object.values(cpaLayers).forEach(l => map.removeLayer(l));
@@ -1081,7 +1112,7 @@ const LayerSwitcher = L.Control.extend({
 
   try {
 		// 2. Esegue il caricamento dei dati e attende che ENTRAMBI finiscano
-		await Promise.all([loadWaterways(), loadCPA()]);
+		await loadOSMData();
 	  } catch (err) {
 		console.error("Errore durante l'aggiornamento dei dati:", err);
 	  } finally {
@@ -1166,8 +1197,7 @@ async function initMarkers() {
         L.geoJSON(arr[0].geojson, { style: { color: 'var(--primary)', weight: 2, fillOpacity: .03, fillColor: 'var(--primary)', dashArray: '6 6' } }).addTo(map);
     }).catch(() => {});
 
-  loadWaterways();
-  loadCPA();
+  loadOSMData();
 
   //await Promise.all(STATIONS.map(loadOSMNode));
   STATIONS.forEach(stn => {
