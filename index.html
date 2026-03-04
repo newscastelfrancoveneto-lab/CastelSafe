@@ -1438,8 +1438,9 @@ async function loadStation(stn, options = false) {
       const latestSignature = getLatestSensorSignature(sensors);
       const refreshState = getStationRefreshState(stn.id);
       const hasPayloadChanges = latestSignature !== stationLastSignature[stn.id];
-      const hasNewData = !opts.waitForNewData || !opts.minTimestamp || isTimestampAfter(latestTs, opts.minTimestamp) || hasPayloadChanges;
-      if (refreshState?.waiting && (isTimestampAfter(latestTs, refreshState.baselineTimestamp) || hasPayloadChanges)) {
+      const hasReachedTargetTimestamp = !opts.minTimestamp || isTimestampAtLeast(latestTs, opts.minTimestamp);
+      const hasNewData = opts.waitForNewData ? hasReachedTargetTimestamp : true;
+      if (refreshState?.waiting && isTimestampAtLeast(latestTs, refreshState.baselineTimestamp)) {
         setStationRefreshState(stn.id, { waiting: false, baselineTimestamp: null });
         if (currentStnRef?.id === stn.id) refreshVisibleStationTimerState();
       }
@@ -1448,7 +1449,10 @@ async function loadStation(stn, options = false) {
         stationLastTimestamp[stn.id] = latestTs;
         stationLastSignature[stn.id] = latestSignature;
         if (!opts.background || currentStnRef?.id === stn.id) renderTabs(stn, sensors);
+      } else if (!opts.waitForNewData && hasPayloadChanges) {
+        stationLastSignature[stn.id] = latestSignature;
       }
+      ensureStationBoundaryWaiting(stn.id, latestTs);
       if (silent && !opts.waitForNewData) scheduleStaleRetry(stn, sensors);
       return { ok: true, hasNewData, latestTs };
     }
@@ -1462,8 +1466,9 @@ async function loadStation(stn, options = false) {
       const latestSignature = getLatestSensorSignature(fallbackSensors);
       const refreshState = getStationRefreshState(stn.id);
       const hasPayloadChanges = latestSignature !== stationLastSignature[stn.id];
-      const hasNewData = !opts.waitForNewData || !opts.minTimestamp || isTimestampAfter(latestTs, opts.minTimestamp) || hasPayloadChanges;
-      if (refreshState?.waiting && (isTimestampAfter(latestTs, refreshState.baselineTimestamp) || hasPayloadChanges)) {
+      const hasReachedTargetTimestamp = !opts.minTimestamp || isTimestampAtLeast(latestTs, opts.minTimestamp);
+      const hasNewData = opts.waitForNewData ? hasReachedTargetTimestamp : true;
+      if (refreshState?.waiting && isTimestampAtLeast(latestTs, refreshState.baselineTimestamp)) {
         setStationRefreshState(stn.id, { waiting: false, baselineTimestamp: null });
         if (currentStnRef?.id === stn.id) refreshVisibleStationTimerState();
       }
@@ -1472,7 +1477,10 @@ async function loadStation(stn, options = false) {
         stationLastTimestamp[stn.id] = latestTs;
         stationLastSignature[stn.id] = latestSignature;
         if (!opts.background || currentStnRef?.id === stn.id) renderTabs(stn, currentSensors);
+      } else if (!opts.waitForNewData && hasPayloadChanges) {
+        stationLastSignature[stn.id] = latestSignature;
       }
+      ensureStationBoundaryWaiting(stn.id, latestTs);
       return { ok: true, hasNewData, latestTs };
     }
   } catch (e) { if (!silent) showError(e.message); return { ok: false, hasNewData: false }; }
@@ -1939,11 +1947,10 @@ async function triggerGlobalHalfHourRefresh(boundaryTs) {
   lastHalfHourRefresh = boundaryTs;
 
   STATIONS.forEach(stn => {
-    const knownLatest = stationLastTimestamp[stn.id] || null;
     setStationRefreshState(stn.id, {
       waiting: true,
       nextRefresh: boundaryTs,
-      baselineTimestamp: knownLatest || toArpavTimestamp(boundaryTs)
+      baselineTimestamp: toArpavTimestamp(boundaryTs)
     });
   });
 
