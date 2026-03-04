@@ -631,7 +631,8 @@ const TAB_LABELS = { LIVIDRO: 'Livello idro.', PRECCUM: 'Precipitazioni', PORTAT
 
 const CV_BBOX = { s: 45.6230, w: 11.8730, n: 45.7020, e: 12.0020 };
 
-const PROXY    = 'https://corsproxy.io/?';
+
+const PROXY = 'https://api.allorigins.win/raw?url=';
 const XML_URL  = 'https://www.arpa.veneto.it/api/risorse/data-meteo/xml/Ultime48ore.xml';
 const CSV_BASE = 'https://meteo.arpa.veneto.it/meteo/dati_meteo/xml/';
 const OSM_API  = 'https://api.openstreetmap.org/api/0.6/node/';
@@ -842,17 +843,30 @@ const OVERPASS_ENDPOINTS = [
 ];
 
 async function overpassFetch(query) {
+  // Puntiamo direttamente all'API ufficiale che supporta CORS nativamente
   const endpoint = 'https://overpass-api.de/api/interpreter';
   
-  return fetch(endpoint, {
-    method: 'POST', // Usando POST non abbiamo bisogno di proxy!
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: 'data=' + encodeURIComponent(query),
-    signal: AbortSignal.timeout(25000)
-  })
-  .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)));
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      // Passiamo la query nel corpo della richiesta
+      body: 'data=' + encodeURIComponent(query),
+      // Timeout di sicurezza
+      signal: AbortSignal.timeout(25000)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Errore API Overpass: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Errore durante il fetch OSM:", error);
+    throw error;
+  }
 }
 
 
