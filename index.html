@@ -1334,6 +1334,13 @@ function isTimestampAtLeast(lhs, rhs) {
   return left >= right;
 }
 
+function isTimestampAfter(lhs, rhs) {
+  const left = normalizeArpavTimestamp(lhs);
+  const right = normalizeArpavTimestamp(rhs);
+  if (!left || !right) return false;
+  return left > right;
+}
+
 async function fetchText(url, maxRetries = 3, delayMs = 2000, options = {}) {
     const { bypassCache = false } = options;
     const cacheKey = url.split('?')[0];
@@ -1427,8 +1434,8 @@ async function loadStation(stn, options = false) {
     if (sensors?.length > 0) {
       const latestTs = getLatestSensorTimestamp(sensors);
       const refreshState = getStationRefreshState(stn.id);
-      const hasNewData = !opts.waitForNewData || !opts.minTimestamp || isTimestampAtLeast(latestTs, opts.minTimestamp);
-      if (refreshState?.waiting && isTimestampAtLeast(latestTs, refreshState.baselineTimestamp)) {
+      const hasNewData = !opts.waitForNewData || !opts.minTimestamp || isTimestampAfter(latestTs, opts.minTimestamp);
+      if (refreshState?.waiting && isTimestampAfter(latestTs, refreshState.baselineTimestamp)) {
         setStationRefreshState(stn.id, { waiting: false, baselineTimestamp: null });
       }
       if (hasNewData) {
@@ -1447,8 +1454,8 @@ async function loadStation(stn, options = false) {
       const fallbackSensors = [{ type: 'LIVIDRO', paramnm: 'Livello idrometrico', unitnm: 'm', rows }];
       const latestTs = getLatestSensorTimestamp(fallbackSensors);
       const refreshState = getStationRefreshState(stn.id);
-      const hasNewData = !opts.waitForNewData || !opts.minTimestamp || isTimestampAtLeast(latestTs, opts.minTimestamp);
-      if (refreshState?.waiting && isTimestampAtLeast(latestTs, refreshState.baselineTimestamp)) {
+      const hasNewData = !opts.waitForNewData || !opts.minTimestamp || isTimestampAfter(latestTs, opts.minTimestamp);
+      if (refreshState?.waiting && isTimestampAfter(latestTs, refreshState.baselineTimestamp)) {
         setStationRefreshState(stn.id, { waiting: false, baselineTimestamp: null });
       }
       if (hasNewData) {
@@ -1871,11 +1878,11 @@ async function tickCountdown() {
       label.textContent = 'In corso...';
 
       const stn = currentStnRef;
-      const boundaryTimestamp = toArpavTimestamp(nextRefresh);
+      const baselineTimestamp = stationLastTimestamp[stn.id] || toArpavTimestamp(nextRefresh);
       setStationRefreshState(stn.id, {
         waiting: true,
         nextRefresh,
-        baselineTimestamp: boundaryTimestamp
+        baselineTimestamp
       });
       triggerGlobalHalfHourRefresh(nextRefresh);
     } else {
@@ -1893,12 +1900,12 @@ async function triggerGlobalHalfHourRefresh(boundaryTs) {
   if (globalRefreshInProgress) return;
   globalRefreshInProgress = true;
 
-  const boundaryTimestamp = toArpavTimestamp(boundaryTs);
   STATIONS.forEach(stn => {
+    const knownLatest = stationLastTimestamp[stn.id] || null;
     setStationRefreshState(stn.id, {
       waiting: true,
       nextRefresh: boundaryTs,
-      baselineTimestamp: boundaryTimestamp
+      baselineTimestamp: knownLatest || toArpavTimestamp(boundaryTs)
     });
   });
 
@@ -2018,12 +2025,28 @@ function allertaBgColor(idr, idro, temp) {
   return ALLERTA_COLORS[max] || '#64748b';
 }
 
+let lastAllertaSignature = null;
+
+function getAllertaSignature(data) {
+  return JSON.stringify({
+    idr: data?.idr || null,
+    idro: data?.idro || null,
+    temp: data?.temp || null,
+    periodo: data?.periodo || null,
+    meteo: data?.meteo || null,
+    suolo: data?.suolo || null
+  });
+}
+
 async function loadAllerta() {
   try {
     const res = await fetch(API_BASE + '/api/allerta');
     if (!res.ok) return;
     const d = await res.json();
     if (!d || !d.idr) return;
+
+    const signature = getAllertaSignature(d);
+    lastAllertaSignature = signature;
 
     const bar = document.getElementById('allerta-bar');
     bar.classList.add('visible');
@@ -2056,8 +2079,24 @@ async function loadAllerta() {
   } catch(e) { console.log('Allerta non disponibile:', e.message); }
 }
 
+async function checkAllertaUpdates() {
+  try {
+    const res = await fetch(API_BASE + '/api/allerta', { cache: 'no-store' });
+    if (!res.ok) return;
+    const d = await res.json();
+    if (!d || !d.idr) return;
+
+    const signature = getAllertaSignature(d);
+    if (lastAllertaSignature && signature === lastAllertaSignature) return;
+    await loadAllerta();
+  } catch (e) {
+    console.log('Polling allerta non disponibile:', e.message);
+  }
+}
+
 loadAllerta();
 setInterval(loadAllerta, 10 * 60 * 1000);
+setInterval(checkAllertaUpdates, 60 * 1000);
 
 </script>
 </body>
