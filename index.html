@@ -902,7 +902,7 @@ async function overpassFetch(query) {
 
 const CVBBOX = { s: 45.6230, w: 11.8730, n: 45.7020, e: 12.0020 };
 
-function buildOverpassQuery(useArea = true) {
+function buildOverpassWaterwayQuery(useArea = true) {
   const selector = useArea
     ? 'area(3600045549)->.searchArea;'
     : `[bbox:${CVBBOX.s},${CVBBOX.w},${CVBBOX.n},${CVBBOX.e}];`;
@@ -913,6 +913,20 @@ function buildOverpassQuery(useArea = true) {
 ${selector}
 (
   way["waterway"~"^(river|stream|canal|drain|ditch)$"]${areaFilter};
+);
+out geom qt;`;
+}
+
+function buildOverpassCPAQuery(useArea = true) {
+  const selector = useArea
+    ? 'area(3600045549)->.searchArea;'
+    : `[bbox:${CVBBOX.s},${CVBBOX.w},${CVBBOX.n},${CVBBOX.e}];`;
+
+  const areaFilter = useArea ? '(area.searchArea)' : '';
+
+  return `[out:json][timeout:30];
+${selector}
+(
   way["emergency"~"^(waiting_area|camp_area|staging_area)$"]${areaFilter};
   way["emergency:waiting_area"="yes"]${areaFilter};
   way["emergency:camp_area"="yes"]${areaFilter};
@@ -921,26 +935,26 @@ ${selector}
 out geom qt;`;
 }
 
-function splitOverpassWaysIntoGeoJSON(elements) {
-  const waterwayFeatures = { type: 'FeatureCollection', features: [] };
-  const cpaFeatures = { type: 'FeatureCollection', features: [] };
+function buildFeatureCollectionFromWays(elements, featureType) {
+  const features = [];
   const acceptedWaterways = new Set(['river', 'stream', 'canal', 'drain', 'ditch']);
 
   elements.forEach(el => {
     if (el.type !== 'way' || !Array.isArray(el.geometry) || el.geometry.length < 2) return;
     const tags = el.tags || {};
 
-    const isWaterway = acceptedWaterways.has(tags.waterway);
-    const isCPA =
-      tags.emergency === 'waiting_area' ||
-      tags.emergency === 'camp_area' ||
-      tags.emergency === 'staging_area' ||
-      tags['emergency:waiting_area'] === 'yes' ||
-      tags['emergency:camp_area'] === 'yes' ||
-      tags['emergency:staging_area'] === 'rescue' ||
-      Boolean(tags['emergency:staging_area']);
-
-    if (!isWaterway && !isCPA) return;
+    if (featureType === 'waterway' && !acceptedWaterways.has(tags.waterway)) return;
+    if (featureType === 'cpa') {
+      const isCPA =
+        tags.emergency === 'waiting_area' ||
+        tags.emergency === 'camp_area' ||
+        tags.emergency === 'staging_area' ||
+        tags['emergency:waiting_area'] === 'yes' ||
+        tags['emergency:camp_area'] === 'yes' ||
+        tags['emergency:staging_area'] === 'rescue' ||
+        Boolean(tags['emergency:staging_area']);
+      if (!isCPA) return;
+    }
 
     const coordinates = el.geometry.map(p => [p.lon, p.lat]);
     const isPolygon =
@@ -948,27 +962,24 @@ function splitOverpassWaysIntoGeoJSON(elements) {
       coordinates[0][0] === coordinates[coordinates.length - 1][0] &&
       coordinates[0][1] === coordinates[coordinates.length - 1][1];
 
-    const feature = {
+    features.push({
       type: 'Feature',
       properties: { id: el.id, tags },
       geometry: isPolygon
         ? { type: 'Polygon', coordinates: [coordinates] }
         : { type: 'LineString', coordinates }
-    };
-
-    if (isWaterway) waterwayFeatures.features.push(feature);
-    if (isCPA) cpaFeatures.features.push(feature);
+    });
   });
 
-  return { waterwayFeatures, cpaFeatures };
+  return { type: 'FeatureCollection', features };
 }
 
-async function fetchOverpassWithFallback() {
+async function fetchOverpassWithFallback(primaryQueryBuilder) {
   try {
-    return await overpassFetch(buildOverpassQuery(false));
+    return await overpassFetch(primaryQueryBuilder(false));
   } catch (bboxErr) {
     console.warn('Query OSM su bbox non riuscita, uso fallback area:', bboxErr);
-    return overpassFetch(buildOverpassQuery(true));
+    return overpassFetch(primaryQueryBuilder(true));
   }
 }
 
@@ -981,17 +992,27 @@ async function loadOSMData(forceRefresh = false) {
     if (cachedW && cachedC) return;
 
     try {
-        const data = await fetchOverpassWithFallback();
-        const { waterwayFeatures, cpaFeatures } = splitOverpassWaysIntoGeoJSON(data.elements || []);
+        const jobs = [];
+
+        if (!cachedC) {
+          jobs.push((async () => {
+            const cpaData = await fetchOverpassWithFallback(buildOverpassCPAQuery);
+            const cpaFeatures = buildFeatureCollectionFromWays(cpaData.elements || [], 'cpa');
+            osmCacheSet('cpa', cpaFeatures);
+            renderCPAGeoJSON(cpaFeatures);
+          })());
+        }
 
         if (!cachedW) {
-          osmCacheSet('waterways', waterwayFeatures);
-          renderWaterwayGeoJSON(waterwayFeatures);
+          jobs.push((async () => {
+            const waterwayData = await fetchOverpassWithFallback(buildOverpassWaterwayQuery);
+            const waterwayFeatures = buildFeatureCollectionFromWays(waterwayData.elements || [], 'waterway');
+            osmCacheSet('waterways', waterwayFeatures);
+            renderWaterwayGeoJSON(waterwayFeatures);
+          })());
         }
-        if (!cachedC) {
-          osmCacheSet('cpa', cpaFeatures);
-          renderCPAGeoJSON(cpaFeatures);
-        }
+
+        await Promise.all(jobs);
 
     } catch (e) {
         console.error('Errore caricamento dati OSM:', e);
