@@ -1385,48 +1385,63 @@ function isTimestampAfter(lhs, rhs) {
   return left > right;
 }
 
+const xmlInFlight = {};
+
+function fetchXmlSource(url, timeoutMs) {
+  return fetch(url, { signal: AbortSignal.timeout(timeoutMs), cache: 'no-store' })
+    .then(r => r.ok ? r.arrayBuffer() : Promise.reject(new Error('http')))
+    .then(buf => decodeXml(buf))
+    .then(text => {
+      if (!text) throw new Error('empty');
+      return text;
+    });
+}
+
 async function fetchText(url, maxRetries = 3, delayMs = 2000, options = {}) {
-    const { bypassCache = false } = options;
-    const cacheKey = url.split('?')[0];
-    const cached = xmlCache[cacheKey];
-    if (!bypassCache && cached && (Date.now() - cached.ts) < (29 * 60 * 1000)) return cached.data;
+  const { bypassCache = false } = options;
+  const cacheKey = url.split('?')[0];
+  const cached = xmlCache[cacheKey];
+  if (!bypassCache && cached && (Date.now() - cached.ts) < (29 * 60 * 1000)) return cached.data;
 
+  if (!bypassCache && xmlInFlight[cacheKey]) return xmlInFlight[cacheKey];
+
+  const requestPromise = (async () => {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        const urlCacheBust = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+      const urlCacheBust = `${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}-${attempt}`;
+      const proxyWaves = [
+        [{ proxy: PROXIES[0], timeout: 5000 }],
+        [{ proxy: PROXIES[1], timeout: 7000 }],
+        [{ proxy: PROXIES[2], timeout: 9000 }]
+      ];
 
-        // Costruisce una promise per ogni sorgente (diretto + tutti i proxy)
-        const attempts = [
-            // Fetch diretto (timeout breve, quasi sempre fallisce per CORS)
-            fetch(url, { signal: AbortSignal.timeout(1500), cache: 'no-store' })
-                .then(r => r.ok ? r.arrayBuffer() : Promise.reject())
-                .then(buf => decodeXml(buf))
-                .then(text => { if (!text) throw new Error(); return text; }),
+      const waveSources = [
+        { url, timeout: 1200 },
+        ...proxyWaves.slice(0, attempt).flat().map(({ proxy, timeout }) => ({
+          url: proxy + encodeURIComponent(urlCacheBust), timeout
+        }))
+      ];
 
-            // Tutti i proxy lanciati in parallelo
-            ...PROXIES.map(px =>
-                fetch(px + encodeURIComponent(urlCacheBust), {
-                    signal: AbortSignal.timeout(12000), cache: 'no-store'
-                })
-                .then(r => r.ok ? r.arrayBuffer() : Promise.reject())
-                .then(buf => decodeXml(buf))
-                .then(text => { if (!text) throw new Error(); return text; })
-            )
-        ];
-
-        try {
-            // Vince il primo che risponde con successo
-            const result = await Promise.any(attempts);
-            xmlCache[cacheKey] = { ts: Date.now(), data: result };
-            return result;
-        } catch {
-            if (attempt < maxRetries) {
-                console.warn(`[fetchText] Tentativo ${attempt}/${maxRetries} fallito, riprovo tra ${delayMs * attempt}ms...`);
-                await new Promise(res => setTimeout(res, delayMs * attempt));
-            }
+      try {
+        const result = await Promise.any(waveSources.map(s => fetchXmlSource(s.url, s.timeout)));
+        xmlCache[cacheKey] = { ts: Date.now(), data: result };
+        return result;
+      } catch {
+        if (attempt < maxRetries) {
+          console.warn(`[fetchText] Tentativo ${attempt}/${maxRetries} fallito, riprovo tra ${delayMs * attempt}ms...`);
+          await new Promise(res => setTimeout(res, delayMs * attempt));
         }
+      }
     }
 
     throw new Error('Impossibile caricare i dati ARPAV');
+  })();
+
+  if (!bypassCache) xmlInFlight[cacheKey] = requestPromise;
+  try {
+    return await requestPromise;
+  } finally {
+    if (!bypassCache) delete xmlInFlight[cacheKey];
+  }
 }
 
 
