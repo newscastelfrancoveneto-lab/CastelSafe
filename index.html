@@ -639,41 +639,7 @@ const CSV_BASE = 'https://meteo.arpa.veneto.it/meteo/dati_meteo/xml/';
 const OSM_API  = 'https://api.openstreetmap.org/api/0.6/node/';
 
 const VAPID_PUBLIC = 'BHE0353MlqN8My2C-hhYQsC0XXD3QXAuIGnkf-BzCQaeV-I1sLVWlb_rT-C3Q9BJy6wVVSSWtQRsbO_iRRLEQsc';
-const API_BASE_DEFAULT = 'https://francis-fantasy-bios-executed.trycloudflare.com';
-const API_BASE_STORAGE_KEY = 'pc_api_base';
-const API_BASE_CANDIDATES = [
-  localStorage.getItem(API_BASE_STORAGE_KEY),
-  window.location.origin,
-  API_BASE_DEFAULT
-].filter((v, i, arr) => !!v && arr.indexOf(v) === i);
-let activeApiBase = API_BASE_CANDIDATES[0] || window.location.origin;
-
-function buildApiUrl(path, base = activeApiBase) {
-  if (!path.startsWith('/')) path = '/' + path;
-  return `${base}${path}`;
-}
-
-async function apiFetch(path, init = {}) {
-  if (!path.startsWith('/')) path = '/' + path;
-  let lastErr = null;
-
-  for (const base of API_BASE_CANDIDATES) {
-    try {
-      const res = await fetch(`${base}${path}`, init);
-      if (!res.ok && res.status >= 500) {
-        continue;
-      }
-      activeApiBase = base;
-      localStorage.setItem(API_BASE_STORAGE_KEY, base);
-      return res;
-    } catch (err) {
-      lastErr = err;
-    }
-  }
-
-  if (lastErr) throw lastErr;
-  return fetch(buildApiUrl(path), init);
-}
+const API_BASE = 'https://francis-fantasy-bios-executed.trycloudflare.com';
 
 let activeChart = null, currentId = null, currentSensors = [];
 let currentStnRef = null, nextRefresh = null;
@@ -2567,7 +2533,7 @@ async function subscribeUser() {
     });
 
     // Invia la sottoscrizione al tuo server usando la costante API_BASE
-    const response = await apiFetch('/api/subscribe', {
+    const response = await fetch(API_BASE + '/api/subscribe', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -2597,7 +2563,7 @@ initGlobalRefreshScheduler();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js')
+    navigator.serviceWorker.register('/PC_APP/sw.js')
       .then(reg => console.log('Service Worker registrato!'))
       .catch(err => console.error('Errore registrazione SW:', err));
   });
@@ -2668,7 +2634,7 @@ async function loadAllerta(data = null) {
       return;
     }
 
-    const res = await apiFetch('/api/allerta', { cache: 'no-store' });
+    const res = await fetch(API_BASE + '/api/allerta', { cache: 'no-store' });
     if (!res.ok) return;
     const d = await res.json();
     renderAllerta(d);
@@ -2677,7 +2643,7 @@ async function loadAllerta(data = null) {
 
 async function checkAllertaUpdates() {
   try {
-    const res = await apiFetch('/api/allerta', { cache: 'no-store' });
+    const res = await fetch(API_BASE + '/api/allerta', { cache: 'no-store' });
     if (!res.ok) return;
     const d = await res.json();
     if (!d || !d.idr) return;
