@@ -651,6 +651,7 @@ let globalRefreshTimerId = null;
 const stationLastTimestamp = {};
 const stationLastSignature = {};
 const stationRefreshState = {};
+const BACKGROUND_STATION_REFRESH_MS = 5 * 60 * 1000;
 const markerRefs = {};
 
 // ── PANNELLO UI ───────────────────────────────────────────────────────────────
@@ -1341,6 +1342,7 @@ async function initMarkers() {
   });
 
   scheduleArpavWarmup();
+  scheduleBackgroundStationRefresh();
 }
 
 function scheduleArpavWarmup() {
@@ -1356,6 +1358,28 @@ function scheduleArpavWarmup() {
       }, idx * 350);
     });
   }, 800);
+}
+
+function scheduleBackgroundStationRefresh() {
+  const runRefreshSweep = () => {
+    if (globalRefreshInProgress) return;
+    STATIONS.forEach((stn, idx) => {
+      setTimeout(() => {
+        loadStation(stn, {
+          silent: true,
+          background: true,
+          waitForNewData: false
+        }).catch(() => {});
+      }, idx * 300);
+    });
+  };
+
+  setTimeout(runRefreshSweep, 1200);
+  setInterval(runRefreshSweep, BACKGROUND_STATION_REFRESH_MS);
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) runRefreshSweep();
+  });
 }
 
 // ── ARPAV: FETCH & PARSING ────────────────────────────────────────────────────
@@ -1836,30 +1860,47 @@ function buildPrecipitationSeries(rows) {
   }
   const fallbackWindow = Math.max(1, Math.round(windowMs / inferredStepMs));
 
-  const accumulation = bars.map((_, i) => {
+  const accumulation = [];
+  let rollingStart = 0;
+  let rollingSum = 0;
+  for (let i = 0; i < bars.length; i++) {
+    rollingSum += bars[i];
     const currentDate = parsedDates[i];
-    if (!currentDate) {
-      const start = Math.max(0, i - fallbackWindow + 1);
-      return Number(bars.slice(start, i + 1).reduce((sum, v) => sum + v, 0).toFixed(3));
+    while (rollingStart <= i) {
+      const candidateDate = parsedDates[rollingStart];
+      if (currentDate && candidateDate) {
+        if ((currentDate - candidateDate) <= windowMs) break;
+      } else if ((i - rollingStart + 1) <= fallbackWindow) {
+        break;
+      }
+      rollingSum -= bars[rollingStart];
+      rollingStart += 1;
     }
-    let sum = 0;
-    for (let j = i; j >= 0; j--) {
-      const candidateDate = parsedDates[j];
-      if (candidateDate && (currentDate - candidateDate) > windowMs) break;
-      if (!candidateDate && (i - j + 1) > fallbackWindow) break;
-      sum += bars[j];
-    }
-    return Number(sum.toFixed(3));
-  });
+    accumulation.push(Number(rollingSum.toFixed(3)));
+  }
 
   return { bars, accumulation };
 }
 
-function renderSpecialPrecipitation(stn, sensor) {
+function yieldToMainThread() {
+  return new Promise(resolve => setTimeout(resolve, 0));
+}
+
+let activePrecipitationRenderToken = 0;
+
+async function renderSpecialPrecipitation(stn, sensor) {
+  const renderToken = ++activePrecipitationRenderToken;
   const rows = [...sensor.rows].reverse();
   const unit = sensor.unitnm || 'mm';
+  document.getElementById('panel-body').innerHTML =
+    `<div class="loading"><div class="spinner"></div>Elaborazione accumulata precipitazioni...</div>`;
+
+  await yieldToMainThread();
+  if (renderToken !== activePrecipitationRenderToken) return;
+
   const labels = rows.map(r => r.label);
   const { bars, accumulation } = buildPrecipitationSeries(rows);
+  if (renderToken !== activePrecipitationRenderToken) return;
 
   const lastStep = bars.at(-1) ?? 0;
   const last24h = accumulation.at(-1) ?? 0;
@@ -1960,7 +2001,7 @@ function renderSpecialPrecipitation(stn, sensor) {
 
 function renderSensor(stn, sensor) {
   if (sensor.isWindCombined) { renderWindCombined(stn, sensor); return; }
-  if (isSpecialPrecipitationChart(stn, sensor)) { renderSpecialPrecipitation(stn, sensor); return; }
+  if (isSpecialPrecipitationChart(stn, sensor)) { void renderSpecialPrecipitation(stn, sensor); return; }
   const isLivello = sensor.type === 'LIVIDRO';
   const soglie    = isLivello ? (sensor.soglie || stn.soglie) : null;
   const rows = sensor.rows, unit = sensor.unitnm;
