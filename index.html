@@ -651,6 +651,7 @@ let globalRefreshTimerId = null;
 const stationLastTimestamp = {};
 const stationLastSignature = {};
 const stationRefreshState = {};
+const BACKGROUND_STATION_REFRESH_MS = 5 * 60 * 1000;
 const markerRefs = {};
 
 // ── PANNELLO UI ───────────────────────────────────────────────────────────────
@@ -1341,6 +1342,7 @@ async function initMarkers() {
   });
 
   scheduleArpavWarmup();
+  scheduleBackgroundStationRefresh();
 }
 
 function scheduleArpavWarmup() {
@@ -1356,6 +1358,69 @@ function scheduleArpavWarmup() {
       }, idx * 350);
     });
   }, 800);
+}
+
+async function refreshStationFeedInBackground(stn) {
+  const xmlUrl = stn.xmlUrl ?? XML_URL;
+  try {
+    const xml = await fetchText(xmlUrl, 1, 0, { bypassCache: true });
+    const sensors = parseXML(xml, stn.id);
+    if (sensors?.length) {
+      const latestTs = getLatestSensorTimestamp(sensors);
+      const latestSignature = getLatestSensorSignature(sensors);
+      stationLastTimestamp[stn.id] = latestTs;
+      stationLastSignature[stn.id] = latestSignature;
+      const refreshState = getStationRefreshState(stn.id);
+      if (refreshState?.waiting && isTimestampAtLeast(latestTs, refreshState.baselineTimestamp)) {
+        setStationRefreshState(stn.id, { waiting: false, baselineTimestamp: null });
+        if (currentStnRef?.id === stn.id) refreshVisibleStationTimerState();
+      }
+      ensureStationBoundaryWaiting(stn.id, latestTs);
+      return;
+    }
+  } catch (_) {}
+
+  try {
+    const csv = await fetchText(`${CSV_BASE}${String(stn.id).padStart(4, '0')}.csv`, 1, 0, { bypassCache: true });
+    const rows = parseCSV(csv);
+    if (rows?.length) {
+      const fallbackSensors = [{ type: 'LIVIDRO', paramnm: 'Livello idrometrico', unitnm: 'm', rows }];
+      const latestTs = getLatestSensorTimestamp(fallbackSensors);
+      const latestSignature = getLatestSensorSignature(fallbackSensors);
+      stationLastTimestamp[stn.id] = latestTs;
+      stationLastSignature[stn.id] = latestSignature;
+      const refreshState = getStationRefreshState(stn.id);
+      if (refreshState?.waiting && isTimestampAtLeast(latestTs, refreshState.baselineTimestamp)) {
+        setStationRefreshState(stn.id, { waiting: false, baselineTimestamp: null });
+        if (currentStnRef?.id === stn.id) refreshVisibleStationTimerState();
+      }
+      ensureStationBoundaryWaiting(stn.id, latestTs);
+    }
+  } catch (_) {}
+}
+
+function scheduleBackgroundStationRefresh() {
+  let sweepInProgress = false;
+
+  const runRefreshSweep = async () => {
+    if (globalRefreshInProgress || sweepInProgress) return;
+    sweepInProgress = true;
+    try {
+      for (const [idx, stn] of STATIONS.entries()) {
+        await new Promise(resolve => setTimeout(resolve, idx === 0 ? 0 : 500));
+        await refreshStationFeedInBackground(stn);
+      }
+    } finally {
+      sweepInProgress = false;
+    }
+  };
+
+  setTimeout(() => { void runRefreshSweep(); }, 1500);
+  setInterval(() => { void runRefreshSweep(); }, BACKGROUND_STATION_REFRESH_MS);
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) void runRefreshSweep();
+  });
 }
 
 // ── ARPAV: FETCH & PARSING ────────────────────────────────────────────────────
@@ -1380,6 +1445,53 @@ const PROXIES = [
 ];
 
 const xmlCache = {};
+const ARPAV_CACHE_STORAGE_KEY = 'arpav_xml_cache_v1';
+const ARPAV_CACHE_MAX_AGE_MS = 29 * 60 * 1000;
+const ARPAV_CACHE_FALLBACK_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+const ARPAV_CACHE_MAX_ENTRIES = 20;
+
+function readPersistentArpavCache() {
+  try {
+    const raw = localStorage.getItem(ARPAV_CACHE_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function getPersistentArpavCacheEntry(cacheKey, maxAgeMs = Infinity) {
+  const store = readPersistentArpavCache();
+  const entry = store?.[cacheKey];
+  if (!entry?.data || !entry?.ts) return null;
+  if ((Date.now() - entry.ts) > maxAgeMs) return null;
+  return entry;
+}
+
+function writePersistentArpavCacheEntry(cacheKey, data, ts) {
+  try {
+    const nowTs = Number(ts) || Date.now();
+    const store = readPersistentArpavCache();
+    store[cacheKey] = { ts: nowTs, data };
+
+    const keys = Object.keys(store);
+    if (keys.length > ARPAV_CACHE_MAX_ENTRIES) {
+      keys
+        .sort((a, b) => (store[a]?.ts || 0) - (store[b]?.ts || 0))
+        .slice(0, keys.length - ARPAV_CACHE_MAX_ENTRIES)
+        .forEach(key => { delete store[key]; });
+    }
+
+    localStorage.setItem(ARPAV_CACHE_STORAGE_KEY, JSON.stringify(store));
+  } catch {}
+}
+
+function setArpavCache(cacheKey, data) {
+  const nowTs = Date.now();
+  xmlCache[cacheKey] = { ts: nowTs, data };
+  writePersistentArpavCacheEntry(cacheKey, data, nowTs);
+}
 
 function normalizeArpavTimestamp(ts) {
   if (!ts) return null;
@@ -1442,7 +1554,15 @@ async function fetchText(url, maxRetries = 3, delayMs = 2000, options = {}) {
   const { bypassCache = false } = options;
   const cacheKey = url.split('?')[0];
   const cached = xmlCache[cacheKey];
-  if (!bypassCache && cached && (Date.now() - cached.ts) < (29 * 60 * 1000)) return cached.data;
+  if (!bypassCache && cached && (Date.now() - cached.ts) < ARPAV_CACHE_MAX_AGE_MS) return cached.data;
+
+  if (!bypassCache && !cached) {
+    const persisted = getPersistentArpavCacheEntry(cacheKey, ARPAV_CACHE_MAX_AGE_MS);
+    if (persisted) {
+      xmlCache[cacheKey] = persisted;
+      return persisted.data;
+    }
+  }
 
   if (!bypassCache && xmlInFlight[cacheKey]) return xmlInFlight[cacheKey];
 
@@ -1464,7 +1584,7 @@ async function fetchText(url, maxRetries = 3, delayMs = 2000, options = {}) {
 
       try {
         const result = await firstFulfilled(waveSources.map(s => fetchXmlSource(s.url, s.timeout)));
-        xmlCache[cacheKey] = { ts: Date.now(), data: result };
+        setArpavCache(cacheKey, result);
         return result;
       } catch {
         if (attempt < maxRetries) {
@@ -1473,6 +1593,14 @@ async function fetchText(url, maxRetries = 3, delayMs = 2000, options = {}) {
         }
       }
     }
+
+    const stalePersisted = getPersistentArpavCacheEntry(cacheKey, ARPAV_CACHE_FALLBACK_MAX_AGE_MS);
+    if (stalePersisted?.data) {
+      xmlCache[cacheKey] = stalePersisted;
+      console.warn('[fetchText] Uso cache persistente ARPAV per fallback offline:', cacheKey);
+      return stalePersisted.data;
+    }
+
     throw new Error('Impossibile caricare i dati ARPAV');
   })();
 
@@ -1836,30 +1964,47 @@ function buildPrecipitationSeries(rows) {
   }
   const fallbackWindow = Math.max(1, Math.round(windowMs / inferredStepMs));
 
-  const accumulation = bars.map((_, i) => {
+  const accumulation = [];
+  let rollingStart = 0;
+  let rollingSum = 0;
+  for (let i = 0; i < bars.length; i++) {
+    rollingSum += bars[i];
     const currentDate = parsedDates[i];
-    if (!currentDate) {
-      const start = Math.max(0, i - fallbackWindow + 1);
-      return Number(bars.slice(start, i + 1).reduce((sum, v) => sum + v, 0).toFixed(3));
+    while (rollingStart <= i) {
+      const candidateDate = parsedDates[rollingStart];
+      if (currentDate && candidateDate) {
+        if ((currentDate - candidateDate) <= windowMs) break;
+      } else if ((i - rollingStart + 1) <= fallbackWindow) {
+        break;
+      }
+      rollingSum -= bars[rollingStart];
+      rollingStart += 1;
     }
-    let sum = 0;
-    for (let j = i; j >= 0; j--) {
-      const candidateDate = parsedDates[j];
-      if (candidateDate && (currentDate - candidateDate) > windowMs) break;
-      if (!candidateDate && (i - j + 1) > fallbackWindow) break;
-      sum += bars[j];
-    }
-    return Number(sum.toFixed(3));
-  });
+    accumulation.push(Number(rollingSum.toFixed(3)));
+  }
 
   return { bars, accumulation };
 }
 
-function renderSpecialPrecipitation(stn, sensor) {
+function yieldToMainThread() {
+  return new Promise(resolve => setTimeout(resolve, 0));
+}
+
+let activePrecipitationRenderToken = 0;
+
+async function renderSpecialPrecipitation(stn, sensor) {
+  const renderToken = ++activePrecipitationRenderToken;
   const rows = [...sensor.rows].reverse();
   const unit = sensor.unitnm || 'mm';
+  document.getElementById('panel-body').innerHTML =
+    `<div class="loading"><div class="spinner"></div>Elaborazione accumulata precipitazioni...</div>`;
+
+  await yieldToMainThread();
+  if (renderToken !== activePrecipitationRenderToken) return;
+
   const labels = rows.map(r => r.label);
   const { bars, accumulation } = buildPrecipitationSeries(rows);
+  if (renderToken !== activePrecipitationRenderToken) return;
 
   const lastStep = bars.at(-1) ?? 0;
   const last24h = accumulation.at(-1) ?? 0;
@@ -1960,7 +2105,7 @@ function renderSpecialPrecipitation(stn, sensor) {
 
 function renderSensor(stn, sensor) {
   if (sensor.isWindCombined) { renderWindCombined(stn, sensor); return; }
-  if (isSpecialPrecipitationChart(stn, sensor)) { renderSpecialPrecipitation(stn, sensor); return; }
+  if (isSpecialPrecipitationChart(stn, sensor)) { void renderSpecialPrecipitation(stn, sensor); return; }
   const isLivello = sensor.type === 'LIVIDRO';
   const soglie    = isLivello ? (sensor.soglie || stn.soglie) : null;
   const rows = sensor.rows, unit = sensor.unitnm;
