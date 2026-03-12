@@ -597,24 +597,43 @@
 const ARPA_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="13" height="13"><rect x="3" y="3" width="1.8" height="12.4" rx=".9" fill="white"/><rect x="3" y="14.2" width="10.5" height="1.8" rx=".9" fill="white"/><path d="M4 3.5 Q9.5 0.5 14 5.5" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/><line x1="6.5" y1="4.6" x2="6.5" y2="14.2" stroke="white" stroke-width="1.1" stroke-linecap="round"/><line x1="9.2" y1="3.4" x2="9.2" y2="14.2" stroke="white" stroke-width="1.1" stroke-linecap="round"/><line x1="12" y1="5" x2="12" y2="14.2" stroke="white" stroke-width="1.1" stroke-linecap="round"/></svg>';
 
 const STATIONS = [
-  { id: 292, osmNodeId: '1.2984401383e+10', name: 'Muson dei Sassi', subtitle: 'Castelfranco Veneto',
-    lat: 45.66983651, lon: 11.92027581,
-    xmlUrl: 'https://meteo.arpa.veneto.it/meteo/dati_meteo/xml/0292.xml',
+  {
+    id: 292,
+    osmNodeId: '1.2984401383e+10',
+    name: 'Muson dei Sassi',
+    subtitle: 'Castelfranco Veneto',
+    lat: 45.66983651,
+    lon: 11.92027581,
+    xmlUrl: `${API_BASE}/api/arpav/xml/0292`,
     refreshInterval: 30,
-    soglie: { s1: 1.8, s2: 2.5, s3: 2.9 } },
+    soglie: { s1: 1.8, s2: 2.5, s3: 2.9 }
+  },
 
-  { id: 653, osmNodeId: '1.2984421539e+10', name: 'Avenale', subtitle: 'Castelfranco Veneto',
-    lat: 45.6747453, lon: 11.9285348,
-    xmlUrl: 'https://meteo.arpa.veneto.it/meteo/dati_meteo/xml/0653.xml',
+  {
+    id: 653,
+    osmNodeId: '1.2984421539e+10',
+    name: 'Avenale',
+    subtitle: 'Castelfranco Veneto',
+    lat: 45.6747453,
+    lon: 11.9285348,
+    xmlUrl: `${API_BASE}/api/arpav/xml/0653`,
     refreshInterval: 30,
-    soglie: { s1: 1.5, s2: 1.8, s3: 2.1 } },
+    soglie: { s1: 1.5, s2: 1.8, s3: 2.1 }
+  },
 
-  { id: 102, osmNodeId: 1.2984403717e+10, name: 'Castelfranco Veneto', subtitle: 'Staz. meteorologica',
-    lat: 45.6949262, lon: 11.9477799,  
-    xmlUrl: 'https://meteo.arpa.veneto.it/meteo/dati_meteo/xml/0102.xml',
+  {
+    id: 102,
+    osmNodeId: 1.2984403717e+10,
+    name: 'Castelfranco Veneto',
+    subtitle: 'Staz. meteorologica',
+    lat: 45.6949262,
+    lon: 11.9477799,
+    xmlUrl: `${API_BASE}/api/arpav/xml/0102`,
     refreshInterval: 30,
-    soglie: null }
+    soglie: null
+  }
 ];
+
 
 const SOGLIA_CFG = [
   { key: 's1', label: 'Guardia 1', color: '#eab308' },
