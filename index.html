@@ -1897,17 +1897,19 @@ function parseArpavDate(ts) {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function buildPrecipitationSeries(rows) {
+function buildPrecipitationBars(rows) {
   const values = rows.map(r => Number.isFinite(r.val) ? r.val : 0);
   const decreases = values.slice(1).reduce((acc, current, idx) => acc + (current < values[idx] ? 1 : 0), 0);
   const looksCumulative = decreases <= Math.max(2, Math.floor(values.length * 0.1));
 
-  const bars = values.map((current, i) => {
+  return values.map((current, i) => {
     if (!looksCumulative || i === 0) return current;
     const prev = values[i - 1];
     return current >= prev ? current - prev : current;
   }).map(v => Math.max(0, Number(v.toFixed(3))));
+}
 
+async function buildRolling24hAccumulation(rows, bars, renderToken) {
   const windowMs = 24 * 60 * 60 * 1000;
   const parsedDates = rows.map(r => parseArpavDate(r.dt));
 
@@ -1927,6 +1929,7 @@ function buildPrecipitationSeries(rows) {
   let rollingStart = 0;
   let rollingSum = 0;
   for (let i = 0; i < bars.length; i++) {
+    if (renderToken !== activePrecipitationRenderToken) return null;
     rollingSum += bars[i];
     const currentDate = parsedDates[i];
     while (rollingStart <= i) {
@@ -1940,9 +1943,10 @@ function buildPrecipitationSeries(rows) {
       rollingStart += 1;
     }
     accumulation.push(Number(rollingSum.toFixed(3)));
+    if (i % 200 === 0) await yieldToMainThread();
   }
 
-  return { bars, accumulation };
+  return accumulation;
 }
 
 function yieldToMainThread() {
@@ -1956,27 +1960,26 @@ async function renderSpecialPrecipitation(stn, sensor) {
   const rows = [...sensor.rows].reverse();
   const unit = sensor.unitnm || 'mm';
   document.getElementById('panel-body').innerHTML =
-    `<div class="loading"><div class="spinner"></div>Elaborazione accumulata precipitazioni...</div>`;
+    `<div class="loading"><div class="spinner"></div>Preparazione grafico precipitazioni...</div>`;
 
   await yieldToMainThread();
   if (renderToken !== activePrecipitationRenderToken) return;
 
   const labels = rows.map(r => r.label);
-  const { bars, accumulation } = buildPrecipitationSeries(rows);
+  const bars = buildPrecipitationBars(rows);
   if (renderToken !== activePrecipitationRenderToken) return;
 
   const lastStep = bars.at(-1) ?? 0;
-  const last24h = accumulation.at(-1) ?? 0;
-  const max24h = accumulation.length ? Math.max(...accumulation) : 0;
   const total48h = bars.reduce((sum, v) => sum + v, 0);
 
   document.getElementById('panel-body').innerHTML =
     `<div class="stat-row">
       <div class="stat-card"><div class="val">${lastStep.toFixed(2)}</div><div class="lbl">Ultimo step (${unit})</div></div>
-      <div class="stat-card"><div class="val">${last24h.toFixed(2)}</div><div class="lbl">Accumulo 24h (${unit})</div></div>
-      <div class="stat-card"><div class="val">${max24h.toFixed(2)}</div><div class="lbl">Picco 24h (${unit})</div></div>
+      <div class="stat-card"><div class="val" id="precip-acc-last">—</div><div class="lbl">Accumulo 24h (${unit})</div></div>
+      <div class="stat-card"><div class="val" id="precip-acc-peak">—</div><div class="lbl">Picco 24h (${unit})</div></div>
       <div class="stat-card"><div class="val">${total48h.toFixed(2)}</div><div class="lbl">Totale 48h (${unit})</div></div>
     </div>
+    <small id="precip-acc-status" style="display:block;margin:10px 4px 0;color:#64748b;font-weight:600;">Calcolo accumulo 24h in background…</small>
     <div class="chart-wrap"><canvas id="sensorChart"></canvas></div>
     <table class="data-table">
       <thead><tr><th>Data / Ora</th><th>Precipitazione (${unit})</th><th>Accumulo 24h (${unit})</th></tr></thead>
@@ -1988,7 +1991,7 @@ async function renderSpecialPrecipitation(stn, sensor) {
     const reverseIdx = src.length - 1 - i;
     const tr = document.createElement('tr');
     if (i === 0) tr.classList.add('latest');
-    tr.innerHTML = `<td>${r.label}</td><td><strong>${bars[reverseIdx].toFixed(2)}</strong></td><td>${accumulation[reverseIdx].toFixed(2)}</td>`;
+    tr.innerHTML = `<td>${r.label}</td><td><strong>${bars[reverseIdx].toFixed(2)}</strong></td><td data-acc-idx="${reverseIdx}">—</td>`;
     tbody.appendChild(tr);
   });
 
@@ -2012,20 +2015,6 @@ async function renderSpecialPrecipitation(stn, sensor) {
           barPercentage: 0.8,
           categoryPercentage: 0.95,
           order: 2
-        },
-        {
-          label: `Precipitazione cumulata 24h (${unit})`,
-          data: accumulation,
-          yAxisID: 'yAccum',
-          type: 'line',
-          borderColor: '#3b82f6',
-          backgroundColor: 'rgba(59,130,246,.12)',
-          borderWidth: 2,
-          tension: 0.2,
-          pointRadius: accumulation.length > 100 ? 0 : 2,
-          pointHoverRadius: 4,
-          fill: false,
-          order: 1
         }
       ]
     },
@@ -2060,6 +2049,42 @@ async function renderSpecialPrecipitation(stn, sensor) {
       }
     }
   });
+
+  setTimeout(async () => {
+    const accumulation = await buildRolling24hAccumulation(rows, bars, renderToken);
+    if (!accumulation || renderToken !== activePrecipitationRenderToken) return;
+
+    const last24h = accumulation.at(-1) ?? 0;
+    const max24h = accumulation.length ? Math.max(...accumulation) : 0;
+    const lastEl = document.getElementById('precip-acc-last');
+    const peakEl = document.getElementById('precip-acc-peak');
+    if (lastEl) lastEl.textContent = last24h.toFixed(2);
+    if (peakEl) peakEl.textContent = max24h.toFixed(2);
+
+    document.querySelectorAll('[data-acc-idx]').forEach(cell => {
+      const idx = Number(cell.getAttribute('data-acc-idx'));
+      cell.textContent = Number.isFinite(idx) ? accumulation[idx].toFixed(2) : '—';
+    });
+
+    const statusEl = document.getElementById('precip-acc-status');
+    if (statusEl) statusEl.textContent = 'Accumulo 24h pronto';
+
+    activeChart.data.datasets.push({
+      label: `Precipitazione cumulata 24h (${unit})`,
+      data: accumulation,
+      yAxisID: 'yAccum',
+      type: 'line',
+      borderColor: '#3b82f6',
+      backgroundColor: 'rgba(59,130,246,.12)',
+      borderWidth: 2,
+      tension: 0.2,
+      pointRadius: accumulation.length > 100 ? 0 : 2,
+      pointHoverRadius: 4,
+      fill: false,
+      order: 1
+    });
+    activeChart.update('none');
+  }, 0);
 }
 
 function renderSensor(stn, sensor) {
