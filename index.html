@@ -2510,37 +2510,41 @@ function getAllertaSignature(data) {
 function renderAllerta(d) {
   if (!d || !d.idr) return;
   const signature = getAllertaSignature(d);
-  lastAllertaSignature = signature; // ← deve stare QUI, senza if
+  lastAllertaSignature = signature;
   const bar = document.getElementById('allerta-bar');
   bar.classList.add('visible');
   bar.style.background = allertaBgColor(d.idr, d.idro, d.temp);
   updatePanelTop();
+
   ['idr','idro','temp'].forEach(k => {
     const el = document.getElementById('bar-bollino-' + k);
     const lbl = document.getElementById('bar-label-' + k);
-    if (el) el.style.background = ALLERTACOLORS[d[k]] || '#64748b';
-    if (lbl) lbl.textContent = {idr:'Idraulico', idro:'Idrogeologico', temp:'Temporali'}[k];
+    if (el) el.style.background = ALLERTA_COLORS[d[k]] || '#64748b';
+    if (lbl) lbl.textContent = { idr:'Idraulico', idro:'Idrogeologico', temp:'Temporali' }[k];
   });
+
   document.getElementById('allerta-periodo').textContent = d.periodo || '';
   document.getElementById('allerta-meteo').textContent = d.meteo || '';
   document.getElementById('allerta-suolo').textContent = d.suolo || '';
+
   const rowsEl = document.getElementById('allerta-rows');
   rowsEl.innerHTML = [
     { key: 'idr',  label: 'Rischio Idraulico' },
     { key: 'idro', label: 'Rischio Idrogeologico' },
     { key: 'temp', label: 'Rischio Idrogeologico per Temporali' }
   ].map(r => `<div class="allerta-row">
-    <div class="bollino-lg" style="background:${ALLERTACOLORS[d[r.key]]||'#64748b'}"></div>
+    <div class="bollino-lg" style="background:${ALLERTA_COLORS[d[r.key]] || '#64748b'}"></div>
     <span class="label">${r.label}</span>
     <span class="livello">${d[r.key] || ''}</span>
   </div>`).join('');
+
   setTimeout(() => map.invalidateSize(), 300);
 }
-
+	
 async function loadAllerta(data = null) {
   try {
     if (data) { renderAllerta(data); return; }
-    const res = await fetch(APIBASE + '/api/allerta', { cache: 'no-store' });
+    const res = await fetch(API_BASE + '/api/allerta', { cache: 'no-store' });
     if (!res.ok) return;
     const d = await res.json();
     renderAllerta(d);
@@ -2550,7 +2554,7 @@ async function loadAllerta(data = null) {
 
 async function checkAllertaUpdates() {
   try {
-    const res = await fetch(APIBASE + '/api/allerta', { cache: 'no-store' });
+    const res = await fetch(API_BASE + '/api/allerta', { cache: 'no-store' });
     if (!res.ok) return;
     const d = await res.json();
     if (!d || !d.idr) return;
