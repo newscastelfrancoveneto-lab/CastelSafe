@@ -650,9 +650,6 @@ let lastHalfHourRefresh = null;
 let globalRefreshTimerId = null;
 const stationLastTimestamp = {};
 const stationLastSignature = {};
-const stationSensorsCache = {};
-const stationPrecipitationCache = {};
-const stationDerivedWarmupQueue = {};
 const stationRefreshState = {};
 const BACKGROUND_STATION_REFRESH_MS = 5 * 60 * 1000;
 const markerRefs = {};
@@ -1658,11 +1655,9 @@ async function loadStation(stn, options = false) {
         if (currentStnRef?.id === stn.id) refreshVisibleStationTimerState();
       }
       if (hasNewData) {
-        stationSensorsCache[stn.id] = sensors;
-        if (!opts.background || currentStnRef?.id === stn.id) currentSensors = sensors;
+        currentSensors = sensors;
         stationLastTimestamp[stn.id] = latestTs;
         stationLastSignature[stn.id] = latestSignature;
-        scheduleStationDerivedCacheWarmup(stn, sensors);
         if (!opts.background || currentStnRef?.id === stn.id) renderTabs(stn, sensors);
       } else if (!opts.waitForNewData && hasPayloadChanges) {
         stationLastSignature[stn.id] = latestSignature;
@@ -1688,12 +1683,10 @@ async function loadStation(stn, options = false) {
         if (currentStnRef?.id === stn.id) refreshVisibleStationTimerState();
       }
       if (hasNewData) {
-        stationSensorsCache[stn.id] = fallbackSensors;
-        if (!opts.background || currentStnRef?.id === stn.id) currentSensors = fallbackSensors;
+        currentSensors = fallbackSensors;
         stationLastTimestamp[stn.id] = latestTs;
         stationLastSignature[stn.id] = latestSignature;
-        scheduleStationDerivedCacheWarmup(stn, fallbackSensors);
-        if (!opts.background || currentStnRef?.id === stn.id) renderTabs(stn, fallbackSensors);
+        if (!opts.background || currentStnRef?.id === stn.id) renderTabs(stn, currentSensors);
       } else if (!opts.waitForNewData && hasPayloadChanges) {
         stationLastSignature[stn.id] = latestSignature;
       }
@@ -1701,16 +1694,6 @@ async function loadStation(stn, options = false) {
       return { ok: true, hasNewData, latestTs };
     }
   } catch (e) { if (!silent) showError(e.message); return { ok: false, hasNewData: false }; }
-
-  const cachedSensors = stationSensorsCache[stn.id];
-  if (cachedSensors?.length) {
-    if (!opts.background || currentStnRef?.id === stn.id) {
-      currentSensors = cachedSensors;
-      renderTabs(stn, cachedSensors);
-    }
-    return { ok: true, hasNewData: false, fromCache: true, latestTs: stationLastTimestamp[stn.id] || null };
-  }
-
   if (!silent) showError('Nessun dato disponibile per la stazione #' + stn.id);
   return { ok: false, hasNewData: false };
 }
@@ -1903,70 +1886,6 @@ function isSpecialPrecipitationChart(stn, sensor) {
   return normalized.includes('precip');
 }
 
-function buildPrecipitationCacheKey(sensor) {
-  const rows = sensor?.rows || [];
-  const first = rows[0]?.dt || '';
-  const last = rows.at(-1)?.dt || '';
-  return `${rows.length}:${first}:${last}`;
-}
-
-function getCachedPrecipitationData(stationId, sensor) {
-  if (!stationId || !sensor) return null;
-  const key = buildPrecipitationCacheKey(sensor);
-  const entry = stationPrecipitationCache[stationId]?.[key];
-  return entry || null;
-}
-
-function buildStationWarmupFingerprint(stn, sensors) {
-  return (sensors || [])
-    .filter(sensor => isSpecialPrecipitationChart(stn, sensor))
-    .map(sensor => `${sensor.type}:${sensor.paramnm}:${buildPrecipitationCacheKey(sensor)}`)
-    .join('|');
-}
-
-function scheduleStationDerivedCacheWarmup(stn, sensors) {
-  if (!stn?.id || !Array.isArray(sensors)) return;
-  const fingerprint = buildStationWarmupFingerprint(stn, sensors);
-  if (!fingerprint || stationDerivedWarmupQueue[stn.id] === fingerprint) return;
-
-  stationDerivedWarmupQueue[stn.id] = fingerprint;
-  const runWarmup = () => {
-    warmupStationDerivedCaches(stn, sensors)
-      .catch(() => {})
-      .finally(() => {
-        if (stationDerivedWarmupQueue[stn.id] === fingerprint) delete stationDerivedWarmupQueue[stn.id];
-      });
-  };
-
-  if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
-    window.requestIdleCallback(runWarmup, { timeout: 1500 });
-  } else {
-    setTimeout(runWarmup, 0);
-  }
-}
-
-async function warmupStationDerivedCaches(stn, sensors) {
-  if (!stn?.id || !Array.isArray(sensors)) return;
-  await yieldToMainThread();
-  stationSensorsCache[stn.id] = sensors;
-  const precipCache = stationPrecipitationCache[stn.id] || {};
-
-  for (const sensor of sensors) {
-    if (!isSpecialPrecipitationChart(stn, sensor)) continue;
-    const key = buildPrecipitationCacheKey(sensor);
-    if (precipCache[key]) continue;
-
-    const rows = [...sensor.rows].reverse();
-    const bars = buildPrecipitationBars(rows);
-    const accumulation = await buildRolling24hAccumulation(rows, bars, null, { ignoreRenderToken: true });
-    if (!accumulation) continue;
-
-    precipCache[key] = { bars, accumulation };
-  }
-
-  stationPrecipitationCache[stn.id] = precipCache;
-}
-
 function parseArpavDate(ts) {
   if (!ts || ts.length < 12) return null;
   const yyyy = Number(ts.slice(0, 4));
@@ -1990,8 +1909,7 @@ function buildPrecipitationBars(rows) {
   }).map(v => Math.max(0, Number(v.toFixed(3))));
 }
 
-async function buildRolling24hAccumulation(rows, bars, renderToken, options = {}) {
-  const { ignoreRenderToken = false } = options;
+async function buildRolling24hAccumulation(rows, bars, renderToken) {
   const windowMs = 24 * 60 * 60 * 1000;
   const parsedDates = rows.map(r => parseArpavDate(r.dt));
 
@@ -2011,7 +1929,7 @@ async function buildRolling24hAccumulation(rows, bars, renderToken, options = {}
   let rollingStart = 0;
   let rollingSum = 0;
   for (let i = 0; i < bars.length; i++) {
-    if (!ignoreRenderToken && renderToken !== activePrecipitationRenderToken) return null;
+    if (renderToken !== activePrecipitationRenderToken) return null;
     rollingSum += bars[i];
     const currentDate = parsedDates[i];
     while (rollingStart <= i) {
@@ -2048,8 +1966,7 @@ async function renderSpecialPrecipitation(stn, sensor) {
   if (renderToken !== activePrecipitationRenderToken) return;
 
   const labels = rows.map(r => r.label);
-  const cachedPrecipitation = getCachedPrecipitationData(stn?.id, sensor);
-  const bars = cachedPrecipitation?.bars || buildPrecipitationBars(rows);
+  const bars = buildPrecipitationBars(rows);
   if (renderToken !== activePrecipitationRenderToken) return;
 
   const lastStep = bars.at(-1) ?? 0;
@@ -2134,8 +2051,7 @@ async function renderSpecialPrecipitation(stn, sensor) {
   });
 
   setTimeout(async () => {
-    const accumulation = cachedPrecipitation?.accumulation
-      || await buildRolling24hAccumulation(rows, bars, renderToken);
+    const accumulation = await buildRolling24hAccumulation(rows, bars, renderToken);
     if (!accumulation || renderToken !== activePrecipitationRenderToken) return;
 
     const last24h = accumulation.at(-1) ?? 0;
