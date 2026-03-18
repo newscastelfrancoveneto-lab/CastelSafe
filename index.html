@@ -728,7 +728,44 @@ function closePanel() {
 }
 
 // --- GESTIONE NOTIFICHE ---
-// Open IndexedDB (stesso nome/versione SW)
+// Salva una notifica in localStorage (max 20) + IndexedDB (principale)
+async function notifSave(notif) {
+  // 1. LocalStorage (per compatibilità)
+  let list = [];
+  try { list = JSON.parse(localStorage.getItem('notifList') || '[]'); } catch {}
+  const key = `${notif.title}-${notif.timestamp}`;
+  if (!list.some(n => `${n.title}-${n.timestamp}` === key)) {
+    list.unshift(notif);
+    if (list.length > 20) list.pop();
+    localStorage.setItem('notifList', JSON.stringify(list));
+  }
+  
+  // 2. IndexedDB (principale, persiste anche senza pagina aperta)
+  try {
+    const db = await openDB();
+    await db.transaction('notifications', 'readwrite').objectStore('notifications').add(notif);
+  } catch (e) { console.warn('IndexedDB save failed', e); }
+}
+
+// Aggiunge una notifica alla UI (non salva)
+function addNotificationToUI(notif, persist = true) {
+  if (persist) notifSave(notif);
+  const listEl = document.querySelector('.notifications-list');
+  if (!listEl) return;
+  const placeholder = listEl.querySelector('.notification-placeholder');
+  if (placeholder) placeholder.remove();
+  
+  const item = document.createElement('div');
+  item.className = 'notification-item';
+  item.innerHTML = `
+    <div class="notif-title">${notif.title}</div>
+    <div class="notif-body">${notif.body}</div>
+    <div class="notif-time">${notif.timestamp}</div>
+  `;
+  listEl.prepend(item);
+}
+
+// Open IndexedDB (stesso nome/versione del SW)
 function openDB() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open('NotificheDB', 1);
@@ -778,93 +815,67 @@ function openDB() {
   });
 }
 
-// Salva notifica (localStorage + IndexedDB)
-async function notifSave(notif) {
-  // 1. LocalStorage compatibilità
-  let list = [];
-  try { list = JSON.parse(localStorage.getItem('notifList') || '[]'); } catch {}
-  const key = `${notif.title}-${notif.timestamp}`;
-  if (!list.some(n => `${n.title}-${n.timestamp}` === key)) {
-    list.unshift(notif);
-    if (list.length > 20) list.pop();
-    localStorage.setItem('notifList', JSON.stringify(list));
-  }
-  // 2. IndexedDB
-  try {
-    const db = await openDB();
-    await db.transaction('notifications', 'readwrite').objectStore('notifications').add(notif);
-  } catch (e) { console.warn('IndexedDB save failed', e); }
-}
-
-// Aggiunge alla UI
-function addNotificationToUI(notif, persist = true) {
-  if (persist) notifSave(notif);
-  const listEl = document.querySelector('.notifications-list');
-  if (!listEl) return;
-  const placeholder = listEl.querySelector('.notification-placeholder');
-  if (placeholder) placeholder.remove();
-  const item = document.createElement('div');
-  item.className = 'notification-item';
-  item.innerHTML = `
-    <div class="notif-title">${notif.title}</div>
-    <div class="notif-body">${notif.body}</div>
-    <div class="notif-time">${notif.timestamp}</div>
-  `;
-  listEl.prepend(item);
-}
-
-// Carica tutte all'avvio
+// Carica tutte le notifiche all'avvio (IndexedDB prima, poi localStorage)
 async function loadSavedNotifications() {
   const listEl = document.querySelector('.notifications-list');
   if (!listEl) return;
-  // 1. IndexedDB
+  
+  // 1. IndexedDB (principale: notifiche dal SW quando app chiusa)
   let notifications = [];
   try {
     const db = await openDB();
     notifications = await db.transaction('notifications', 'readonly').objectStore('notifications').getAll();
-    notifications.reverse();
+    notifications.reverse(); // più recenti prima
   } catch (e) { console.warn('IndexedDB load failed', e); }
-  // 2. LocalStorage
+  
+  // 2. LocalStorage fallback (vecchie notifiche)
   let saved = [];
-  try { saved = JSON.parse(localStorage.getItem('notifList') || '[]'); } catch {}
-  // 3. Merge + deduplica
+  try {
+    saved = JSON.parse(localStorage.getItem('notifList') || '[]');
+  } catch {}
+  
+  // Merge + deduplica (timestamp + title)
   const all = [...notifications, ...saved].filter((n, i, arr) => 
     arr.findIndex(m => m.timestamp === n.timestamp && m.title === n.title) === i
   );
+  
   if (all.length === 0) {
     listEl.innerHTML = '<p class="notification-placeholder">Nessuna notifica recente</p>';
     return;
   }
+  
   listEl.innerHTML = '';
-  all.slice(0, 20).forEach(n => addNotificationToUI(n, false));
+  all.slice(0, 20).forEach(n => addNotificationToUI(n, false)); // false: non ri-salvare
 }
 
 // Svuota tutto
 async function clearNotifications() {
+  // 1. LocalStorage
   localStorage.removeItem('notifList');
+  // 2. DOM
   const listEl = document.querySelector('.notifications-list');
   if (listEl) listEl.innerHTML = '<p class="notification-placeholder">Nessuna notifica recente</p>';
+  // 3. IndexedDB
   try {
     const db = await openDB();
     await db.transaction('notifications', 'readwrite').objectStore('notifications').clear();
   } catch (e) { console.warn('IndexedDB clear failed', e); }
 }
 
-// BroadcastChannel + load iniziale
+// Ascolta notifiche in arrivo dal Service Worker in tempo reale
 const bc = new BroadcastChannel('notifications-channel');
 bc.onmessage = (event) => {
-  console.log('Notifica ricevuta in tempo reale', event.data);
-  addNotificationToUI(event.data, true);
-  if (typeof loadAllerta === 'function') setTimeout(loadAllerta, 1000);
+  console.log("Notifica ricevuta in tempo reale:", event.data);
+  addNotificationToUI(event.data, true) // aggiunge UI + salva in localStorage
+  setTimeout(() => { if (typeof loadAllerta === 'function') loadAllerta(); }, 1000);
 };
 
-// Carica notifiche all'avvio
+// Carica notifiche salvate quando la pagina è pronta
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', loadSavedNotifications);
 } else {
   loadSavedNotifications();
 }
-
 
 // ── MAPPA ─────────────────────────────────────────────────────────────────────
 const map = L.map('map', { center: [45.6640, 11.9580], zoom: 13, zoomControl: false });
@@ -2655,10 +2666,9 @@ async function loadAllerta(data = null) {
 }
 
 
-let lastAllertaSignature = null;
 async function checkAllertaUpdates() {
   try {
-    const res = await fetch(`${APIBASE}/apiallerta`, { cache: 'no-store' });
+    const res = await fetch(API_BASE + '/api/allerta', { cache: 'no-store' });
     if (!res.ok) return;
     const d = await res.json();
     if (!d || !d.idr) return;
