@@ -2017,6 +2017,51 @@ function buildPrecipitationBars(rows) {
   }).map(v => Math.max(0, Number(v.toFixed(3))));
 }
 
+function normalizeSensorText(sensor) {
+  return `${sensor?.type || ''} ${sensor?.paramnm || ''} ${sensor?.unitnm || ''}`.toLowerCase();
+}
+
+function findSupportSensor(sensors, matchers) {
+  return (sensors || []).find(sensor => {
+    const text = normalizeSensorText(sensor);
+    return matchers.some(matcher => text.includes(matcher));
+  }) || null;
+}
+
+function buildTimestampValueMap(rows) {
+  return new Map((rows || [])
+    .filter(row => row?.dt)
+    .map(row => [row.dt, Number.isFinite(row.val) ? row.val : null]));
+}
+
+function buildPrecipitationSupportSeries(rows, sensors, currentSensor) {
+  const siblingSensors = (sensors || []).filter(sensor => sensor !== currentSensor);
+  const temperatureSensor = findSupportSensor(siblingSensors, ['temperat', 'temp aria', 'temp']);
+  const radiationSensor = findSupportSensor(siblingSensors, ['radiaz', 'solar', 'solare', 'globale']);
+
+  const temperatureMap = buildTimestampValueMap(temperatureSensor?.rows);
+  const radiationMap = buildTimestampValueMap(radiationSensor?.rows);
+
+  return {
+    temperatureSensor,
+    radiationSensor,
+    temperatureSeries: rows.map(row => temperatureMap.get(row.dt) ?? null),
+    radiationSeries: rows.map(row => radiationMap.get(row.dt) ?? null)
+  };
+}
+
+function estimateDryingLossMm(stepHours, temperature, radiation) {
+  const safeStepHours = Math.max(0, Number.isFinite(stepHours) ? stepHours : 0.5);
+  const temp = Number.isFinite(temperature) ? temperature : null;
+  const rad = Number.isFinite(radiation) ? radiation : null;
+
+  let lossRateMmPerHour = 0;
+  if (temp !== null) lossRateMmPerHour += Math.max(0, temp - 4) * 0.03;
+  if (rad !== null) lossRateMmPerHour += Math.max(0, rad) * 0.00035;
+
+  return Number(Math.max(0, lossRateMmPerHour * safeStepHours).toFixed(3));
+}
+
 async function buildRolling24hAccumulation(rows, bars, renderToken) {
   const windowMs = 24 * 60 * 60 * 1000;
   const parsedDates = rows.map(r => parseArpavDate(r.dt));
@@ -2057,6 +2102,80 @@ async function buildRolling24hAccumulation(rows, bars, renderToken) {
   return accumulation;
 }
 
+async function buildDryingAdjusted24hAccumulation(rows, bars, supportSeries, renderToken) {
+  const windowMs = 24 * 60 * 60 * 1000;
+  const parsedDates = rows.map(r => parseArpavDate(r.dt));
+  const temperatureSeries = supportSeries?.temperatureSeries || [];
+  const radiationSeries = supportSeries?.radiationSeries || [];
+  const hasSupport = temperatureSeries.some(Number.isFinite) || radiationSeries.some(Number.isFinite);
+  if (!hasSupport) return null;
+
+  let inferredStepMs = 30 * 60 * 1000;
+  for (let i = 1; i < parsedDates.length; i++) {
+    if (parsedDates[i] && parsedDates[i - 1]) {
+      const delta = parsedDates[i] - parsedDates[i - 1];
+      if (delta > 0) {
+        inferredStepMs = delta;
+        break;
+      }
+    }
+  }
+  const fallbackWindow = Math.max(1, Math.round(windowMs / inferredStepMs));
+
+  const adjustedAccumulation = [];
+  const remainingRainQueue = [];
+  let rollingSum = 0;
+  for (let i = 0; i < bars.length; i++) {
+    if (renderToken !== activePrecipitationRenderToken) return null;
+
+    const currentDate = parsedDates[i];
+    const prevDate = i > 0 ? parsedDates[i - 1] : null;
+    const stepMs = currentDate && prevDate && currentDate > prevDate ? (currentDate - prevDate) : inferredStepMs;
+    let dryingLoss = estimateDryingLossMm(
+      stepMs / (60 * 60 * 1000),
+      temperatureSeries[i],
+      radiationSeries[i]
+    );
+
+    if (bars[i] > 0) {
+      remainingRainQueue.push({
+        idx: i,
+        date: currentDate,
+        remaining: bars[i]
+      });
+      rollingSum += bars[i];
+    }
+
+    for (let q = 0; q < remainingRainQueue.length && dryingLoss > 0; q++) {
+      const entry = remainingRainQueue[q];
+      if (entry.remaining <= 0) continue;
+      const consumed = Math.min(entry.remaining, dryingLoss);
+      entry.remaining = Number((entry.remaining - consumed).toFixed(3));
+      rollingSum = Number(Math.max(0, rollingSum - consumed).toFixed(3));
+      dryingLoss = Number((dryingLoss - consumed).toFixed(3));
+    }
+
+    while (remainingRainQueue.length) {
+      const candidate = remainingRainQueue[0];
+      const tooOldByDate = currentDate && candidate.date
+        ? (currentDate - candidate.date) > windowMs
+        : (i - candidate.idx + 1) > fallbackWindow;
+      if (!tooOldByDate) break;
+      rollingSum = Number(Math.max(0, rollingSum - candidate.remaining).toFixed(3));
+      remainingRainQueue.shift();
+    }
+
+    while (remainingRainQueue.length && remainingRainQueue[0].remaining <= 0) {
+      remainingRainQueue.shift();
+    }
+
+    adjustedAccumulation.push(Number(Math.max(0, rollingSum).toFixed(3)));
+    if (i % 200 === 0) await yieldToMainThread();
+  }
+
+  return adjustedAccumulation;
+}
+
 function yieldToMainThread() {
   return new Promise(resolve => setTimeout(resolve, 0));
 }
@@ -2067,6 +2186,12 @@ async function renderSpecialPrecipitation(stn, sensor) {
   const renderToken = ++activePrecipitationRenderToken;
   const rows = [...sensor.rows].reverse();
   const unit = sensor.unitnm || 'mm';
+  const supportSeries = buildPrecipitationSupportSeries(rows, currentSensors, sensor);
+  const hasDryingSupport = !!(supportSeries.temperatureSensor || supportSeries.radiationSensor);
+  const supportSummary = [
+    supportSeries.temperatureSensor ? `temperatura: ${supportSeries.temperatureSensor.paramnm}` : null,
+    supportSeries.radiationSensor ? `radiazione: ${supportSeries.radiationSensor.paramnm}` : null
+  ].filter(Boolean).join(' · ');
   document.getElementById('panel-body').innerHTML =
     `<div class="loading"><div class="spinner"></div>Preparazione grafico precipitazioni...</div>`;
 
@@ -2084,13 +2209,15 @@ async function renderSpecialPrecipitation(stn, sensor) {
     `<div class="stat-row">
       <div class="stat-card"><div class="val">${lastStep.toFixed(2)}</div><div class="lbl">Ultimo step (${unit})</div></div>
       <div class="stat-card"><div class="val" id="precip-acc-last">—</div><div class="lbl">Accumulo 24h (${unit})</div></div>
+      <div class="stat-card"><div class="val" id="precip-acc-drying">—</div><div class="lbl">Accumulo 24h corretto (${unit})</div></div>
       <div class="stat-card"><div class="val" id="precip-acc-peak">—</div><div class="lbl">Picco 24h (${unit})</div></div>
       <div class="stat-card"><div class="val">${total48h.toFixed(2)}</div><div class="lbl">Totale 48h (${unit})</div></div>
     </div>
     <small id="precip-acc-status" style="display:block;margin:10px 4px 0;color:#64748b;font-weight:600;">Calcolo accumulo 24h in background…</small>
+    <small id="precip-drying-note" style="display:block;margin:4px 4px 0;color:#64748b;">${hasDryingSupport ? `Correzione “asciugatura” attiva con ${supportSummary}.` : 'Correzione “asciugatura” non disponibile: sensori di temperatura/radiazione non trovati per questa stazione.'}</small>
     <div class="chart-wrap"><canvas id="sensorChart"></canvas></div>
     <table class="data-table">
-      <thead><tr><th>Data / Ora</th><th>Precipitazione (${unit})</th><th>Accumulo 24h (${unit})</th></tr></thead>
+      <thead><tr><th>Data / Ora</th><th>Precipitazione (${unit})</th><th>Accumulo 24h (${unit})</th><th>Accumulo 24h corretto (${unit})</th></tr></thead>
       <tbody id="tbl-body"></tbody>
     </table>`;
 
@@ -2099,7 +2226,7 @@ async function renderSpecialPrecipitation(stn, sensor) {
     const reverseIdx = src.length - 1 - i;
     const tr = document.createElement('tr');
     if (i === 0) tr.classList.add('latest');
-    tr.innerHTML = `<td>${r.label}</td><td><strong>${bars[reverseIdx].toFixed(2)}</strong></td><td data-acc-idx="${reverseIdx}">—</td>`;
+    tr.innerHTML = `<td>${r.label}</td><td><strong>${bars[reverseIdx].toFixed(2)}</strong></td><td data-acc-idx="${reverseIdx}">—</td><td data-drying-idx="${reverseIdx}">—</td>`;
     tbody.appendChild(tr);
   });
 
@@ -2161,17 +2288,29 @@ async function renderSpecialPrecipitation(stn, sensor) {
   setTimeout(async () => {
     const accumulation = await buildRolling24hAccumulation(rows, bars, renderToken);
     if (!accumulation || renderToken !== activePrecipitationRenderToken) return;
+    const dryingAdjustedAccumulation = hasDryingSupport
+      ? await buildDryingAdjusted24hAccumulation(rows, bars, supportSeries, renderToken)
+      : null;
+    if (renderToken !== activePrecipitationRenderToken) return;
 
     const last24h = accumulation.at(-1) ?? 0;
     const max24h = accumulation.length ? Math.max(...accumulation) : 0;
+    const last24hDrying = dryingAdjustedAccumulation?.at(-1) ?? null;
     const lastEl = document.getElementById('precip-acc-last');
+    const dryingEl = document.getElementById('precip-acc-drying');
     const peakEl = document.getElementById('precip-acc-peak');
     if (lastEl) lastEl.textContent = last24h.toFixed(2);
+    if (dryingEl) dryingEl.textContent = last24hDrying !== null ? last24hDrying.toFixed(2) : '—';
     if (peakEl) peakEl.textContent = max24h.toFixed(2);
 
     document.querySelectorAll('[data-acc-idx]').forEach(cell => {
       const idx = Number(cell.getAttribute('data-acc-idx'));
       cell.textContent = Number.isFinite(idx) ? accumulation[idx].toFixed(2) : '—';
+    });
+    document.querySelectorAll('[data-drying-idx]').forEach(cell => {
+      const idx = Number(cell.getAttribute('data-drying-idx'));
+      const value = Number.isFinite(idx) ? dryingAdjustedAccumulation?.[idx] : null;
+      cell.textContent = Number.isFinite(value) ? value.toFixed(2) : '—';
     });
 
     const statusEl = document.getElementById('precip-acc-status');
@@ -2191,6 +2330,22 @@ async function renderSpecialPrecipitation(stn, sensor) {
       fill: false,
       order: 1
     });
+    if (dryingAdjustedAccumulation) {
+      activeChart.data.datasets.push({
+        label: `Accumulo 24h corretto (${unit})`,
+        data: dryingAdjustedAccumulation,
+        yAxisID: 'yAccum',
+        type: 'line',
+        borderColor: '#ef4444',
+        backgroundColor: 'rgba(239,68,68,.12)',
+        borderWidth: 2,
+        tension: 0.2,
+        pointRadius: dryingAdjustedAccumulation.length > 100 ? 0 : 2,
+        pointHoverRadius: 4,
+        fill: false,
+        order: 0
+      });
+    }
     activeChart.update('none');
   }, 0);
 }
