@@ -606,33 +606,12 @@ function withNgrokBypass(url) {
   return `${url}${sep}ngrok-skip-browser-warning=true`;
 }
 
-function buildApiUrl(pathOrUrl) {
-  return /^https?:\/\//i.test(pathOrUrl)
+function apiFetch(pathOrUrl, options = {}) {
+  const fullUrl = /^https?:\/\//i.test(pathOrUrl)
     ? pathOrUrl
     : `${API_BASE}${pathOrUrl.startsWith('/') ? '' : '/'}${pathOrUrl}`;
-}
 
-function shouldProxyFallback(err) {
-  return err instanceof TypeError;
-}
-
-async function apiFetch(pathOrUrl, options = {}) {
-  const fullUrl = buildApiUrl(pathOrUrl);
-  const targetUrl = withNgrokBypass(fullUrl);
-
-  try {
-    return await fetch(targetUrl, options);
-  } catch (err) {
-    const method = String(options?.method || 'GET').toUpperCase();
-    const isNgrok = targetUrl.includes('.ngrok-free.dev');
-    const canProxy = method === 'GET' && isNgrok && shouldProxyFallback(err);
-
-    if (!canProxy) throw err;
-
-    console.warn('Fetch diretto fallito, uso proxy CORS fallback:', err.message || err);
-    const proxyUrl = `${PROXY}${encodeURIComponent(targetUrl)}`;
-    return fetch(proxyUrl, { ...options, cache: 'no-store' });
-  }
+  return fetch(withNgrokBypass(fullUrl), options);
 }
 const XML_URL = 'https://www.arpa.veneto.it/api/risorse/data-meteo/xml/Ultime48ore.xml';
 const CSV_BASE = `${API_BASE}/api/arpav/csv/`;
