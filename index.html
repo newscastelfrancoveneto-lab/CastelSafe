@@ -2845,7 +2845,7 @@ initMarkers();
 // CARICA ALLERTA SUBITO, indipendentemente da notifiche/push
 loadAllerta();
 setInterval(loadAllerta, 10 * 60 * 1000);  // Ogni 10min
-setInterval(checkAllertaUpdates, 60 * 1000); // Polling 1min
+setInterval(checkAllertaUpdates, 10 * 1000); // Polling 1min
 updatePanelTop()
 
 initGlobalRefreshScheduler();
