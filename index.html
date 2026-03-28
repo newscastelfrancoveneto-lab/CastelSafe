@@ -608,12 +608,23 @@ function withNgrokBypass(url) {
 }
 
 function apiFetch(pathOrUrl, options = {}) {
-  const fullUrl = /^https?:\/\//i.test(pathOrUrl)
-    ? pathOrUrl
-    : `${API_BASE}${pathOrUrl.startsWith('/') ? '' : '/'}${pathOrUrl}`;
-
-  return fetch(withNgrokBypass(fullUrl), options);
+  const fullUrl = /^https?:/.test(pathOrUrl) ? pathOrUrl : APIBASE + pathOrUrl;
+  const url = withNgrokBypass(fullUrl);
+  // CORS + NGROK forzato
+  const fetchOpts = {
+    ...options,
+    headers: {
+      ...options.headers,
+      'ngrok-skip-browser-warning': 'true',
+      'Origin': 'https://newscastelfrancoveneto-lab.github.io'  // Spoof origin
+    },
+    mode: 'cors',
+    credentials: 'include'
+  };
+  return fetch(url, fetchOpts);
 }
+
+	
 const XML_URL = 'https://www.arpa.veneto.it/api/risorse/data-meteo/xml/Ultime48ore.xml';
 const CSV_BASE = `${API_BASE}/api/arpav/csv/`;
 const OSM_API = 'https://api.openstreetmap.org/api/0.6/node/';
