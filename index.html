@@ -2925,7 +2925,7 @@ function renderAllerta(d) {
 async function loadAllerta(data = null) {
   try {
     if (data) { renderAllerta(data); return; }
-    const res = await apiFetch('/api/allerta', { cache: 'no-store' });
+    const res = await apiFetch('api/allerta', { cache: 'no-store' });
     if (!res.ok) return;
     const d = await res.json();
     renderAllerta(d);
@@ -2935,7 +2935,7 @@ async function loadAllerta(data = null) {
 
 async function checkAllertaUpdates() {
   try {
-    const res = await apiFetch('/api/allerta', { cache: 'no-store' });
+    const res = await apiFetch('api/allerta', { cache: 'no-store' });
     if (!res.ok) return;
     const d = await res.json();
     if (!d || !d.idr) return;
