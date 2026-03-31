@@ -2835,15 +2835,18 @@ async function subscribeUser() {
     
     const result = await response.json();
     console.log('Subscribe OK:', result);
+	updateSubscribeButton();
     /*
     btn.textContent = `Attive (${result.count})`;
     btn.style.background = '#16A34A';  // Verde OK
     */
   } catch (err) {
     console.error('Subscribe fallito:', err);
+	updateSubscribeButton();
     /*btn.textContent = 'Errore - Riprova';
     btn.style.background = '#DC2626';  // Rosso errore*/
   } finally {
+	updateSubscribeButton();
     btn.disabled = false;  // ← RIABILITA SEMPRE!
   }
 }
