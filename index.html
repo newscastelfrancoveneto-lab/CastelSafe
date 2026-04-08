@@ -518,6 +518,8 @@
     <div id="info-box" class="modal-box">
       <button class="modal-close-btn" onclick="document.getElementById('info-modal').classList.remove('open')">✕</button>
       <h2>Informazioni sull'app</h2>
+      <h3>ℹ️ A cosa serve</h3>
+      <p>Questa app aiuta i cittadini a consultare in modo rapido le allerte meteo regionali, i dati dei sensori ARPAV e le aree di protezione civile del Comune di Castelfranco Veneto.</p>
 	  <h3>Aree di protezione civile</h3>
 	  <h3><span class="info-area-badge" style="background:#166534">Area di attesa</span> </h3>
       <p>Punto di raccolta sicuro per la popolazione in caso di evacuazione. Recati qui <strong>immediatamente</strong> se ricevi un'allerta di evacuazione. Rimani in attesa di istruzioni.</p>
@@ -527,8 +529,12 @@
       <p>Zona riservata ai soccorritori e ai mezzi di emergenza. <strong>Non accessibile alla popolazione.</strong></p>
       <h3>📡 Stazioni sensori ARPAV</h3>
       <p>Livelli dei corsi d'acqua, precipitazioni e altri dati ambientali forniti da <strong>ARPAV</strong>, aggiornati ogni 30 min.<br><a href="https://www.arpa.veneto.it/dati-ambientali/dati-in-diretta/meteo-idro-nivo/pannello-meteo-segnalazioni" target="_blank">→ Dati in diretta ARPAV</a></p>
+      <h3>🚧 Avvisi strade/aree (chiusure e pericoli)</h3>
+      <p>Nella mappa trovi gli avvisi su strade e aree con limitazioni temporanee: chiusure totali, chiusure parziali, passaggi limitati e zone con pericolo (es. allagamenti, ostacoli, lavori, eventi). Apri il dettaglio dell'avviso per vedere descrizione, periodo di validità e area interessata.</p>
       <h3>🗺️ Dati geografici</h3>
       <p>Corsi d'acqua e aree di protezione civile estratti da <a href="https://www.openstreetmap.org" target="_blank">OpenStreetMap</a> </p>
+      <h3>🔒 Area operatori</h3>
+      <p>La pagina di gestione avvisi è riservata agli operatori autorizzati: <a href="./admin.html" target="_blank">Apri pagina admin</a>.</p>
     </div>
   </div>
 
@@ -1497,10 +1503,6 @@ const LayerSwitcher = L.Control.extend({
             <span class="layer-swatch alert"></span>
             Strade/aree chiuse
           </label>
-          <a class="layer-control-item" href="./admin.html" style="text-decoration:none;color:inherit;">
-            <span class="layer-swatch" style="background:#8d021f"></span>
-            Apri pagina admin
-          </a>
         </div>
       </div>
     `;
