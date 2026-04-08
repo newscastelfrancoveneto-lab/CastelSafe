@@ -50,15 +50,7 @@
   <div class="layout">
     <div class="panel">
       <h1>Nuovo avviso chiusura</h1>
-      <label>Tipo geometria</label>
-      <select id="geomType">
-        <option value="Point">Punto</option>
-        <option value="LineString">Linea</option>
-        <option value="Polygon">Area (poligono)</option>
-      </select>
-      <p class="hint">La geometria viene presa da OpenStreetMap: scarica i dati dell'area visibile e seleziona un elemento OSM sulla mappa.</p>
-      <button id="loadOsmBtn">Scarica dati OSM area visibile</button>
-      <button id="finishGeomBtn">Conferma selezione OSM</button>
+      <p class="hint">La geometria viene presa da OpenStreetMap: i dati dell'area visibile si aggiornano automaticamente mentre scorri la mappa. Clicca sulla mappa per selezionare o deselezionare più elementi OSM insieme.</p>
 
       <label>Titolo</label><input id="title" placeholder="Es. Chiusura Via Roma" />
       <label>Descrizione</label><textarea id="description" rows="4" placeholder="Dettagli lavori/evento..."></textarea>
@@ -104,9 +96,11 @@ setLogged(sessionStorage.getItem(AUTH_KEY) === '1');
 
 let map, draftLayer, alertsLayer, osmSourceLayer;
 let draftGeometry = null;
-let draftType = 'Point';
-let selectedOSMFeature = null;
+let selectedOSMFeatures = [];
+let selectedOSMIds = new Set();
 let osmFeaturesCache = [];
+let osmLoadTimer = null;
+let osmFetchController = null;
 
 function getData() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || { type:'FeatureCollection', features:[] }; }
@@ -118,8 +112,10 @@ function style() { return { color:'#b91c1c', fillColor:'#dc2626', weight:3, fill
 
 function resetDraft() {
   draftGeometry = null;
-  selectedOSMFeature = null;
+  selectedOSMFeatures = [];
+  selectedOSMIds = new Set();
   draftLayer.clearLayers();
+  renderOsmFeatures();
   document.getElementById('state').textContent = 'Bozza cancellata.';
 }
 
@@ -135,9 +131,7 @@ function refreshAlerts() {
   }).addTo(alertsLayer);
 }
 
-function geometryFromDraft() {
-  return draftGeometry;
-}
+function geometryFromDraft() { return draftGeometry; }
 
 function drawDraft() {
   draftLayer.clearLayers();
@@ -157,41 +151,35 @@ function toRing(coords = []) {
   return closed ? coords : [...coords, first];
 }
 
-function geometryCompatibleWithType(geometry, type) {
-  if (!geometry) return false;
-  if (type === 'Point') return geometry.type === 'Point';
-  if (type === 'LineString') return geometry.type === 'LineString' || geometry.type === 'MultiLineString';
-  return geometry.type === 'Polygon' || geometry.type === 'MultiPolygon';
-}
-
-function normalizeGeometryForDraft(geometry, type) {
-  if (!geometryCompatibleWithType(geometry, type)) return null;
-  if (type === 'Point') return geometry.type === 'Point' ? geometry : null;
-
-  if (type === 'LineString') {
-    if (geometry.type === 'LineString') return geometry.coordinates.length >= 2 ? geometry : null;
-    const line = (geometry.coordinates || []).reduce((best, current) => (
-      (current?.length || 0) > (best?.length || 0) ? current : best
-    ), null);
-    return line?.length >= 2 ? { type:'LineString', coordinates: line } : null;
+function normalizeGeometryForDraft(geometry) {
+  if (!geometry) return null;
+  if (geometry.type === 'Point') return geometry;
+  if (geometry.type === 'LineString') return geometry.coordinates?.length >= 2 ? geometry : null;
+  if (geometry.type === 'MultiLineString') {
+    const lines = (geometry.coordinates || []).filter((line) => line?.length >= 2);
+    return lines.length ? { type:'MultiLineString', coordinates: lines } : null;
   }
-
   if (geometry.type === 'Polygon') {
     const outer = toRing(geometry.coordinates?.[0] || []);
     return outer?.length >= 4 ? { type:'Polygon', coordinates:[outer] } : null;
   }
-  const firstPoly = geometry.coordinates?.[0];
-  const outer = toRing(firstPoly?.[0] || []);
-  return outer?.length >= 4 ? { type:'Polygon', coordinates:[outer] } : null;
+  if (geometry.type === 'MultiPolygon') {
+    const polygons = (geometry.coordinates || [])
+      .map((poly) => toRing(poly?.[0] || []))
+      .filter((ring) => ring?.length >= 4)
+      .map((ring) => [ring]);
+    return polygons.length ? { type:'MultiPolygon', coordinates: polygons } : null;
+  }
+  return null;
 }
 
 function osmFeatureStyle(feature) {
-  const isCompatible = geometryCompatibleWithType(feature.geometry, draftType);
-  const isSelected = selectedOSMFeature && selectedOSMFeature.properties?._osmId === feature.properties?._osmId;
+  const hasGeometry = Boolean(normalizeGeometryForDraft(feature.geometry));
+  const isSelected = selectedOSMIds.has(feature.properties?._osmId);
   return {
-    color: isSelected ? '#16a34a' : isCompatible ? '#2563eb' : '#94a3b8',
-    fillColor: isSelected ? '#22c55e' : isCompatible ? '#60a5fa' : '#cbd5e1',
-    fillOpacity: isSelected ? 0.35 : isCompatible ? 0.2 : 0.08,
+    color: isSelected ? '#16a34a' : hasGeometry ? '#2563eb' : '#94a3b8',
+    fillColor: isSelected ? '#22c55e' : hasGeometry ? '#60a5fa' : '#cbd5e1',
+    fillOpacity: isSelected ? 0.35 : hasGeometry ? 0.2 : 0.08,
     weight: isSelected ? 4 : 2
   };
 }
@@ -242,39 +230,75 @@ function overpassToFeature(element) {
   };
 }
 
+function updateDraftGeometryFromSelection() {
+  const geometries = selectedOSMFeatures
+    .map((feature) => normalizeGeometryForDraft(feature.geometry))
+    .filter(Boolean);
+  if (!geometries.length) {
+    draftGeometry = null;
+  } else if (geometries.length === 1) {
+    draftGeometry = geometries[0];
+  } else {
+    draftGeometry = { type:'GeometryCollection', geometries };
+  }
+}
+
 async function loadOsmData() {
   const state = document.getElementById('state');
+  if (osmFetchController) osmFetchController.abort();
+  osmFetchController = new AbortController();
   state.textContent = 'Scaricamento dati OSM in corso...';
   const response = await fetch(OVERPASS_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-    body: new URLSearchParams({ data: overpassQueryForBounds(map.getBounds()) })
+    body: new URLSearchParams({ data: overpassQueryForBounds(map.getBounds()) }),
+    signal: osmFetchController.signal
   });
   if (!response.ok) throw new Error(`Overpass HTTP ${response.status}`);
   const data = await response.json();
   osmFeaturesCache = (data.elements || []).map(overpassToFeature).filter(Boolean);
   renderOsmFeatures();
-  state.textContent = `Dati OSM caricati: ${osmFeaturesCache.length} elementi. Seleziona un elemento compatibile.`;
+  state.textContent = `Dati OSM caricati: ${osmFeaturesCache.length} elementi. Elementi selezionati: ${selectedOSMFeatures.length}.`;
+}
+
+function scheduleOsmLoad() {
+  clearTimeout(osmLoadTimer);
+  osmLoadTimer = setTimeout(async () => {
+    try {
+      await loadOsmData();
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+      console.error(err);
+      document.getElementById('state').textContent = 'Errore nello scaricamento dati OSM. Riprova muovendo la mappa.';
+    }
+  }, 350);
 }
 
 function selectOSMFeature(feature) {
-  const normalized = normalizeGeometryForDraft(feature.geometry, draftType);
+  const normalized = normalizeGeometryForDraft(feature.geometry);
   if (!normalized) {
-    document.getElementById('state').textContent = 'Elemento OSM non compatibile con il tipo geometria selezionato.';
+    document.getElementById('state').textContent = 'Elemento OSM non utilizzabile.';
     return;
   }
-  selectedOSMFeature = feature;
-  draftGeometry = normalized;
+  const osmId = feature.properties?._osmId;
+  if (!osmId) return;
+  if (selectedOSMIds.has(osmId)) {
+    selectedOSMIds.delete(osmId);
+    selectedOSMFeatures = selectedOSMFeatures.filter((f) => f.properties?._osmId !== osmId);
+  } else {
+    selectedOSMIds.add(osmId);
+    selectedOSMFeatures.push(feature);
+  }
+  updateDraftGeometryFromSelection();
   drawDraft();
   renderOsmFeatures();
-  const name = feature.properties?.name || feature.properties?.highway || feature.properties?.amenity || feature.properties?._osmId;
-  document.getElementById('state').textContent = `Selezionato OSM: ${name}`;
+  document.getElementById('state').textContent = `Elementi OSM selezionati: ${selectedOSMFeatures.length}`;
 }
 
 function initAdminMap() {
   window._adminMapInit = true;
-  map = L.map('map', { center:[45.664,11.958], zoom:13 });
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap' }).addTo(map);
+  map = L.map('map', { center:[45.664,11.958], zoom:13, maxZoom:22 });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:22 }).addTo(map);
   draftLayer = L.layerGroup().addTo(map);
   alertsLayer = L.layerGroup().addTo(map);
   osmSourceLayer = L.geoJSON([], {
@@ -288,21 +312,8 @@ function initAdminMap() {
     }
   }).addTo(map);
   refreshAlerts();
-
-  document.getElementById('geomType').onchange = (e) => {
-    draftType = e.target.value;
-    resetDraft();
-    renderOsmFeatures();
-  };
-  document.getElementById('loadOsmBtn').onclick = async () => {
-    try {
-      await loadOsmData();
-    } catch (err) {
-      console.error(err);
-      document.getElementById('state').textContent = 'Errore nello scaricamento dati OSM. Riprova.';
-    }
-  };
-  document.getElementById('finishGeomBtn').onclick = drawDraft;
+  scheduleOsmLoad();
+  map.on('moveend', scheduleOsmLoad);
   document.getElementById('clearDraftBtn').onclick = resetDraft;
 
   document.getElementById('saveBtn').onclick = async () => {
