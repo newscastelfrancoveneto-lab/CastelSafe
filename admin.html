@@ -272,6 +272,9 @@ let osmFeaturesCache = [];
 let osmLoadTimer = null;
 let osmFetchController = null;
 let isEditingMode = true;
+const OSM_CACHE_TTL_MS = 5 * 60 * 1000;
+const OSM_CACHE_MAX_ENTRIES = 30;
+const osmViewportCache = new Map();
 
 function setOsmLoaderState(isLoading, message) {
   const loader = document.getElementById('osmLoader');
@@ -545,6 +548,35 @@ function overpassQueryForBounds(bounds) {
 out geom;`;
 }
 
+
+function getViewportCacheKey(bounds, zoom) {
+  return [
+    bounds.getSouth().toFixed(3),
+    bounds.getWest().toFixed(3),
+    bounds.getNorth().toFixed(3),
+    bounds.getEast().toFixed(3),
+    Number(zoom || 0).toFixed(1)
+  ].join('|');
+}
+
+function readViewportCache(cacheKey) {
+  const cached = osmViewportCache.get(cacheKey);
+  if (!cached) return null;
+  if (Date.now() - cached.timestamp > OSM_CACHE_TTL_MS) {
+    osmViewportCache.delete(cacheKey);
+    return null;
+  }
+  return cached.features;
+}
+
+function writeViewportCache(cacheKey, features) {
+  if (!cacheKey) return;
+  osmViewportCache.set(cacheKey, { timestamp: Date.now(), features });
+  if (osmViewportCache.size <= OSM_CACHE_MAX_ENTRIES) return;
+  const oldestKey = osmViewportCache.keys().next().value;
+  if (oldestKey) osmViewportCache.delete(oldestKey);
+}
+
 function overpassToFeature(element) {
   const id = `${element.type}/${element.id}`;
   if (element.type === 'node' && typeof element.lon === 'number' && typeof element.lat === 'number') {
@@ -620,11 +652,23 @@ async function overpassFetch(query) {
 
 async function loadOsmData() {
   const state = document.getElementById('state');
+  const bounds = map.getBounds();
+  const cacheKey = getViewportCacheKey(bounds, map.getZoom());
+  const cachedFeatures = readViewportCache(cacheKey);
+
+  if (cachedFeatures) {
+    osmFeaturesCache = cachedFeatures;
+    renderOsmFeatures();
+    state.textContent = `Dati OSM in cache: ${osmFeaturesCache.length} elementi. Elementi selezionati: ${selectedOSMFeatures.length}.`;
+    setOsmLoaderState(false, `OSM cache: ${osmFeaturesCache.length} elementi`);
+    return;
+  }
+
   if (osmFetchController) osmFetchController.abort();
   osmFetchController = new AbortController();
   state.textContent = 'Scaricamento dati OSM in corso...';
   setOsmLoaderState(true, 'Caricamento dati OSM...');
-  const query = overpassQueryForBounds(map.getBounds());
+  const query = overpassQueryForBounds(bounds);
   const data = await Promise.race([
     overpassFetch(query),
     new Promise((_, reject) => {
@@ -632,6 +676,7 @@ async function loadOsmData() {
     })
   ]);
   osmFeaturesCache = (data.elements || []).map(overpassToFeature).filter(Boolean);
+  writeViewportCache(cacheKey, osmFeaturesCache);
   renderOsmFeatures();
   state.textContent = `Dati OSM caricati: ${osmFeaturesCache.length} elementi. Elementi selezionati: ${selectedOSMFeatures.length}.`;
   setOsmLoaderState(false, `OSM: ${osmFeaturesCache.length} elementi`);
