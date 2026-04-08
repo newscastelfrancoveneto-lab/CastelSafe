@@ -1334,10 +1334,17 @@ function closureAlertPopupHtml(properties = {}) {
   const endDate = escapeHtml(properties.endDate || '-');
   const startTime = escapeHtml(properties.startTime || '--:--');
   const endTime = escapeHtml(properties.endTime || '--:--');
+  const osmNames = Array.isArray(properties.osmNames)
+    ? properties.osmNames.filter(Boolean).map((name) => escapeHtml(name))
+    : [];
+  const namesHtml = osmNames.length
+    ? `<div style="margin-top:8px;font-size:0.8rem;color:#475569;"><strong>Vie/aree/punti:</strong> ${osmNames.join(', ')}</div>`
+    : '';
 
   return `<div style="font-family:'Inter',sans-serif;font-size:0.9rem;line-height:1.45;">
     <strong style="color:#991b1b;font-size:1rem;">${title}</strong>
     <div style="margin-top:6px;color:#334155;">${description}</div>
+    ${namesHtml}
     <div style="margin-top:8px;font-size:0.78rem;color:#64748b;">
       <strong>Periodo:</strong> ${startDate} ${startTime} → ${endDate} ${endTime}
     </div>
