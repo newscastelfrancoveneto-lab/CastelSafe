@@ -458,12 +458,13 @@ let map, draftLayer, alertsLayer, osmSourceLayer;
 let draftGeometry = null;
 let selectedOSMFeatures = [];
 let selectedOSMIds = new Set();
+const globalOsmCache = new Map();
 let osmFeaturesCache = [];
 let osmLoadTimer = null;
 let osmFetchController = null;
 let isEditingMode = true;
 const OSM_CACHE_TTL_MS = 5 * 60 * 1000;
-const OSM_CACHE_MAX_ENTRIES = 30;
+const OSM_CACHE_MAX_ENTRIES = 50;
 const osmViewportCache = new Map();
 
 function setOsmLoaderState(isLoading, message) {
@@ -753,17 +754,17 @@ function getViewportCacheKey(bounds, zoom) {
 
 function readViewportCache(cacheKey) {
   const cached = osmViewportCache.get(cacheKey);
-  if (!cached) return null;
+  if (!cached) return false;
   if (Date.now() - cached.timestamp > OSM_CACHE_TTL_MS) {
     osmViewportCache.delete(cacheKey);
-    return null;
+    return false;
   }
-  return cached.features;
+  return true; // True significa: "abbiamo già interrogato quest'area di recente"
 }
 
-function writeViewportCache(cacheKey, features) {
+function writeViewportCache(cacheKey) {
   if (!cacheKey) return;
-  osmViewportCache.set(cacheKey, { timestamp: Date.now(), features });
+  osmViewportCache.set(cacheKey, { timestamp: Date.now() });
   if (osmViewportCache.size <= OSM_CACHE_MAX_ENTRIES) return;
   const oldestKey = osmViewportCache.keys().next().value;
   if (oldestKey) osmViewportCache.delete(oldestKey);
@@ -845,29 +846,56 @@ async function overpassFetch(query) {
 async function loadOsmData() {
   const bounds = map.getBounds();
   const cacheKey = getViewportCacheKey(bounds, map.getZoom());
-  const cachedFeatures = readViewportCache(cacheKey);
 
-  if (cachedFeatures) {
-    osmFeaturesCache = cachedFeatures;
-    renderOsmFeatures();
-    setOsmLoaderState(false, `OSM: ${osmFeaturesCache.length} elementi`);
+  // 1. Se abbiamo già scaricato questa esatta porzione di mappa, non fare nulla
+  if (readViewportCache(cacheKey)) {
+    setOsmLoaderState(false, `Dati in cache (${globalOsmCache.size} totali)`);
     return;
   }
 
   if (osmFetchController) osmFetchController.abort();
   osmFetchController = new AbortController();
-  setOsmLoaderState(true, 'Caricamento dati OSM...');
-  const query = overpassQueryForBounds(bounds);
-  const data = await Promise.race([
-    overpassFetch(query),
-    new Promise((_, reject) => {
-      osmFetchController.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
-    })
-  ]);
-  osmFeaturesCache = (data.elements || []).map(overpassToFeature).filter(Boolean);
-  writeViewportCache(cacheKey, osmFeaturesCache);
-  renderOsmFeatures();
-  setOsmLoaderState(false, `OSM: ${osmFeaturesCache.length} elementi`);
+  setOsmLoaderState(true, 'Caricamento nuovi dati OSM...');
+
+  try {
+    const query = overpassQueryForBounds(bounds);
+    const data = await Promise.race([
+      overpassFetch(query),
+      new Promise((_, reject) => {
+        osmFetchController.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+      })
+    ]);
+
+    const newFeatures = (data.elements || []).map(overpassToFeature).filter(Boolean);
+
+    // 2. Accumula i dati. La Map usa l'_osmId come chiave, scartando i duplicati
+    // se ci sono elementi sovrapposti tra due caricamenti adiacenti.
+    let addedCount = 0;
+    newFeatures.forEach(feature => {
+      const id = feature.properties._osmId;
+      if (!globalOsmCache.has(id)) {
+        globalOsmCache.set(id, feature);
+        addedCount++;
+      }
+    });
+
+    // 3. Riversa la mappa nell'array usato da Leaflet per renderizzare e selezionare
+    osmFeaturesCache = Array.from(globalOsmCache.values());
+    
+    writeViewportCache(cacheKey); // Memorizza che abbiamo visitato quest'area
+    
+    // Ridisegna solo se abbiamo effettivamente aggiunto roba nuova
+    if (addedCount > 0) {
+      renderOsmFeatures();
+    }
+    
+    setOsmLoaderState(false, `OSM: +${addedCount} nuovi (${globalOsmCache.size} totali)`);
+
+  } catch (err) {
+    if (err?.name === 'AbortError') return;
+    console.error(err);
+    setOsmLoaderState(false, 'Errore caricamento OSM');
+  }
 }
 
 function scheduleOsmLoad() {
