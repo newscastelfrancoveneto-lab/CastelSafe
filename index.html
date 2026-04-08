@@ -619,23 +619,15 @@
   </div>
 </div>
 
-<div id="admin-login-panel" class="closures-admin">
-  <h3>Login Admin</h3>
-  <p>Accedi per attivare la modalità chiusure e selezionare elementi OSM (punti/linee/aree).</p>
-  <p style="font-size:.72rem;color:#991b1b;">Se backend login non è attivo: usa credenziali demo <strong>admin / admin123</strong>.</p>
-  <label for="admin-user">Username</label>
-  <input id="admin-user" autocomplete="username" />
-  <label for="admin-pass">Password</label>
-  <input id="admin-pass" type="password" autocomplete="current-password" />
-  <div class="btns">
-    <button type="button" class="btn-primary" onclick="loginAdmin()">Accedi</button>
-    <button type="button" class="btn-secondary" onclick="closeAdminLogin()">Chiudi</button>
-  </div>
-</div>
-
 <div id="closures-admin-panel" class="closures-admin">
   <h3>Modalità chiusure (Admin)</h3>
-  <p>Seleziona dalla mappa un elemento OSM esistente (punto, linea o area), poi compila l'avviso.</p>
+  <p>Seleziona geometria (punto/linea/area), poi clicca sulla mappa per aggiungere vertici. Per linee/aree usa almeno 2/3 punti.</p>
+  <label for="closure-geom-type">Geometria</label>
+  <select id="closure-geom-type">
+    <option value="Point">Punto</option>
+    <option value="LineString">Linea</option>
+    <option value="Polygon">Area</option>
+  </select>
   <label for="closure-title">Titolo</label>
   <input id="closure-title" placeholder="Es. Strada chiusa per lavori" />
   <label for="closure-description">Descrizione</label>
@@ -650,11 +642,10 @@
       <input id="closure-end" type="date" />
     </div>
   </div>
-  <div id="closure-admin-hint" class="admin-hint">Nessun elemento OSM selezionato.</div>
+  <div id="closure-admin-hint" class="admin-hint">Nessun vertice selezionato.</div>
   <div class="btns">
-    <button type="button" class="btn-secondary" onclick="clearClosureSelection()">Deseleziona</button>
+    <button type="button" class="btn-secondary" onclick="clearClosureDraft()">Reset bozza</button>
     <button type="button" class="btn-primary" onclick="saveClosureAlert()">Salva avviso</button>
-    <button type="button" class="btn-secondary" onclick="logoutAdmin()">Logout</button>
     <button type="button" class="btn-secondary" onclick="toggleClosureAdminMode()">Chiudi</button>
   </div>
 </div>
@@ -1002,15 +993,12 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 // ── LAYER GROUPS ──────────────────────────────────────────────────────────────
 const waterwayLayerGroup = L.layerGroup().addTo(map);
 const closureLayerGroup = L.layerGroup().addTo(map);
-const closureSelectionLayerGroup = L.layerGroup();
 let cpaLayers = {};
 let activeFilters = ['waiting', 'camp', 'staging'];
 let closureLayerVisible = true;
 let closureAdminMode = false;
-let selectedOsmFeature = null;
-let selectedOsmLayer = null;
-let closureSelectableGeoJSON = { type: 'FeatureCollection', features: [] };
-let adminToken = localStorage.getItem('closure_admin_token') || '';
+let closureDraftPoints = [];
+let closureDraftPreview = null;
 
 // ── WATERWAY ──────────────────────────────────────────────────────────────────
 const WATERWAY_STYLES = {
@@ -1477,165 +1465,101 @@ function toggleClosureLayer(visible) {
   else map.removeLayer(closureLayerGroup);
 }
 
-function updateClosureSelectionHint() {
+function getDraftGeoJSON(geometryType) {
+  if (geometryType === 'Point' && closureDraftPoints.length === 1) {
+    return { type: 'Point', coordinates: [closureDraftPoints[0].lng, closureDraftPoints[0].lat] };
+  }
+  if (geometryType === 'LineString' && closureDraftPoints.length >= 2) {
+    return { type: 'LineString', coordinates: closureDraftPoints.map(p => [p.lng, p.lat]) };
+  }
+  if (geometryType === 'Polygon' && closureDraftPoints.length >= 3) {
+    const ring = closureDraftPoints.map(p => [p.lng, p.lat]);
+    ring.push([closureDraftPoints[0].lng, closureDraftPoints[0].lat]);
+    return { type: 'Polygon', coordinates: [ring] };
+  }
+  return null;
+}
+
+function updateClosureDraftHint() {
   const hint = document.getElementById('closure-admin-hint');
-  if (!selectedOsmFeature) {
-    hint.textContent = 'Nessun elemento OSM selezionato.';
-    return;
+  const geom = document.getElementById('closure-geom-type').value;
+  const needed = geom === 'Point' ? 1 : geom === 'LineString' ? 2 : 3;
+  hint.textContent = `Vertici: ${closureDraftPoints.length} / min ${needed}.`;
+}
+
+function redrawClosureDraftPreview() {
+  if (closureDraftPreview) map.removeLayer(closureDraftPreview);
+  closureDraftPreview = null;
+  const geometryType = document.getElementById('closure-geom-type').value;
+  const geometry = getDraftGeoJSON(geometryType);
+  if (!geometry) return;
+  closureDraftPreview = L.geoJSON({ type: 'Feature', properties: {}, geometry }, {
+    style: { color: '#be123c', weight: 3, dashArray: '7 5', fillColor: '#fb7185', fillOpacity: 0.2 },
+    pointToLayer: (_, latlng) => L.circleMarker(latlng, { radius: 7, color: '#be123c', fillColor: '#fb7185', fillOpacity: 1 })
+  }).addTo(map);
+}
+
+function clearClosureDraft() {
+  closureDraftPoints = [];
+  if (closureDraftPreview) {
+    map.removeLayer(closureDraftPreview);
+    closureDraftPreview = null;
   }
-  const label = selectedOsmFeature.properties?.label || `OSM #${selectedOsmFeature.properties?.osmId}`;
-  const gt = selectedOsmFeature.geometry?.type || 'n/d';
-  hint.textContent = `Selezionato: ${label} (${gt})`;
+  updateClosureDraftHint();
 }
 
-function styleSelectableClosure(feature) {
-  const gt = feature?.geometry?.type;
-  if (gt === 'Point') return { radius: 5, color: '#0f172a', fillColor: '#38bdf8', fillOpacity: 0.85, weight: 1.5 };
-  if (gt === 'Polygon') return { color: '#0f172a', fillColor: '#93c5fd', fillOpacity: 0.2, weight: 2, dashArray: '5 4' };
-  return { color: '#0369a1', weight: 3, dashArray: '5 4', opacity: 0.9 };
-}
-
-function renderClosureSelectionLayer() {
-  closureSelectionLayerGroup.clearLayers();
-  L.geoJSON(closureSelectableGeoJSON, {
-    style: styleSelectableClosure,
-    pointToLayer: (feature, latlng) => L.circleMarker(latlng, styleSelectableClosure(feature)),
-    onEachFeature: (feature, layer) => {
-      layer.on('click', () => {
-        if (!closureAdminMode) return;
-        if (selectedOsmLayer?.setStyle) selectedOsmLayer.setStyle(styleSelectableClosure(selectedOsmFeature));
-        selectedOsmFeature = feature;
-        selectedOsmLayer = layer;
-        if (layer.setStyle) layer.setStyle({ color: '#be123c', fillColor: '#fb7185', weight: 4, fillOpacity: 0.35, dashArray: null });
-        updateClosureSelectionHint();
-      });
-      closureSelectionLayerGroup.addLayer(layer);
-    }
-  });
-}
-
-function clearClosureSelection() {
-  selectedOsmFeature = null;
-  if (selectedOsmLayer?.setStyle) selectedOsmLayer.setStyle(styleSelectableClosure(selectedOsmLayer.feature));
-  selectedOsmLayer = null;
-  updateClosureSelectionHint();
-}
-
-function closeAdminLogin() {
-  document.getElementById('admin-login-panel').classList.remove('open');
-}
-
-function openAdminLogin() {
-  document.getElementById('admin-login-panel').classList.add('open');
-}
-
-async function loginAdmin() {
-  const username = document.getElementById('admin-user').value.trim();
-  const password = document.getElementById('admin-pass').value;
-  if (!username || !password) {
-    alert('Inserisci username e password.');
-    return;
-  }
-  try {
-    const res = await apiFetch('/api/admin/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (!data?.token) throw new Error('Token mancante');
-      adminToken = data.token;
-    } else if (username === DEMO_ADMIN_USER && password === DEMO_ADMIN_PASS) {
-      adminToken = `demo-token-${Date.now()}`;
-      console.warn('Login API non disponibile: usato account demo locale.');
-    } else {
-      throw new Error(`HTTP ${res.status}`);
-    }
-    localStorage.setItem('closure_admin_token', adminToken);
-    closeAdminLogin();
-    toggleClosureAdminMode(true);
-  } catch (err) {
-    if (username === DEMO_ADMIN_USER && password === DEMO_ADMIN_PASS) {
-      adminToken = `demo-token-${Date.now()}`;
-      localStorage.setItem('closure_admin_token', adminToken);
-      closeAdminLogin();
-      toggleClosureAdminMode(true);
-      console.warn('Fallback demo login attivato dopo errore API:', err);
-      return;
-    }
-    console.error('Login admin fallito:', err);
-    alert('Login fallito. Credenziali errate o endpoint /api/admin/login non disponibile.');
-  }
-}
-
-function logoutAdmin() {
-  adminToken = '';
-  localStorage.removeItem('closure_admin_token');
-  toggleClosureAdminMode(false);
-}
-
-function toggleClosureAdminMode(forceState = null) {
-  if (!adminToken) {
-    openAdminLogin();
-    return;
-  }
-  closureAdminMode = forceState === null ? !closureAdminMode : Boolean(forceState);
+function toggleClosureAdminMode() {
+  closureAdminMode = !closureAdminMode;
   const panel = document.getElementById('closures-admin-panel');
   panel.classList.toggle('open', closureAdminMode);
-  if (closureAdminMode) {
-    renderClosureSelectionLayer();
-    map.addLayer(closureSelectionLayerGroup);
-  } else {
-    clearClosureSelection();
-    map.removeLayer(closureSelectionLayerGroup);
-  }
+  if (!closureAdminMode) clearClosureDraft();
 }
 
 async function saveClosureAlert() {
+  const geomType = document.getElementById('closure-geom-type').value;
   const title = document.getElementById('closure-title').value.trim();
   const description = document.getElementById('closure-description').value.trim();
   const startDate = document.getElementById('closure-start').value || null;
   const endDate = document.getElementById('closure-end').value || null;
-  const geometry = selectedOsmFeature?.geometry || null;
+  const geometry = getDraftGeoJSON(geomType);
 
   if (!title || !description || !geometry) {
-    alert('Compila titolo/descrizione e seleziona un elemento OSM sulla mappa.');
+    alert('Compila titolo/descrizione e completa la geometria sulla mappa.');
     return;
   }
 
   const payload = {
     type: 'Feature',
-    properties: {
-      title,
-      description,
-      startDate,
-      endDate,
-      osmId: selectedOsmFeature.properties?.osmId,
-      osmType: selectedOsmFeature.properties?.osmType,
-      osmTags: selectedOsmFeature.properties?.tags || {}
-    },
+    properties: { title, description, startDate, endDate },
     geometry
   };
 
   try {
     const res = await apiFetch('/api/closures', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(adminToken ? { Authorization: `Bearer ${adminToken}` } : {})
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     await loadClosureAlerts();
-    clearClosureSelection();
+    clearClosureDraft();
     alert('Avviso salvato con successo.');
   } catch (err) {
     console.error('Errore salvataggio avviso:', err);
     alert('Salvataggio non riuscito. Verifica endpoint /api/closures lato server.');
   }
 }
+
+map.on('click', (e) => {
+  if (!closureAdminMode) return;
+  closureDraftPoints.push(e.latlng);
+  const geomType = document.getElementById('closure-geom-type').value;
+  if (geomType === 'Point' && closureDraftPoints.length > 1) {
+    closureDraftPoints = [closureDraftPoints[closureDraftPoints.length - 1]];
+  }
+  redrawClosureDraftPreview();
+  updateClosureDraftHint();
+});
 
 // Funzione per aprire/chiudere il menu
 function toggleNotificationsMenu() {
@@ -1789,6 +1713,11 @@ const LayerSwitcher = L.Control.extend({
 });
 map.addControl(new LayerSwitcher());
 updateClosureSelectionHint();
+
+document.getElementById('closure-geom-type').addEventListener('change', () => {
+  clearClosureDraft();
+});
+updateClosureDraftHint();
 
 
 // ── MARKER STAZIONI ───────────────────────────────────────────────────────────
