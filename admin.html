@@ -466,6 +466,7 @@ let isEditingMode = true;
 const OSM_CACHE_TTL_MS = 5 * 60 * 1000;
 const OSM_CACHE_MAX_ENTRIES = 50;
 const osmViewportCache = new Map();
+let closureDataCache = { type:'FeatureCollection', features:[] };
 
 function setOsmLoaderState(isLoading, message) {
   const loader = document.getElementById('osmLoader');
@@ -475,11 +476,51 @@ function setOsmLoaderState(isLoading, message) {
   text.textContent = message || (isLoading ? 'Caricamento dati OSM...' : 'Dati OSM pronti');
 }
 
-function getData() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || { type:'FeatureCollection', features:[] }; }
-  catch { return { type:'FeatureCollection', features:[] }; }
+async function loadData() {
+  try {
+    const response = await fetch('/api/closures', { headers: { 'Accept':'application/json' } });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    if (payload && payload.type === 'FeatureCollection' && Array.isArray(payload.features)) {
+      closureDataCache = payload;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      return closureDataCache;
+    }
+  } catch (err) {
+    console.info('Endpoint /api/closures non disponibile, uso cache locale.', err);
+  }
+  try {
+    closureDataCache = JSON.parse(localStorage.getItem(STORAGE_KEY)) || { type:'FeatureCollection', features:[] };
+  } catch {
+    closureDataCache = { type:'FeatureCollection', features:[] };
+  }
+  return closureDataCache;
 }
-function saveData(fc) { localStorage.setItem(STORAGE_KEY, JSON.stringify(fc)); }
+
+function getData() {
+  return {
+    ...closureDataCache,
+    features: Array.isArray(closureDataCache.features) ? [...closureDataCache.features] : []
+  };
+}
+
+async function saveData(fc) {
+  closureDataCache = {
+    ...fc,
+    features: Array.isArray(fc?.features) ? [...fc.features] : []
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(closureDataCache));
+  try {
+    const response = await fetch('/api/closures', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify(closureDataCache)
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  } catch (err) {
+    console.info('Salvataggio su /api/closures non disponibile, mantengo cache locale.', err);
+  }
+}
 
 function getAlertDateRange(properties = {}) {
   const startDate = properties.startDate || '';
@@ -556,13 +597,14 @@ function setMode(editingEnabled) {
   }
 }
 
-function refreshAlerts() {
+async function refreshAlerts() {
+  await loadData();
   const fc = getData();
   const allFeatures = fc.features || [];
   const now = new Date();
   const features = allFeatures.filter((feature) => getAlertStatus(feature.properties || {}, now) !== 'ended');
   if (features.length !== allFeatures.length) {
-    saveData({ ...fc, features });
+    await saveData({ ...fc, features });
   }
   alertsLayer.clearLayers();
   L.geoJSON({ type:'FeatureCollection', features }, {
@@ -951,7 +993,7 @@ function initAdminMap() {
     }
   }).addTo(map);
   map.on('click', (event) => selectNearestFeatureByClick(event.latlng));
-  refreshAlerts();
+  refreshAlerts().catch((err) => console.error('Errore refresh avvisi', err));
   setMode(false);
   requestAnimationFrame(() => map.invalidateSize(true));
   document.getElementById('clearDraftBtn').onclick = resetDraft;
@@ -981,19 +1023,8 @@ function initAdminMap() {
       geometry,
       properties: { id: crypto.randomUUID(), title, description, startDate, endDate, startTime, endTime, osmNames, updatedAt: new Date().toISOString() }
     });
-    saveData(fc);
-
-    try {
-      await fetch('/api/closures', {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json' },
-        body: JSON.stringify(fc)
-      });
-    } catch (_) {
-      // endpoint non disponibile in static hosting: dati restano salvati in locale
-    }
-
-    refreshAlerts();
+    await saveData(fc);
+    await refreshAlerts();
     resetDraft();
     document.getElementById('title').value = '';
     document.getElementById('description').value = '';
@@ -1003,13 +1034,13 @@ function initAdminMap() {
     setTimeout(() => { stateEl.textContent = ''; }, 3000);
   };
 
-  document.getElementById('deleteAllBtn').onclick = () => {
+  document.getElementById('deleteAllBtn').onclick = async () => {
     if (!confirm('Sei sicuro di voler eliminare TUTTI gli avvisi?')) return;
-    saveData({ type:'FeatureCollection', features:[] });
-    refreshAlerts();
+    await saveData({ type:'FeatureCollection', features:[] });
+    await refreshAlerts();
   };
 
-  document.getElementById('alertsList').onclick = (event) => {
+  document.getElementById('alertsList').onclick = async (event) => {
     const button = event.target.closest('button[data-alert-id]');
     if (!button) return;
     const alertId = button.getAttribute('data-alert-id');
@@ -1019,8 +1050,8 @@ function initAdminMap() {
     fc.features = (fc.features || []).filter((feature, index) => alertId
       ? feature?.properties?.id !== alertId
       : index !== alertIndex);
-    saveData(fc);
-    refreshAlerts();
+    await saveData(fc);
+    await refreshAlerts();
   };
 }
 </script>
