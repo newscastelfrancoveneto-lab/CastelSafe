@@ -117,7 +117,11 @@ const ADMIN_USER = 'admin';
 const ADMIN_PASS = 'admin123';
 const AUTH_KEY = 'closure_admin_logged';
 const STORAGE_KEY = 'closure_alerts_geojson_v1';
-const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
+const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter'
+];
 const TILE_CACHE_BUSTER = Date.now();
 const PICK_TOLERANCE_PX = 18;
 
@@ -261,7 +265,9 @@ function refreshAlerts() {
     pointToLayer: (feature,latlng) => L.circleMarker(latlng, { ...styleByStatus(getAlertStatus(feature.properties || {}, now)), radius:8 }),
     onEachFeature: (f,l) => {
       const p = f.properties || {};
-      l.bindPopup(`<strong>${p.title || 'Avviso'}</strong><br>${p.description || ''}<br><small>${p.startDate || '-'} ${p.startTime || '--:--'} → ${p.endDate || '-'} ${p.endTime || '--:--'}</small>`);
+      const osmNames = Array.isArray(p.osmNames) ? p.osmNames.filter(Boolean) : [];
+      const namesHtml = osmNames.length ? `<br><small><strong>Vie/aree/punti:</strong> ${osmNames.join(', ')}</small>` : '';
+      l.bindPopup(`<strong>${p.title || 'Avviso'}</strong><br>${p.description || ''}${namesHtml}<br><small>${p.startDate || '-'} ${p.startTime || '--:--'} → ${p.endDate || '-'} ${p.endTime || '--:--'}</small>`);
     }
   }).addTo(alertsLayer);
   renderAlertsList(features, now);
@@ -279,6 +285,10 @@ function renderAlertsList(features, now = new Date()) {
     const id = p.id || '';
     const status = getAlertStatus(p, now);
     const itemClass = status === 'upcoming' ? 'alert-upcoming' : 'alert-active';
+    const osmNames = Array.isArray(p.osmNames) ? p.osmNames.filter(Boolean) : [];
+    const namesText = osmNames.length
+      ? `<p class="alert-desc"><strong>Vie/aree/punti:</strong> ${osmNames.join(', ')}</p>`
+      : '';
     return `<div class="alert-item ${itemClass}">
       <div class="alert-head">
         <p class="alert-title">${p.title || `Avviso #${index + 1}`}</p>
@@ -286,6 +296,7 @@ function renderAlertsList(features, now = new Date()) {
       </div>
       <p class="alert-meta">${p.startDate || '-'} ${p.startTime || '--:--'} → ${p.endDate || '-'} ${p.endTime || '--:--'}</p>
       <p class="alert-desc">${p.description || 'Nessuna descrizione.'}</p>
+      ${namesText}
     </div>`;
   }).join('');
 }
@@ -457,19 +468,57 @@ function updateDraftGeometryFromSelection() {
   }
 }
 
+function getOSMFeatureDisplayName(feature) {
+  const p = feature?.properties || {};
+  return p.name || p.highway || p.amenity || p.shop || p.leisure || p.landuse || p.building || p._osmId || null;
+}
+
+function getSelectedOSMNames() {
+  const uniqueNames = new Set();
+  selectedOSMFeatures.forEach((feature) => {
+    const name = getOSMFeatureDisplayName(feature);
+    if (name) uniqueNames.add(String(name).trim());
+  });
+  return Array.from(uniqueNames).filter(Boolean);
+}
+
+async function overpassFetch(query) {
+  const controllers = [];
+  try {
+    const requests = OVERPASS_ENDPOINTS.map((endpoint) => {
+      const controller = new AbortController();
+      controllers.push(controller);
+      return fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+        body: new URLSearchParams({ data: query }),
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12000)])
+      }).then(async (response) => {
+        if (!response.ok) {
+          const errorBody = await response.text();
+          throw new Error(`${endpoint} -> HTTP ${response.status}: ${errorBody.slice(0, 180)}`);
+        }
+        return response.json();
+      });
+    });
+    return await Promise.any(requests);
+  } finally {
+    controllers.forEach((controller) => controller.abort());
+  }
+}
+
 async function loadOsmData() {
   const state = document.getElementById('state');
   if (osmFetchController) osmFetchController.abort();
   osmFetchController = new AbortController();
   state.textContent = 'Scaricamento dati OSM in corso...';
-  const response = await fetch(OVERPASS_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-    body: new URLSearchParams({ data: overpassQueryForBounds(map.getBounds()) }),
-    signal: osmFetchController.signal
-  });
-  if (!response.ok) throw new Error(`Overpass HTTP ${response.status}`);
-  const data = await response.json();
+  const query = overpassQueryForBounds(map.getBounds());
+  const data = await Promise.race([
+    overpassFetch(query),
+    new Promise((_, reject) => {
+      osmFetchController.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+    })
+  ]);
   osmFeaturesCache = (data.elements || []).map(overpassToFeature).filter(Boolean);
   renderOsmFeatures();
   state.textContent = `Dati OSM caricati: ${osmFeaturesCache.length} elementi. Elementi selezionati: ${selectedOSMFeatures.length}.`;
@@ -546,6 +595,7 @@ function initAdminMap() {
     const startTime = document.getElementById('startTime').value;
     const endTime = document.getElementById('endTime').value;
     const geometry = geometryFromDraft();
+    const osmNames = getSelectedOSMNames();
 
     if (!title || !description || !startDate || !endDate || !startTime || !endTime || !geometry) {
       return alert('Compila tutti i campi e disegna una geometria valida.');
@@ -555,7 +605,7 @@ function initAdminMap() {
     fc.features.push({
       type: 'Feature',
       geometry,
-      properties: { id: crypto.randomUUID(), title, description, startDate, endDate, startTime, endTime, updatedAt: new Date().toISOString() }
+      properties: { id: crypto.randomUUID(), title, description, startDate, endDate, startTime, endTime, osmNames, updatedAt: new Date().toISOString() }
     });
     saveData(fc);
 
