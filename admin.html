@@ -651,7 +651,6 @@ async function overpassFetch(query) {
 }
 
 async function loadOsmData() {
-  const state = document.getElementById('state');
   const bounds = map.getBounds();
   const cacheKey = getViewportCacheKey(bounds, map.getZoom());
   const cachedFeatures = readViewportCache(cacheKey);
@@ -659,7 +658,6 @@ async function loadOsmData() {
   if (cachedFeatures) {
     osmFeaturesCache = cachedFeatures;
     renderOsmFeatures();
-    state.textContent = `Dati OSM in cache: ${osmFeaturesCache.length} elementi. Elementi selezionati: ${selectedOSMFeatures.length}.`;
     setOsmLoaderState(false, `OSM cache: ${osmFeaturesCache.length} elementi`);
     return;
   }
@@ -677,7 +675,6 @@ async function loadOsmData() {
   osmFeaturesCache = (data.elements || []).map(overpassToFeature).filter(Boolean);
   writeViewportCache(cacheKey, osmFeaturesCache);
   renderOsmFeatures();
-  state.textContent = `Dati OSM caricati: ${osmFeaturesCache.length} elementi. Elementi selezionati: ${selectedOSMFeatures.length}.`;
   setOsmLoaderState(false, `OSM: ${osmFeaturesCache.length} elementi`);
 }
 
@@ -690,7 +687,6 @@ function scheduleOsmLoad() {
     } catch (err) {
       if (err?.name === 'AbortError') return;
       console.error(err);
-      document.getElementById('state').textContent = 'Errore nello scaricamento dati OSM. Riprova muovendo la mappa.';
       setOsmLoaderState(false, 'Errore caricamento OSM');
     }
   }, 350);
@@ -699,10 +695,7 @@ function scheduleOsmLoad() {
 function selectOSMFeature(feature) {
   if (!isEditingMode) return;
   const normalized = normalizeGeometryForDraft(feature.geometry);
-  if (!normalized) {
-    document.getElementById('state').textContent = 'Elemento OSM non utilizzabile.';
-    return;
-  }
+  if (!normalized) return;
   const osmId = feature.properties?._osmId;
   if (!osmId) return;
   if (selectedOSMIds.has(osmId)) {
@@ -715,7 +708,7 @@ function selectOSMFeature(feature) {
   updateDraftGeometryFromSelection();
   drawDraft();
   renderOsmFeatures();
-  document.getElementById('state').textContent = `Elementi OSM selezionati: ${selectedOSMFeatures.length}`;
+  setOsmLoaderState(false, `OSM selezionati: ${selectedOSMFeatures.length}`);
 }
 
 function initAdminMap() {
