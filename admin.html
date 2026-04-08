@@ -52,19 +52,67 @@
     .topbar-title { margin:0; font-size:1.05rem; font-weight:750; color:#0f172a; }
     .topbar-subtitle { margin:0; font-size:.8rem; color:#64748b; }
     .topbar-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
+    .topbar-actions .cluster {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .btn-ghost {
+      width:auto;
+      min-height:40px;
+      padding:0 14px;
+      border-radius:10px;
+      border:1px solid #cbd5e1;
+      background:#fff;
+      color:#0f172a;
+      font-weight:700;
+      box-shadow:0 4px 12px rgba(15,23,42,.08);
+      transition:all .16s ease;
+    }
+    .btn-ghost:hover { transform:translateY(-1px); border-color:#94a3b8; box-shadow:0 8px 20px rgba(15,23,42,.12); }
+    .btn-ghost:active { transform:translateY(0); }
     .topbar-link {
       display:flex;
       align-items:center;
       width:auto;
-      padding:0 12px;
-      border:1px solid #cbd5e1;
-      border-radius:8px;
-      text-decoration:none;
-      color:#0f172a;
-      background:#fff;
-      font-weight:600;
       min-height:40px;
+      padding:0 14px;
+      border:1px solid #fecaca;
+      border-radius:10px;
+      text-decoration:none;
+      color:#7f1d1d;
+      background:linear-gradient(180deg, #fff 0%, #fff1f2 100%);
+      font-weight:700;
+      box-shadow:0 4px 12px rgba(185,28,28,.14);
+      transition:all .16s ease;
     }
+    .topbar-link:hover { transform:translateY(-1px); box-shadow:0 8px 18px rgba(185,28,28,.2); }
+    .osm-loader {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      min-height:40px;
+      padding:0 12px;
+      border-radius:10px;
+      border:1px solid #cbd5e1;
+      background:#fff;
+      color:#475569;
+      font-size:.8rem;
+      font-weight:600;
+    }
+    .spinner {
+      width:16px;
+      height:16px;
+      border:2px solid #cbd5e1;
+      border-top-color:#0ea5e9;
+      border-radius:50%;
+      display:none;
+      animation:spin .9s linear infinite;
+    }
+    .osm-loader.loading .spinner { display:inline-block; }
+    .osm-loader.loading { color:#0f172a; border-color:#bae6fd; background:#f0f9ff; }
+    @keyframes spin { to { transform:rotate(360deg); } }
     .layout { display:grid; grid-template-columns:360px 1fr; min-height:calc(100vh - 62px); }
     .panel { padding:14px; background:transparent; border-right:1px solid var(--border); overflow:auto; }
     #map { min-height:calc(100vh - 62px); }
@@ -126,11 +174,16 @@
     <div class="topbar-actions">
       <button class="btn-ok" id="saveBtn">Salva avviso</button>
       <button class="btn-danger" id="clearDraftBtn">Cancella geometria</button>
-      <label class="mode-switch" title="Attiva/disattiva modalità editing con caricamento OSM">
-        <input type="checkbox" id="modeToggle" />
-        <span id="modeLabel">Modalità editing (OSM)</span>
-      </label>
-      <a href="./index.html" class="topbar-link">Apri mappa pubblica</a>
+      <div class="cluster">
+        <button id="modeToggleBtn" class="btn-ghost" type="button" title="Attiva/disattiva modalità editing con caricamento OSM">
+          Modalità avvisi attivi
+        </button>
+        <a href="./index.html" class="topbar-link">Apri mappa pubblica</a>
+        <div id="osmLoader" class="osm-loader" aria-live="polite">
+          <span class="spinner" aria-hidden="true"></span>
+          <span id="osmLoaderText">Dati OSM pronti</span>
+        </div>
+      </div>
       <button id="logoutBtn">Logout</button>
     </div>
   </div>
@@ -220,6 +273,14 @@ let osmLoadTimer = null;
 let osmFetchController = null;
 let isEditingMode = true;
 
+function setOsmLoaderState(isLoading, message) {
+  const loader = document.getElementById('osmLoader');
+  const text = document.getElementById('osmLoaderText');
+  if (!loader || !text) return;
+  loader.classList.toggle('loading', Boolean(isLoading));
+  text.textContent = message || (isLoading ? 'Caricamento dati OSM...' : 'Dati OSM pronti');
+}
+
 function getData() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || { type:'FeatureCollection', features:[] }; }
   catch { return { type:'FeatureCollection', features:[] }; }
@@ -268,15 +329,13 @@ function resetDraft() {
 
 function setMode(editingEnabled) {
   isEditingMode = Boolean(editingEnabled);
-  const modeLabel = document.getElementById('modeLabel');
+  const modeButton = document.getElementById('modeToggleBtn');
   const panelTitle = document.querySelector('.panel h1');
   const panelHint = document.querySelector('.panel .hint');
   const saveBtn = document.getElementById('saveBtn');
   const clearDraftBtn = document.getElementById('clearDraftBtn');
-  const modeToggle = document.getElementById('modeToggle');
 
-  modeToggle.checked = isEditingMode;
-  modeLabel.textContent = isEditingMode ? 'Modalità editing (OSM)' : 'Modalità avvisi attivi';
+  modeButton.textContent = isEditingMode ? 'Modalità editing (OSM)' : 'Modalità avvisi attivi';
   panelTitle.textContent = isEditingMode ? 'Nuovo avviso chiusura' : 'Avvisi attivi';
   panelHint.textContent = isEditingMode
     ? "La geometria viene presa da OpenStreetMap: i dati dell'area visibile si aggiornano automaticamente mentre scorri la mappa. Clicca sulla mappa per selezionare o deselezionare più elementi OSM insieme."
@@ -299,6 +358,7 @@ function setMode(editingEnabled) {
     map.removeLayer(osmSourceLayer);
     map.removeLayer(draftLayer);
     document.getElementById('state').textContent = 'Visualizzazione avvisi attivi.';
+    setOsmLoaderState(false, 'Caricamento OSM disattivato');
   }
 }
 
@@ -563,6 +623,7 @@ async function loadOsmData() {
   if (osmFetchController) osmFetchController.abort();
   osmFetchController = new AbortController();
   state.textContent = 'Scaricamento dati OSM in corso...';
+  setOsmLoaderState(true, 'Caricamento dati OSM...');
   const query = overpassQueryForBounds(map.getBounds());
   const data = await Promise.race([
     overpassFetch(query),
@@ -573,6 +634,7 @@ async function loadOsmData() {
   osmFeaturesCache = (data.elements || []).map(overpassToFeature).filter(Boolean);
   renderOsmFeatures();
   state.textContent = `Dati OSM caricati: ${osmFeaturesCache.length} elementi. Elementi selezionati: ${selectedOSMFeatures.length}.`;
+  setOsmLoaderState(false, `OSM: ${osmFeaturesCache.length} elementi`);
 }
 
 function scheduleOsmLoad() {
@@ -585,6 +647,7 @@ function scheduleOsmLoad() {
       if (err?.name === 'AbortError') return;
       console.error(err);
       document.getElementById('state').textContent = 'Errore nello scaricamento dati OSM. Riprova muovendo la mappa.';
+      setOsmLoaderState(false, 'Errore caricamento OSM');
     }
   }, 350);
 }
@@ -632,7 +695,7 @@ function initAdminMap() {
   setMode(false);
   requestAnimationFrame(() => map.invalidateSize(true));
   document.getElementById('clearDraftBtn').onclick = resetDraft;
-  document.getElementById('modeToggle').onchange = (e) => setMode(e.target.checked);
+  document.getElementById('modeToggleBtn').onclick = () => setMode(!isEditingMode);
   const publicMapLink = document.querySelector('.topbar a[href="./index.html"]');
   if (publicMapLink) {
     publicMapLink.addEventListener('click', forceLogoutOnExit);
