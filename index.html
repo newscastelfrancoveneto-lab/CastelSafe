@@ -598,8 +598,6 @@
 const ARPA_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="13" height="13"><rect x="3" y="3" width="1.8" height="12.4" rx=".9" fill="white"/><rect x="3" y="14.2" width="10.5" height="1.8" rx=".9" fill="white"/><path d="M4 3.5 Q9.5 0.5 14 5.5" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/><line x1="6.5" y1="4.6" x2="6.5" y2="14.2" stroke="white" stroke-width="1.1" stroke-linecap="round"/><line x1="9.2" y1="3.4" x2="9.2" y2="14.2" stroke="white" stroke-width="1.1" stroke-linecap="round"/><line x1="12" y1="5" x2="12" y2="14.2" stroke="white" stroke-width="1.1" stroke-linecap="round"/></svg>';
 
 const API_BASE = "https://parthenocarpically-presymphonic-alesia.ngrok-free.dev";
-const DEMO_ADMIN_USER = 'admin';
-const DEMO_ADMIN_PASS = 'admin123';
 
 const PROXY = 'https://api.allorigins.win/raw?url=';
 
@@ -1065,22 +1063,6 @@ ${selector}
 out geom qt;`;
 }
 
-function buildOverpassClosureSelectionQuery(useArea = true) {
-  const selector = useArea
-    ? 'area(3600045549)->.searchArea;'
-    : `[bbox:${CVBBOX.s},${CVBBOX.w},${CVBBOX.n},${CVBBOX.e}];`;
-  const areaFilter = useArea ? '(area.searchArea)' : '';
-
-  return `[out:json][timeout:30];
-${selector}
-(
-  node["highway"~"^(traffic_signals|crossing|bus_stop)$"]${areaFilter};
-  way["highway"]${areaFilter};
-  way["amenity"~"^(school|hospital|parking|fire_station)$"]${areaFilter};
-);
-out geom qt;`;
-}
-
 function buildFeatureCollectionFromWays(elements, featureType) {
   const features = [];
   const acceptedWaterways = new Set(['river', 'stream', 'canal', 'drain', 'ditch']);
@@ -1120,42 +1102,6 @@ function buildFeatureCollectionFromWays(elements, featureType) {
   return { type: 'FeatureCollection', features };
 }
 
-function buildFeatureCollectionForClosureSelection(elements) {
-  const features = [];
-
-  elements.forEach(el => {
-    const tags = el.tags || {};
-    const label = tags.name || tags.ref || tags.highway || tags.amenity || `OSM #${el.id}`;
-
-    if (el.type === 'node' && Number.isFinite(el.lat) && Number.isFinite(el.lon)) {
-      features.push({
-        type: 'Feature',
-        properties: { osmId: el.id, osmType: 'node', tags, label },
-        geometry: { type: 'Point', coordinates: [el.lon, el.lat] }
-      });
-      return;
-    }
-
-    if (el.type === 'way' && Array.isArray(el.geometry) && el.geometry.length >= 2) {
-      const coordinates = el.geometry.map(p => [p.lon, p.lat]);
-      const closed =
-        coordinates.length >= 4 &&
-        coordinates[0][0] === coordinates[coordinates.length - 1][0] &&
-        coordinates[0][1] === coordinates[coordinates.length - 1][1];
-
-      features.push({
-        type: 'Feature',
-        properties: { osmId: el.id, osmType: 'way', tags, label },
-        geometry: closed
-          ? { type: 'Polygon', coordinates: [coordinates] }
-          : { type: 'LineString', coordinates }
-      });
-    }
-  });
-
-  return { type: 'FeatureCollection', features };
-}
-
 async function fetchOverpassWithFallback(primaryQueryBuilder) {
   try {
     return await overpassFetch(primaryQueryBuilder(false));
@@ -1169,11 +1115,9 @@ async function loadOSMData(forceRefresh = false) {
     // Cache: se entrambi validi, renderizza e torna subito
     const cachedW = forceRefresh ? null : osmCacheGet('waterways');
     const cachedC = forceRefresh ? null : osmCacheGet('cpa');
-    const cachedS = forceRefresh ? null : osmCacheGet('closure_selectables');
     if (cachedW) renderWaterwayGeoJSON(cachedW);
     if (cachedC) renderCPAGeoJSON(cachedC);
-    if (cachedS) closureSelectableGeoJSON = cachedS;
-    if (cachedW && cachedC && cachedS) return;
+    if (cachedW && cachedC) return;
 
     try {
         const jobs = [];
@@ -1193,15 +1137,6 @@ async function loadOSMData(forceRefresh = false) {
             const waterwayFeatures = buildFeatureCollectionFromWays(waterwayData.elements || [], 'waterway');
             osmCacheSet('waterways', waterwayFeatures);
             renderWaterwayGeoJSON(waterwayFeatures);
-          })());
-        }
-
-        if (!cachedS) {
-          jobs.push((async () => {
-            const closureSelectionData = await fetchOverpassWithFallback(buildOverpassClosureSelectionQuery);
-            const closureSelectableFeatures = buildFeatureCollectionForClosureSelection(closureSelectionData.elements || []);
-            osmCacheSet('closure_selectables', closureSelectableFeatures);
-            closureSelectableGeoJSON = closureSelectableFeatures;
           })());
         }
 
@@ -1232,7 +1167,6 @@ async function triggerOSMRefresh({ forceRefresh = false, animate = false } = {})
     localStorage.removeItem('osmcache_cpa'); // legacy cache key
     localStorage.removeItem(osmCacheKey('waterways'));
     localStorage.removeItem(osmCacheKey('cpa'));
-    localStorage.removeItem(osmCacheKey('closure_selectables'));
   }
 
   try {
@@ -1474,7 +1408,6 @@ const LayerSwitcher = L.Control.extend({
   }
 });
 map.addControl(new LayerSwitcher());
-updateClosureSelectionHint();
 
 
 // ── MARKER STAZIONI ───────────────────────────────────────────────────────────
