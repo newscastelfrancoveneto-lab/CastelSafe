@@ -383,6 +383,7 @@
     .layer-control-item input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
     .layer-swatch { width: 22px; height: 4px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
     .layer-swatch.area { height: 16px; border-radius: 4px; border: 2px solid; }
+    .layer-swatch.alert { height: 12px; border-radius: 3px; border: 2px solid #991b1b; background: rgba(239,68,68,.35); }
     
     #btn-load-cpa {
       background: var(--text-main); color: white; border: none; padding: 10px; width: 100%;
@@ -390,6 +391,33 @@
       font-weight: 600; margin-top: 14px; display: block;
     }
     #btn-load-cpa:hover { background: #0f172a; }
+
+    .admin-btn {
+      margin-top: 10px; width: 100%; border: none; border-radius: 10px;
+      background: #991b1b; color: #fff; padding: 10px 12px; font-size: 0.8rem; font-weight: 700; cursor: pointer;
+    }
+    .admin-btn:hover { background: #7f1d1d; }
+
+    .closures-admin {
+      position: fixed; bottom: 24px; right: 16px; z-index: 1300;
+      width: min(360px, calc(100vw - 32px)); background: #fff; border-radius: 16px;
+      box-shadow: 0 14px 30px rgba(0,0,0,.18); border: 1px solid #e2e8f0;
+      padding: 14px; display: none; flex-direction: column; gap: 8px;
+    }
+    .closures-admin.open { display: flex; }
+    .closures-admin h3 { font-size: 0.95rem; color: #7f1d1d; }
+    .closures-admin p { font-size: 0.76rem; color: #64748b; line-height: 1.4; }
+    .closures-admin label { font-size: 0.75rem; font-weight: 600; color: #334155; margin-top: 4px; }
+    .closures-admin input, .closures-admin select, .closures-admin textarea {
+      width: 100%; border: 1px solid #cbd5e1; border-radius: 9px; padding: 8px 10px; font-size: 0.8rem;
+    }
+    .closures-admin textarea { min-height: 70px; resize: vertical; }
+    .closures-admin .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .closures-admin .btns { display: flex; gap: 8px; margin-top: 6px; }
+    .closures-admin button { border: none; border-radius: 8px; padding: 8px 10px; font-weight: 700; cursor: pointer; font-size: 0.78rem; }
+    .btn-primary { background: #991b1b; color: #fff; }
+    .btn-secondary { background: #e2e8f0; color: #1e293b; }
+    .admin-hint { background: #fff1f2; color: #991b1b; border-radius: 8px; padding: 8px; font-size: .74rem; }
 
     /* ── FABS (Pulsanti Fluttuanti) ── */
     .fab-container { position: fixed; bottom: 24px; left: 16px; z-index: 500; display: flex; flex-direction: column; gap: 12px; }
@@ -588,6 +616,37 @@
         <p>Tocca un sensore sulla mappa per<br>visualizzare i dati in tempo reale.</p>
       </div>
     </div>
+  </div>
+</div>
+
+<div id="closures-admin-panel" class="closures-admin">
+  <h3>Modalità chiusure (Admin)</h3>
+  <p>Seleziona geometria (punto/linea/area), poi clicca sulla mappa per aggiungere vertici. Per linee/aree usa almeno 2/3 punti.</p>
+  <label for="closure-geom-type">Geometria</label>
+  <select id="closure-geom-type">
+    <option value="Point">Punto</option>
+    <option value="LineString">Linea</option>
+    <option value="Polygon">Area</option>
+  </select>
+  <label for="closure-title">Titolo</label>
+  <input id="closure-title" placeholder="Es. Strada chiusa per lavori" />
+  <label for="closure-description">Descrizione</label>
+  <textarea id="closure-description" placeholder="Dettaglio avviso..."></textarea>
+  <div class="row">
+    <div>
+      <label for="closure-start">Data inizio</label>
+      <input id="closure-start" type="date" />
+    </div>
+    <div>
+      <label for="closure-end">Data fine</label>
+      <input id="closure-end" type="date" />
+    </div>
+  </div>
+  <div id="closure-admin-hint" class="admin-hint">Nessun vertice selezionato.</div>
+  <div class="btns">
+    <button type="button" class="btn-secondary" onclick="clearClosureDraft()">Reset bozza</button>
+    <button type="button" class="btn-primary" onclick="saveClosureAlert()">Salva avviso</button>
+    <button type="button" class="btn-secondary" onclick="toggleClosureAdminMode()">Chiudi</button>
   </div>
 </div>
 
@@ -931,8 +990,13 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 
 // ── LAYER GROUPS ──────────────────────────────────────────────────────────────
 const waterwayLayerGroup = L.layerGroup().addTo(map);
+const closureLayerGroup = L.layerGroup().addTo(map);
 let cpaLayers = {};
 let activeFilters = ['waiting', 'camp', 'staging'];
+let closureLayerVisible = true;
+let closureAdminMode = false;
+let closureDraftPoints = [];
+let closureDraftPreview = null;
 
 // ── WATERWAY ──────────────────────────────────────────────────────────────────
 const WATERWAY_STYLES = {
@@ -1266,6 +1330,171 @@ function toggleWaterways(visible) {
   else map.removeLayer(waterwayLayerGroup);
 }
 
+function formatClosurePeriod(startDate, endDate) {
+  const fmt = d => {
+    if (!d) return '—';
+    const dt = new Date(d);
+    return Number.isNaN(dt.getTime()) ? d : dt.toLocaleDateString('it-IT');
+  };
+  return `${fmt(startDate)} → ${fmt(endDate)}`;
+}
+
+function closureStyleByGeometry(geometryType) {
+  if (geometryType === 'Point') {
+    return { radius: 8, color: '#991b1b', fillColor: '#ef4444', fillOpacity: 0.95, weight: 2 };
+  }
+  if (geometryType === 'Polygon') {
+    return { color: '#991b1b', fillColor: '#ef4444', fillOpacity: 0.3, weight: 3 };
+  }
+  return { color: '#991b1b', weight: 4, opacity: 0.95 };
+}
+
+function popupHtmlForClosure(props = {}) {
+  const title = props.title || 'Avviso viabilità';
+  const description = props.description || 'Nessuna descrizione disponibile';
+  const period = formatClosurePeriod(props.startDate, props.endDate);
+  return `<div style="font-family:'Inter',sans-serif;min-width:220px;">
+    <div style="font-weight:800;color:#991b1b;font-size:0.95rem;">${title}</div>
+    <div style="font-size:0.82rem;color:#334155;margin-top:6px;line-height:1.45;">${description}</div>
+    <div style="margin-top:10px;font-size:0.75rem;color:#64748b;"><strong>Periodo:</strong> ${period}</div>
+  </div>`;
+}
+
+function renderClosuresGeoJSON(geojson) {
+  closureLayerGroup.clearLayers();
+  L.geoJSON(geojson, {
+    style: feature => closureStyleByGeometry(feature?.geometry?.type),
+    pointToLayer: (feature, latlng) => L.circleMarker(latlng, closureStyleByGeometry('Point')),
+    onEachFeature: (feature, layer) => {
+      layer.bindPopup(popupHtmlForClosure(feature?.properties || {}));
+      closureLayerGroup.addLayer(layer);
+    }
+  });
+  if (closureLayerVisible) map.addLayer(closureLayerGroup);
+}
+
+async function loadClosureAlerts() {
+  try {
+    const res = await apiFetch('/api/closures', { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data?.type === 'FeatureCollection') {
+      renderClosuresGeoJSON(data);
+      return;
+    }
+    console.warn('Formato closures inatteso, uso fallback demo.');
+    renderClosuresGeoJSON({
+      type: 'FeatureCollection',
+      features: []
+    });
+  } catch (err) {
+    console.warn('Impossibile caricare /api/closures, layer vuoto.', err);
+    renderClosuresGeoJSON({ type: 'FeatureCollection', features: [] });
+  }
+}
+
+function toggleClosureLayer(visible) {
+  closureLayerVisible = visible;
+  if (visible) map.addLayer(closureLayerGroup);
+  else map.removeLayer(closureLayerGroup);
+}
+
+function getDraftGeoJSON(geometryType) {
+  if (geometryType === 'Point' && closureDraftPoints.length === 1) {
+    return { type: 'Point', coordinates: [closureDraftPoints[0].lng, closureDraftPoints[0].lat] };
+  }
+  if (geometryType === 'LineString' && closureDraftPoints.length >= 2) {
+    return { type: 'LineString', coordinates: closureDraftPoints.map(p => [p.lng, p.lat]) };
+  }
+  if (geometryType === 'Polygon' && closureDraftPoints.length >= 3) {
+    const ring = closureDraftPoints.map(p => [p.lng, p.lat]);
+    ring.push([closureDraftPoints[0].lng, closureDraftPoints[0].lat]);
+    return { type: 'Polygon', coordinates: [ring] };
+  }
+  return null;
+}
+
+function updateClosureDraftHint() {
+  const hint = document.getElementById('closure-admin-hint');
+  const geom = document.getElementById('closure-geom-type').value;
+  const needed = geom === 'Point' ? 1 : geom === 'LineString' ? 2 : 3;
+  hint.textContent = `Vertici: ${closureDraftPoints.length} / min ${needed}.`;
+}
+
+function redrawClosureDraftPreview() {
+  if (closureDraftPreview) map.removeLayer(closureDraftPreview);
+  closureDraftPreview = null;
+  const geometryType = document.getElementById('closure-geom-type').value;
+  const geometry = getDraftGeoJSON(geometryType);
+  if (!geometry) return;
+  closureDraftPreview = L.geoJSON({ type: 'Feature', properties: {}, geometry }, {
+    style: { color: '#be123c', weight: 3, dashArray: '7 5', fillColor: '#fb7185', fillOpacity: 0.2 },
+    pointToLayer: (_, latlng) => L.circleMarker(latlng, { radius: 7, color: '#be123c', fillColor: '#fb7185', fillOpacity: 1 })
+  }).addTo(map);
+}
+
+function clearClosureDraft() {
+  closureDraftPoints = [];
+  if (closureDraftPreview) {
+    map.removeLayer(closureDraftPreview);
+    closureDraftPreview = null;
+  }
+  updateClosureDraftHint();
+}
+
+function toggleClosureAdminMode() {
+  closureAdminMode = !closureAdminMode;
+  const panel = document.getElementById('closures-admin-panel');
+  panel.classList.toggle('open', closureAdminMode);
+  if (!closureAdminMode) clearClosureDraft();
+}
+
+async function saveClosureAlert() {
+  const geomType = document.getElementById('closure-geom-type').value;
+  const title = document.getElementById('closure-title').value.trim();
+  const description = document.getElementById('closure-description').value.trim();
+  const startDate = document.getElementById('closure-start').value || null;
+  const endDate = document.getElementById('closure-end').value || null;
+  const geometry = getDraftGeoJSON(geomType);
+
+  if (!title || !description || !geometry) {
+    alert('Compila titolo/descrizione e completa la geometria sulla mappa.');
+    return;
+  }
+
+  const payload = {
+    type: 'Feature',
+    properties: { title, description, startDate, endDate },
+    geometry
+  };
+
+  try {
+    const res = await apiFetch('/api/closures', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    await loadClosureAlerts();
+    clearClosureDraft();
+    alert('Avviso salvato con successo.');
+  } catch (err) {
+    console.error('Errore salvataggio avviso:', err);
+    alert('Salvataggio non riuscito. Verifica endpoint /api/closures lato server.');
+  }
+}
+
+map.on('click', (e) => {
+  if (!closureAdminMode) return;
+  closureDraftPoints.push(e.latlng);
+  const geomType = document.getElementById('closure-geom-type').value;
+  if (geomType === 'Point' && closureDraftPoints.length > 1) {
+    closureDraftPoints = [closureDraftPoints[closureDraftPoints.length - 1]];
+  }
+  redrawClosureDraftPreview();
+  updateClosureDraftHint();
+});
+
 // Funzione per aprire/chiudere il menu
 function toggleNotificationsMenu() {
   const menu = document.getElementById('notifications-menu');
@@ -1350,6 +1579,15 @@ const LayerSwitcher = L.Control.extend({
             </label>
           `).join('')}
         </div>
+        <div class="layer-control-section-title">Viabilità / Avvisi</div>
+        <div class="layer-control-items">
+          <label class="layer-control-item">
+            <input type="checkbox" id="toggle-closures" checked onchange="toggleClosureLayer(this.checked)">
+            <span class="layer-swatch alert"></span>
+            Strade chiuse e avvisi
+          </label>
+        </div>
+        <button type="button" class="admin-btn" onclick="toggleClosureAdminMode()">Modalità chiusure (admin)</button>
       </div>
     `;
 
@@ -1409,6 +1647,11 @@ const LayerSwitcher = L.Control.extend({
 });
 map.addControl(new LayerSwitcher());
 
+document.getElementById('closure-geom-type').addEventListener('change', () => {
+  clearClosureDraft();
+});
+updateClosureDraftHint();
+
 
 // ── MARKER STAZIONI ───────────────────────────────────────────────────────────
 async function loadOSMNode(stn) {
@@ -1452,6 +1695,7 @@ async function initMarkers() {
 
   // Caricamento automatico: animazione come refresh utente + uso cache per carichi successivi.
   triggerOSMRefresh({ forceRefresh: false, animate: true });
+  loadClosureAlerts();
 
   //await Promise.all(STATIONS.map(loadOSMNode));
   STATIONS.forEach(stn => {
