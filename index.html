@@ -383,6 +383,7 @@
     .layer-control-item input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
     .layer-swatch { width: 22px; height: 4px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
     .layer-swatch.area { height: 16px; border-radius: 4px; border: 2px solid; }
+    .layer-swatch.alert { height: 16px; border-radius: 4px; border: 2px solid #b91c1c; background: rgba(220,38,38,0.35); }
     
     #btn-load-cpa {
       background: var(--text-main); color: white; border: none; padding: 10px; width: 100%;
@@ -931,6 +932,8 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 
 // ── LAYER GROUPS ──────────────────────────────────────────────────────────────
 const waterwayLayerGroup = L.layerGroup().addTo(map);
+const closureAlertLayerGroup = L.layerGroup().addTo(map);
+let closureAlertsVisible = true;
 let cpaLayers = {};
 let activeFilters = ['waiting', 'camp', 'staging'];
 
@@ -1267,6 +1270,96 @@ function toggleWaterways(visible) {
 }
 
 // Funzione per aprire/chiudere il menu
+
+const CLOSURE_ALERT_STORAGE_KEY = 'closure_alerts_geojson_v1';
+
+function closureAlertStyle() {
+  return {
+    color: '#b91c1c',
+    fillColor: '#dc2626',
+    weight: 3,
+    opacity: 0.95,
+    fillOpacity: 0.35,
+    radius: 8
+  };
+}
+
+function escapeHtml(text) {
+  return String(text || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function closureAlertPopupHtml(properties = {}) {
+  const title = escapeHtml(properties.title || 'Avviso viabilità');
+  const description = escapeHtml(properties.description || 'Nessuna descrizione disponibile.');
+  const startDate = escapeHtml(properties.startDate || '-');
+  const endDate = escapeHtml(properties.endDate || '-');
+
+  return `<div style="font-family:'Inter',sans-serif;font-size:0.9rem;line-height:1.45;">
+    <strong style="color:#991b1b;font-size:1rem;">${title}</strong>
+    <div style="margin-top:6px;color:#334155;">${description}</div>
+    <div style="margin-top:8px;font-size:0.78rem;color:#64748b;">
+      <strong>Periodo:</strong> ${startDate} → ${endDate}
+    </div>
+  </div>`;
+}
+
+function renderClosureAlerts(geojson) {
+  closureAlertLayerGroup.clearLayers();
+  if (!geojson?.features?.length) return;
+
+  L.geoJSON(geojson, {
+    style: closureAlertStyle,
+    pointToLayer: (_, latlng) => L.circleMarker(latlng, closureAlertStyle()),
+    onEachFeature: (feature, layer) => {
+      layer.bindPopup(closureAlertPopupHtml(feature.properties || {}));
+      closureAlertLayerGroup.addLayer(layer);
+    }
+  });
+
+  if (!closureAlertsVisible) {
+    map.removeLayer(closureAlertLayerGroup);
+  }
+}
+
+function readLocalClosureAlerts() {
+  try {
+    const raw = localStorage.getItem(CLOSURE_ALERT_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (err) {
+    console.warn('Impossibile leggere gli avvisi locali:', err);
+    return null;
+  }
+}
+
+async function loadClosureAlerts() {
+  const localData = readLocalClosureAlerts();
+  if (localData) renderClosureAlerts(localData);
+
+  try {
+    const response = await fetch('/api/closures', { headers: { 'Accept': 'application/json' } });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    if (data?.type === 'FeatureCollection') {
+      localStorage.setItem(CLOSURE_ALERT_STORAGE_KEY, JSON.stringify(data));
+      renderClosureAlerts(data);
+    }
+  } catch (err) {
+    console.info('Endpoint /api/closures non disponibile, uso dati locali.', err);
+  }
+}
+
+function toggleClosureAlerts(visible) {
+  closureAlertsVisible = visible;
+  if (visible) map.addLayer(closureAlertLayerGroup);
+  else map.removeLayer(closureAlertLayerGroup);
+}
+
 function toggleNotificationsMenu() {
   const menu = document.getElementById('notifications-menu');
   menu.classList.toggle('open');
@@ -1349,6 +1442,15 @@ const LayerSwitcher = L.Control.extend({
               ${style.label}
             </label>
           `).join('')}
+        </div>
+
+        <div class="layer-control-section-title">Avvisi e Chiusure</div>
+        <div class="layer-control-items">
+          <label class="layer-control-item">
+            <input type="checkbox" id="toggle-closures" checked onchange="toggleClosureAlerts(this.checked)">
+            <span class="layer-swatch alert"></span>
+            Strade/aree chiuse
+          </label>
         </div>
       </div>
     `;
@@ -1452,6 +1554,7 @@ async function initMarkers() {
 
   // Caricamento automatico: animazione come refresh utente + uso cache per carichi successivi.
   triggerOSMRefresh({ forceRefresh: false, animate: true });
+  loadClosureAlerts();
 
   //await Promise.all(STATIONS.map(loadOSMNode));
   STATIONS.forEach(stn => {

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Chiusure - Castelfranco Veneto</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root { --primary:#8d021f; --ok:#166534; --danger:#b91c1c; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Inter, Arial, sans-serif; color:#0f172a; }
+    #login, #admin { min-height:100vh; }
+    #login { display:flex; align-items:center; justify-content:center; background:#f1f5f9; }
+    .card { background:#fff; padding:20px; width:min(420px,92vw); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.12); }
+    h1 { font-size:1.2rem; margin:0 0 10px; }
+    label { display:block; font-size:.85rem; margin:10px 0 4px; }
+    input, textarea, select, button { width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px; font:inherit; }
+    button { cursor:pointer; font-weight:600; }
+    .btn-primary { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .btn-danger { background:#fff1f2; border-color:#fecdd3; color:var(--danger); }
+    .btn-ok { background:#ecfdf5; border-color:#bbf7d0; color:var(--ok); }
+    .topbar { display:flex; gap:10px; padding:10px; background:#fff; border-bottom:1px solid #e2e8f0; position:sticky; top:0; z-index:1000; }
+    .layout { display:grid; grid-template-columns:360px 1fr; min-height:calc(100vh - 62px); }
+    .panel { padding:12px; background:#f8fafc; border-right:1px solid #e2e8f0; overflow:auto; }
+    #map { min-height:calc(100vh - 62px); }
+    .hint { font-size:.78rem; color:#475569; margin-top:6px; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  </style>
+</head>
+<body>
+<div id="login">
+  <div class="card">
+    <h1>Login Admin (Chiusure)</h1>
+    <p style="font-size:.85rem;color:#475569;margin:0 0 10px;">Accesso richiesto per creare avvisi su punti, linee e aree.</p>
+    <label>Username</label><input id="username" value="admin" />
+    <label>Password</label><input id="password" type="password" placeholder="••••••••" />
+    <button class="btn-primary" id="loginBtn">Accedi</button>
+    <div id="loginMsg" class="hint"></div>
+  </div>
+</div>
+
+<div id="admin" style="display:none;">
+  <div class="topbar">
+    <button class="btn-ok" id="saveBtn">Salva avviso</button>
+    <button class="btn-danger" id="clearDraftBtn">Cancella geometria</button>
+    <button id="logoutBtn">Logout</button>
+    <a href="/" style="display:flex;align-items:center;padding:0 12px;border:1px solid #cbd5e1;border-radius:8px;text-decoration:none;color:#0f172a;">Apri mappa pubblica</a>
+  </div>
+  <div class="layout">
+    <div class="panel">
+      <h1>Nuovo avviso chiusura</h1>
+      <label>Tipo geometria</label>
+      <select id="geomType">
+        <option value="Point">Punto</option>
+        <option value="LineString">Linea</option>
+        <option value="Polygon">Area (poligono)</option>
+      </select>
+      <p class="hint">Clicca sulla mappa per aggiungere vertici. Per linea/area usa "Conferma geometria" quando hai finito.</p>
+      <button id="finishGeomBtn">Conferma geometria</button>
+
+      <label>Titolo</label><input id="title" placeholder="Es. Chiusura Via Roma" />
+      <label>Descrizione</label><textarea id="description" rows="4" placeholder="Dettagli lavori/evento..."></textarea>
+      <div class="row">
+        <div><label>Data inizio</label><input id="startDate" type="date" /></div>
+        <div><label>Data fine</label><input id="endDate" type="date" /></div>
+      </div>
+      <div id="state" class="hint"></div>
+      <hr style="margin:14px 0;border:none;border-top:1px solid #e2e8f0;">
+      <button id="deleteAllBtn" class="btn-danger">Elimina tutti gli avvisi</button>
+    </div>
+    <div id="map"></div>
+  </div>
+</div>
+
+<script>
+const ADMIN_USER = 'admin';
+const ADMIN_PASS = 'admin123';
+const AUTH_KEY = 'closure_admin_logged';
+const STORAGE_KEY = 'closure_alerts_geojson_v1';
+
+const login = document.getElementById('login');
+const admin = document.getElementById('admin');
+const loginMsg = document.getElementById('loginMsg');
+
+function setLogged(value) {
+  sessionStorage.setItem(AUTH_KEY, value ? '1' : '0');
+  login.style.display = value ? 'none' : 'flex';
+  admin.style.display = value ? 'block' : 'none';
+  if (value && !window._adminMapInit) initAdminMap();
+}
+
+document.getElementById('loginBtn').onclick = () => {
+  const u = document.getElementById('username').value.trim();
+  const p = document.getElementById('password').value;
+  if (u === ADMIN_USER && p === ADMIN_PASS) return setLogged(true);
+  loginMsg.textContent = 'Credenziali non valide.';
+};
+
+document.getElementById('logoutBtn').onclick = () => setLogged(false);
+setLogged(sessionStorage.getItem(AUTH_KEY) === '1');
+
+let map, draftLayer, alertsLayer;
+let draftCoords = [];
+let draftType = 'Point';
+
+function getData() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || { type:'FeatureCollection', features:[] }; }
+  catch { return { type:'FeatureCollection', features:[] }; }
+}
+function saveData(fc) { localStorage.setItem(STORAGE_KEY, JSON.stringify(fc)); }
+
+function style() { return { color:'#b91c1c', fillColor:'#dc2626', weight:3, fillOpacity:.35 }; }
+
+function resetDraft() {
+  draftCoords = [];
+  draftLayer.clearLayers();
+  document.getElementById('state').textContent = 'Bozza cancellata.';
+}
+
+function refreshAlerts() {
+  alertsLayer.clearLayers();
+  L.geoJSON(getData(), {
+    style,
+    pointToLayer: (_,latlng) => L.circleMarker(latlng, { ...style(), radius:8 }),
+    onEachFeature: (f,l) => {
+      const p = f.properties || {};
+      l.bindPopup(`<strong>${p.title || 'Avviso'}</strong><br>${p.description || ''}<br><small>${p.startDate || '-'} → ${p.endDate || '-'}</small>`);
+    }
+  }).addTo(alertsLayer);
+}
+
+function geometryFromDraft() {
+  if (draftType === 'Point') {
+    if (draftCoords.length !== 1) return null;
+    return { type:'Point', coordinates:draftCoords[0] };
+  }
+  if (draftType === 'LineString') {
+    if (draftCoords.length < 2) return null;
+    return { type:'LineString', coordinates:draftCoords };
+  }
+  if (draftCoords.length < 3) return null;
+  const ring = [...draftCoords, draftCoords[0]];
+  return { type:'Polygon', coordinates:[ring] };
+}
+
+function drawDraft() {
+  draftLayer.clearLayers();
+  const geom = geometryFromDraft();
+  if (!geom) return;
+  L.geoJSON({ type:'Feature', properties:{}, geometry:geom }, {
+    style,
+    pointToLayer: (_,latlng) => L.circleMarker(latlng, { ...style(), radius:8 })
+  }).addTo(draftLayer);
+}
+
+function initAdminMap() {
+  window._adminMapInit = true;
+  map = L.map('map', { center:[45.664,11.958], zoom:13 });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap' }).addTo(map);
+  draftLayer = L.layerGroup().addTo(map);
+  alertsLayer = L.layerGroup().addTo(map);
+  refreshAlerts();
+
+  map.on('click', (e) => {
+    if (draftType === 'Point') draftCoords = [[e.latlng.lng, e.latlng.lat]];
+    else draftCoords.push([e.latlng.lng, e.latlng.lat]);
+    drawDraft();
+    document.getElementById('state').textContent = `Vertici bozza: ${draftCoords.length}`;
+  });
+
+  document.getElementById('geomType').onchange = (e) => { draftType = e.target.value; resetDraft(); };
+  document.getElementById('finishGeomBtn').onclick = drawDraft;
+  document.getElementById('clearDraftBtn').onclick = resetDraft;
+
+  document.getElementById('saveBtn').onclick = async () => {
+    const title = document.getElementById('title').value.trim();
+    const description = document.getElementById('description').value.trim();
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const geometry = geometryFromDraft();
+
+    if (!title || !description || !startDate || !endDate || !geometry) {
+      return alert('Compila tutti i campi e disegna una geometria valida.');
+    }
+
+    const fc = getData();
+    fc.features.push({
+      type: 'Feature',
+      geometry,
+      properties: { id: crypto.randomUUID(), title, description, startDate, endDate, updatedAt: new Date().toISOString() }
+    });
+    saveData(fc);
+
+    try {
+      await fetch('/api/closures', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify(fc)
+      });
+    } catch (_) {
+      // endpoint non disponibile in static hosting: dati restano salvati in locale
+    }
+
+    refreshAlerts();
+    resetDraft();
+    alert('Avviso salvato. Visibile nella mappa pubblica su questo dispositivo.');
+  };
+
+  document.getElementById('deleteAllBtn').onclick = () => {
+    if (!confirm('Eliminare tutti gli avvisi?')) return;
+    saveData({ type:'FeatureCollection', features:[] });
+    refreshAlerts();
+  };
+}
+</script>
+</body>
+</html>
