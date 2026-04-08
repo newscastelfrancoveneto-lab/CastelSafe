@@ -1338,7 +1338,7 @@ function closureAlertPopupHtml(properties = {}) {
     ? properties.osmNames.filter(Boolean).map((name) => escapeHtml(name))
     : [];
   const namesHtml = osmNames.length
-    ? `<div style="margin-top:8px;font-size:0.8rem;color:#475569;"><strong>Vie/aree/punti:</strong> ${osmNames.join(', ')}</div>`
+    ? `<div style="margin-top:8px;font-size:0.8rem;color:#475569;"><strong>Vie/zone interessate:</strong> ${osmNames.join(', ')}</div>`
     : '';
 
   return `<div style="font-family:'Inter',sans-serif;font-size:0.9rem;line-height:1.45;">
