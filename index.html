@@ -462,6 +462,32 @@
       width: 32px; height: 32px; font-size: 1rem; cursor: pointer;
       display: flex; align-items: center; justify-content: center; color: var(--text-muted); transition: background 0.2s;
     }
+
+	.modal-help-btn {
+	  position: absolute;
+	  top: 16px;
+	  left: 16px;
+	  background: #f1f5f9;
+	  border: none;
+	  border-radius: 50%;
+	  width: 32px;
+	  height: 32px;
+	  font-size: 1rem;
+	  font-weight: 800;
+	  cursor: pointer;
+	  display: flex;
+	  align-items: center;
+	  justify-content: center;
+	  color: var(--text-muted);
+	  transition: background 0.2s, color 0.2s, transform 0.2s;
+	}
+	
+	.modal-help-btn:hover {
+	  background: #e2e8f0;
+	  color: var(--text-main);
+	  transform: scale(1.05);
+	}
+	  
     .modal-close-btn:hover { background: #e2e8f0; color: var(--text-main); }
 
     .modal-box h2 { font-size: 1.1rem; color: var(--text-main); margin-bottom: 8px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
@@ -508,9 +534,21 @@
 
   <div id="allerta-modal" class="modal-overlay" style="align-items: flex-end;" onclick="if(event.target===this)this.classList.remove('open')">
     <div id="allerta-box" class="modal-box">
-      <div class="drag-handle"></div>
-      <button class="modal-close-btn" onclick="document.getElementById('allerta-modal').classList.remove('open')">✕</button>
-      <h2>Bollettino Protezione Civile Regionale - VENE E</h2>
+	  <div class="drag-handle"></div>
+	
+	  <button
+	    class="modal-help-btn"
+	    title="Spiegazione colori e comportamenti"
+	    onclick="document.getElementById('allerta-help-modal').classList.add('open')"
+	  >?</button>
+	
+	  <button
+	    class="modal-close-btn"
+	    onclick="document.getElementById('allerta-modal').classList.remove('open')"
+	    title="Chiudi"
+	  >✕</button>
+	
+	  <h2>Bollettino Protezione Civile Regionale - VENE...</h2>
       <div class="periodo" id="allerta-periodo">—</div>
       <div id="allerta-rows"></div>
       <div class="allerta-section-title">📋 Previsione Meteo</div>
@@ -519,6 +557,85 @@
       <div class="allerta-section-body" id="allerta-suolo">—</div>
     </div>
   </div>
+
+  <div id="allerta-help-modal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal-box">
+    <button
+      class="modal-close-btn"
+      onclick="document.getElementById('allerta-help-modal').classList.remove('open')"
+      title="Chiudi"
+    >✕</button>
+
+    <h2>Come leggere il bollettino</h2>
+
+    <p class="periodo">
+      In questa sezione puoi spiegare in modo semplice il significato dei colori di allerta
+      e il tipo di criticità associata per rischio idraulico, idrogeologico e temporali.
+    </p>
+
+    <div class="allerta-section-title">Colori delle allerte</div>
+    <div class="allerta-section-body">
+      <p>
+        Qui inserirai un breve testo esplicativo dei livelli di allerta e l'immagine ufficiale
+        della tabella / infografica della Protezione Civile.
+      </p>
+
+      <!-- ESEMPIO: sostituisci src con il link corretto dell'immagine quando lo avrai -->
+      <!--
+      <img
+        src="URL_IMMAGINE"
+        alt="Tabella dei colori delle allerte meteo-idro"
+        style="width:100%; border-radius:12px; margin-top:12px;"
+      />
+      -->
+
+      <p style="margin-top:12px;">
+        Fonte di riferimento:
+        <a href="https://rischi.protezionecivile.it/it/meteo-idro/allertamento/tabella-allerte-e-scenari-di-criticita/" target="_blank" rel="noopener noreferrer">
+          Dipartimento della Protezione Civile - Tabella allerte e scenari di criticità
+        </a>
+      </p>
+    </div>
+
+    <div class="allerta-section-title">Cosa fare</div>
+    <div class="allerta-section-body">
+      <p><strong>Durante l'allerta</strong></p>
+      <p>
+        Qui inserirò le indicazioni essenziali da seguire quando viene diramata un'allerta:
+        attenzione agli aggiornamenti ufficiali, evitare aree allagabili, proteggere i locali
+        esposti solo se in sicurezza e prepararsi a eventuali ulteriori istruzioni.
+      </p>
+
+      <p style="margin-top:14px;"><strong>Durante l'alluvione</strong></p>
+      <p>
+        Qui inserirò i comportamenti da adottare mentre l'evento è in corso, distinguendo
+        se la persona si trova in casa o all'aperto, e ricordando le principali azioni da evitare
+        per non esporsi a pericoli.
+      </p>
+
+      <p style="margin-top:14px;"><strong>Dopo l'alluvione</strong></p>
+      <p>
+        Qui inserirò le prime regole di comportamento per il rientro e per la fase successiva
+        all'evento: seguire le indicazioni delle autorità, fare attenzione a impianti, acqua,
+        strade allagate e possibili situazioni residue di pericolo.
+      </p>
+    </div>
+
+    <div class="allerta-section-title">Nota</div>
+    <div class="allerta-section-body">
+      <p>
+        Le regole di comportamento riportate in questa sezione sono tratte e adattate dalla
+        campagna nazionale <strong>Io non rischio</strong>.
+      </p>
+      <p>
+        Per informazioni complete e aggiornate consulta sempre i materiali ufficiali:
+        <a href="https://www.iononrischio.gov.it/it/preparati/alluvione/cosa-fare/" target="_blank" rel="noopener noreferrer">
+          Io non rischio - Alluvione
+        </a>
+      </p>
+    </div>
+  </div>
+</div>
 
   <div id="info-modal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
     <div id="info-box" class="modal-box">
