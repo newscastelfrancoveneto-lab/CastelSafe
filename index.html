@@ -437,11 +437,11 @@
     }
     .modal-overlay.open { display: flex; }
     
-    .modal-box {
+	.modal-box {
 	  background: #fff;
-	  border-radius: var(--radius-lg);
-	  padding: 56px 24px 24px;
-	  max-width: 450px;
+	  border-radius: 20px;
+	  padding: 56px 22px 22px;
+	  max-width: 520px;
 	  width: 92%;
 	  max-height: 85vh;
 	  overflow-y: auto;
@@ -467,25 +467,26 @@
 	  position: absolute;
 	  top: 16px;
 	  left: 16px;
-	  background: #f1f5f9;
-	  border: none;
+	  background: rgba(241, 245, 249, 0.9);
+	  border: 1px solid #e2e8f0;
 	  border-radius: 50%;
-	  width: 32px;
-	  height: 32px;
-	  font-size: 1rem;
+	  width: 34px;
+	  height: 34px;
+	  font-size: 0.95rem;
 	  font-weight: 800;
 	  cursor: pointer;
 	  display: flex;
 	  align-items: center;
 	  justify-content: center;
 	  color: var(--text-muted);
-	  transition: background 0.2s, color 0.2s, transform 0.2s;
+	  transition: background 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
+	  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 	}
 	
 	.modal-help-btn:hover {
-	  background: #e2e8f0;
-	  color: var(--text-main);
-	  transform: scale(1.05);
+	  background: #ffffff;
+	  color: var(--primary);
+	  transform: scale(1.04);
 	}
 	  
     .modal-close-btn:hover { background: #e2e8f0; color: var(--text-main); }
@@ -503,10 +504,72 @@
     .allerta-row .label { font-size: 0.85rem; font-weight: 600; color: var(--text-main); }
     .allerta-row .livello { font-size: 0.85rem; font-weight: 800; margin-left: auto; text-transform: uppercase; }
     
-    .allerta-section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: .05em; margin: 20px 0 8px; }
-    .allerta-section-body { font-size: 0.85rem; color: var(--text-main); line-height: 1.6; background: #f8fafc; border-radius: var(--radius-md); padding: 14px; border: 1px solid #e2e8f0; white-space: pre-wrap; }
-    .periodo { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px; font-weight: 500; }
+    .allerta-section-title {
+		  font-size: 0.74rem;
+		  font-weight: 800;
+		  text-transform: uppercase;
+		  color: var(--primary);
+		  letter-spacing: 0.08em;
+		  margin: 22px 0 8px;
+		  padding-top: 14px;
+		  border-top: 1px solid #e2e8f0;
+		}
+    
+	.allerta-section-body {
+		  font-size: 0.9rem;
+		  color: var(--text-main);
+		  line-height: 1.65;
+		  background: transparent;
+		  border-radius: 0;
+		  padding: 0;
+		  border: none;
+		  white-space: normal;
+		}
 
+	  #allerta-help-modal .modal-box {
+		  max-width: 560px;
+		}
+		
+		#allerta-help-modal .allerta-section-title:first-of-type {
+		  margin-top: 0;
+		  padding-top: 0;
+		  border-top: none;
+		}
+		
+		#allerta-help-modal .allerta-section-body p {
+		  font-size: 0.9rem;
+		  line-height: 1.65;
+		  color: var(--text-main);
+		  margin-bottom: 10px;
+		}
+		
+		#allerta-help-modal .allerta-section-body p:last-child {
+		  margin-bottom: 0;
+		}
+		
+		#allerta-help-modal .allerta-section-body img {
+		  width: 100%;
+		  display: block;
+		  margin-top: 14px;
+		  border-radius: 14px;
+		  border: 1px solid #e2e8f0;
+		  background: #fff;
+		  box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+		}
+		
+		#allerta-help-modal .allerta-section-body a {
+		  word-break: break-word;
+		}
+			  
+	.periodo {
+	  font-size: 0.84rem;
+	  color: var(--text-muted);
+	  margin-bottom: 18px;
+	  font-weight: 500;
+	  line-height: 1.5;
+	  padding-right: 28px;
+	}
+	  
     /* Leaflet Overrides per estetica moderna */
     .leaflet-bar { border: none !important; box-shadow: var(--shadow-soft) !important; border-radius: 8px !important; overflow: hidden; }
     .leaflet-bar a { background-color: #fff !important; color: var(--text-main) !important; width: 36px !important; height: 36px !important; line-height: 36px !important; transition: background 0.2s; }
@@ -626,29 +689,34 @@
     </div>
 
     <div class="allerta-section-title">Nota</div>
-    <div class="allerta-section-body">
-      <p style="font-size:0.78rem; color:var(--text-muted); line-height:1.5;">
-        Le indicazioni di comportamento presenti in questa sezione sono ispirate ai materiali
-        ufficiali della campagna nazionale <strong>Io non rischio</strong> e hanno finalità
-        esclusivamente informative.
-      </p>
-      <p style="font-size:0.78rem; color:var(--text-muted); line-height:1.5; margin-top:10px;">
-        In caso di emergenza fai sempre riferimento alle comunicazioni ufficiali di Protezione
-        Civile, Regione, Comune e autorità competenti.
-      </p>
-      <p style="font-size:0.78rem; color:var(--text-muted); line-height:1.5; margin-top:10px;">
-        Fonte:
-        <a
-          href="https://www.iononrischio.gov.it/it/preparati/alluvione/cosa-fare/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Io non rischio - Alluvione
-        </a>
-      </p>
-    </div>
+	<div class="allerta-section-body allerta-note-box">
+	  <p>
+	    Le indicazioni di comportamento presenti in questa sezione sono ispirate ai materiali ufficiali della campagna nazionale <strong>Io non rischio</strong> e hanno finalità esclusivamente informative.
+	  </p>
+	  <p>
+	    In caso di emergenza fai sempre riferimento alle comunicazioni ufficiali di Protezione Civile, Regione, Comune e autorità competenti.
+	  </p>
+	  <p>
+	    Fonte: <a href="https://www.iononrischio.gov.it/it/preparati/alluvione/cosa-fare" target="_blank" rel="noopener noreferrer">Io non rischio - Alluvione</a>
+	  </p>
+	</div>
   </div>
 </div>
+
+
+.allerta-note-box {
+  margin-top: 4px;
+  padding: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+
+.allerta-note-box p {
+  font-size: 0.8rem !important;
+  color: var(--text-muted) !important;
+  line-height: 1.55 !important;
+}
 
   <div id="info-modal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
     <div id="info-box" class="modal-box">
