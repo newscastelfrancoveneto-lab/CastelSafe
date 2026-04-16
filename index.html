@@ -895,7 +895,7 @@ async function loadSavedNotifications() {
         <div class="notif-body">${notif.body}</div>
         <div class="notif-time">${notif.timestamp}</div>
       `;
-      listEl.prepend(item);
+      listEl.appendChild(item);
     });
 }
 
