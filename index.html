@@ -585,6 +585,7 @@
       height: 100%; color: var(--text-muted); text-align: center; padding: 30px;
     }
     .placeholder svg { margin-bottom: 16px; opacity: 0.3; color: var(--primary); }
+	.contact-call-btn svg { stroke: #ffffff;}
     .placeholder p { font-size: 0.9rem; line-height: 1.5; font-weight: 500; }
 
     .stat-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 16px; }
@@ -1054,96 +1055,95 @@
     </button>
 
     <div id="contacts-menu" class="contacts-menu" role="dialog" aria-label="Contatti di emergenza">
-        <div class="contacts-menu-header">
-            <div>
-                <div class="contacts-menu-title">Contatti utili</div>
-                <div class="contacts-menu-subtitle">Tocca l'icona telefono per chiamare</div>
-            </div>
-            <button type="button" class="contacts-close-btn" id="contacts-menu-close" aria-label="Chiudi contatti">✕</button>
+    <div class="contacts-menu-header">
+        <div>
+            <div class="contacts-menu-title">Contatti utili</div>
+            <div class="contacts-menu-subtitle">Tocca l'icona telefono per chiamare</div>
         </div>
+        <button type="button" class="contacts-close-btn" id="contacts-menu-close" aria-label="Chiudi contatti">✕</button>
+    </div>
 
-        <div class="contacts-section-title">Emergenze nazionali</div>
+    <div class="contacts-section-title">Emergenze nazionali</div>
 
-        <div class="contact-card">
-            <div class="contact-card-main">
-                <div class="contact-name">Carabinieri</div>
-                <div class="contact-number">112</div>
-            </div>
-            <a class="contact-call-btn" href="tel:112" aria-label="Chiama Carabinieri 112">📞</a>
+    <div class="contact-card">
+        <div class="contact-card-main">
+            <div class="contact-name">Carabinieri</div>
+            <div class="contact-number">112</div>
         </div>
+        <a class="contact-call-btn" href="tel:112" aria-label="Chiama Carabinieri 112"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.62a2 2 0 0 1-.45 2.11L8 9.91a16 16 0 0 0 6.09 6.09l1.46-1.28a2 2 0 0 1 2.11-.45c.84.29 1.72.5 2.62.62A2 2 0 0 1 22 16.92z"/></svg></a>
+    </div>
 
-        <div class="contact-card">
-            <div class="contact-card-main">
-                <div class="contact-name">Polizia di Stato</div>
-                <div class="contact-number">113</div>
-            </div>
-            <a class="contact-call-btn" href="tel:113" aria-label="Chiama Polizia di Stato 113">📞</a>
+    <div class="contact-card">
+        <div class="contact-card-main">
+            <div class="contact-name">Polizia di Stato</div>
+            <div class="contact-number">113</div>
         </div>
+        <a class="contact-call-btn" href="tel:113" aria-label="Chiama Polizia di Stato 113"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.62a2 2 0 0 1-.45 2.11L8 9.91a16 16 0 0 0 6.09 6.09l1.46-1.28a2 2 0 0 1 2.11-.45c.84.29 1.72.5 2.62.62A2 2 0 0 1 22 16.92z"/></svg></a>
+    </div>
 
-        <div class="contact-card">
-            <div class="contact-card-main">
-                <div class="contact-name">Vigili del Fuoco</div>
-                <div class="contact-number">115</div>
-            </div>
-            <a class="contact-call-btn" href="tel:115" aria-label="Chiama Vigili del Fuoco 115">📞</a>
+    <div class="contact-card">
+        <div class="contact-card-main">
+            <div class="contact-name">Vigili del Fuoco</div>
+            <div class="contact-number">115</div>
         </div>
+        <a class="contact-call-btn" href="tel:115" aria-label="Chiama Vigili del Fuoco 115"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.62a2 2 0 0 1-.45 2.11L8 9.91a16 16 0 0 0 6.09 6.09l1.46-1.28a2 2 0 0 1 2.11-.45c.84.29 1.72.5 2.62.62A2 2 0 0 1 22 16.92z"/></svg></a>
+    </div>
 
-        <div class="contact-card">
-            <div class="contact-card-main">
-                <div class="contact-name">Guardia di Finanza</div>
-                <div class="contact-number">117</div>
-            </div>
-            <a class="contact-call-btn" href="tel:117" aria-label="Chiama Guardia di Finanza 117">📞</a>
+    <div class="contact-card">
+        <div class="contact-card-main">
+            <div class="contact-name">Guardia di Finanza</div>
+            <div class="contact-number">117</div>
         </div>
+        <a class="contact-call-btn" href="tel:117" aria-label="Chiama Guardia di Finanza 117"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.62a2 2 0 0 1-.45 2.11L8 9.91a16 16 0 0 0 6.09 6.09l1.46-1.28a2 2 0 0 1 2.11-.45c.84.29 1.72.5 2.62.62A2 2 0 0 1 22 16.92z"/></svg></a>
+    </div>
 
-        <div class="contacts-section-title">Contatti locali</div>
+    <div class="contacts-section-title">Contatti locali</div>
 
-        <div class="contact-card">
-            <div class="contact-card-main">
-                <div class="contact-name">Polizia locale</div>
-                <div class="contact-number">0423 735 536</div>
-            </div>
-            <a class="contact-call-btn" href="tel:+390423735536" aria-label="Chiama Polizia locale">📞</a>
+    <div class="contact-card">
+        <div class="contact-card-main">
+            <div class="contact-name">Polizia locale</div>
+            <div class="contact-number">0423 735 536</div>
         </div>
+        <a class="contact-call-btn" href="tel:+390423735536" aria-label="Chiama Polizia locale"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.62a2 2 0 0 1-.45 2.11L8 9.91a16 16 0 0 0 6.09 6.09l1.46-1.28a2 2 0 0 1 2.11-.45c.84.29 1.72.5 2.62.62A2 2 0 0 1 22 16.92z"/></svg></a>
+    </div>
 
-        <div class="contact-card">
-            <div class="contact-card-main">
-                <div class="contact-name">Protezione civile locale</div>
-                <div class="contact-note">In emergenza</div>
-                <div class="contact-number">329 299 3682</div>
-            </div>
-            <a class="contact-call-btn" href="tel:+393292993682" aria-label="Chiama Protezione civile locale in emergenza">📞</a>
+    <div class="contact-card">
+        <div class="contact-card-main">
+            <div class="contact-name">Protezione civile locale</div>
+            <div class="contact-note">In emergenza</div>
+            <div class="contact-number">329 299 3682</div>
         </div>
+        <a class="contact-call-btn" href="tel:+393292993682" aria-label="Chiama Protezione civile locale in emergenza"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.62a2 2 0 0 1-.45 2.11L8 9.91a16 16 0 0 0 6.09 6.09l1.46-1.28a2 2 0 0 1 2.11-.45c.84.29 1.72.5 2.62.62A2 2 0 0 1 22 16.92z"/></svg></a>
+    </div>
 
-        <div class="contact-card">
-            <div class="contact-card-main">
-                <div class="contact-name">Protezione civile locale</div>
-                <div class="contact-note">In orario d'ufficio</div>
-                <div class="contact-number">0423 735 727</div>
-            </div>
-            <a class="contact-call-btn" href="tel:+390423735727" aria-label="Chiama Protezione civile locale in orario d'ufficio">📞</a>
+    <div class="contact-card">
+        <div class="contact-card-main">
+            <div class="contact-name">Protezione civile locale</div>
+            <div class="contact-note">In orario d'ufficio</div>
+            <div class="contact-number">0423 735 727</div>
         </div>
+        <a class="contact-call-btn" href="tel:+390423735727" aria-label="Chiama Protezione civile locale in orario d'ufficio"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.62a2 2 0 0 1-.45 2.11L8 9.91a16 16 0 0 0 6.09 6.09l1.46-1.28a2 2 0 0 1 2.11-.45c.84.29 1.72.5 2.62.62A2 2 0 0 1 22 16.92z"/></svg></a>
+    </div>
 
-        <div class="contact-card">
-            <div class="contact-card-main">
-                <div class="contact-name">Protezione civile locale</div>
-                <div class="contact-note">Fuori orario d'ufficio</div>
-                <div class="contact-number">348 355 1489</div>
-            </div>
-            <a class="contact-call-btn" href="tel:+393483551489" aria-label="Chiama Protezione civile locale fuori orario d'ufficio">📞</a>
+    <div class="contact-card">
+        <div class="contact-card-main">
+            <div class="contact-name">Protezione civile locale</div>
+            <div class="contact-note">Fuori orario d'ufficio</div>
+            <div class="contact-number">348 355 1489</div>
         </div>
+        <a class="contact-call-btn" href="tel:+393483551489" aria-label="Chiama Protezione civile locale fuori orario d'ufficio"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.62a2 2 0 0 1-.45 2.11L8 9.91a16 16 0 0 0 6.09 6.09l1.46-1.28a2 2 0 0 1 2.11-.45c.84.29 1.72.5 2.62.62A2 2 0 0 1 22 16.92z"/></svg></a>
+    </div>
 
-        <div class="contact-card">
-            <div class="contact-card-main">
-                <div class="contact-name">Protezione civile regionale</div>
-                <div class="contact-number">800 99 00 09</div>
-            </div>
-            <a class="contact-call-btn" href="tel:800990009" aria-label="Chiama Protezione civile regionale">📞</a>
+    <div class="contact-card">
+        <div class="contact-card-main">
+            <div class="contact-name">Protezione civile regionale</div>
+            <div class="contact-number">800 99 00 09</div>
         </div>
+        <a class="contact-call-btn" href="tel:800990009" aria-label="Chiama Protezione civile regionale"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.78.62 2.62a2 2 0 0 1-.45 2.11L8 9.91a16 16 0 0 0 6.09 6.09l1.46-1.28a2 2 0 0 1 2.11-.45c.84.29 1.72.5 2.62.62A2 2 0 0 1 22 16.92z"/></svg></a>
+    </div>
 
-        <div class="contacts-help-note">
-            Usa i numeri locali per segnalazioni e coordinamento sul territorio. Per emergenze immediate fai riferimento ai numeri nazionali.
-        </div>
+    <div class="contacts-help-note">
+        Usa i numeri locali per segnalazioni e coordinamento sul territorio. Per emergenze immediate fai riferimento ai numeri nazionali.
     </div>
 </div>
 
