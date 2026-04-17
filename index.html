@@ -675,12 +675,12 @@
     .layer-control-toggle:hover { background: #f8fafc; color: var(--primary); }
     
     .layer-control-menu {
-      position: absolute; top: 0; right: 54px; width: 240px;
+      position: absolute; top: 0; right: -240px; width: 240px;
       background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
       border-radius: var(--radius-lg); padding: 14px;
       box-shadow: var(--shadow-float); border: 1px solid rgba(255,255,255,0.5);
       opacity: 0; visibility: hidden; transform: translateX(10px) scale(0.95);
-      transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); transform-origin: top right;
+      transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); transform-origin: top left; 
     }
     .layer-control-menu.open { opacity: 1; visibility: visible; transform: translateX(0) scale(1); }
     
