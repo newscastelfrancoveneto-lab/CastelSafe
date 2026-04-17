@@ -1420,54 +1420,32 @@ function closePanel() {
 }
 
 
-async function loadSedePCFromOSM() {
-  const query = `[out:json][timeout:15];way(1342219172);out geom qt;`;
+function loadSedePCFromOSM() {
+  const lat = 45.670167;
+  const lon = 11.953020;
+  const name = 'Sede Protezione Civile';
 
-  try {
-    // chiamata diretta senza il sistema bbox/area che causa il 400
-    const response = await fetch('https://overpass-api.de/api/interpreter', {
-      method: 'POST',
-      body: new URLSearchParams({ data: query }),
-      signal: AbortSignal.timeout(15000)
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
+  if (pcLayerGroup) pcLayerGroup.clearLayers();
 
-    if (!data?.elements?.length) return;
-    const el = data.elements[0];
-    if (el.type !== 'way' || !el.geometry?.length) return;
-
-    const lat = el.geometry.reduce((s, p) => s + p.lat, 0) / el.geometry.length;
-    const lon = el.geometry.reduce((s, p) => s + p.lon, 0) / el.geometry.length;
-
-    if (pcLayerGroup) pcLayerGroup.clearLayers();
-
-    const marker = L.marker([lat, lon], { icon: pcIcon });
-	marker.bindPopup(`
-	  <div style="font-family:Inter,sans-serif;font-size:0.9rem">
-		<strong style="color:#ff6600;font-size:1rem">🏠 Sede Protezione Civile</strong>
-		<span style="font-size:0.8rem;color:#64748b;margin-top:4px;display:block">
-		  ${el.tags?.name ?? 'Castelfranco Veneto'}
-		</span>
-		<div style="margin-top:12px">
-		  <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}"
-			 target="_blank"
-			 style="display:inline-flex;align-items:center;gap:6px;background:var(--primary);color:#fff;
-					padding:8px 14px;border-radius:8px;text-decoration:none;font-size:0.8rem;
-					font-weight:600;transition:background 0.2s">
-			Naviga con Maps
-		  </a>
-		</div>
-	  </div>
-	`);
-	pcLayerGroup.addLayer(marker);
-	  
-    marker.bindPopup(`...`); // il tuo popup
-    pcLayerGroup.addLayer(marker);
-
-  } catch(e) {
-    console.warn('Sede PC OSM non trovata:', e);
-  }
+  const marker = L.marker([lat, lon], { icon: pcIcon });
+  marker.bindPopup(`
+    <div style="font-family:Inter,sans-serif;font-size:0.9rem">
+      <strong style="color:#ff6600;font-size:1rem">🏠 ${name}</strong>
+      <span style="font-size:0.8rem;color:#64748b;margin-top:4px;display:block">
+        Castelfranco Veneto
+      </span>
+      <div style="margin-top:12px">
+        <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}"
+           target="_blank"
+           style="display:inline-flex;align-items:center;gap:6px;background:#8d021f;color:#fff;
+                  padding:8px 14px;border-radius:8px;text-decoration:none;font-size:0.8rem;
+                  font-weight:600">
+          Naviga con Maps
+        </a>
+      </div>
+    </div>
+  `);
+  pcLayerGroup.addLayer(marker);
 }
 
 // --- GESTIONE NOTIFICHE ---
