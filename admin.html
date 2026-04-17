@@ -550,20 +550,22 @@ function getData() {
 }
 
 async function saveData(fc) {
+  const token = getToken()
   closureDataCache = {
     ...fc,
     features: Array.isArray(fc?.features) ? [...fc.features] : []
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(closureDataCache));
   try {
-      const response = await fetch('https://parthenocarpically-presymphonic-alesia.ngrok-free.dev/api/closures', {
-          method: 'POST',
-          headers: {
-              'Content-Type': 'application/json',
-              'ngrok-skip-browser-warning': 'true'
-          },
-          body: JSON.stringify(closureDataCache)
-      });
+      const response = await fetch(SERVER_URL + '/api/closures', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true',
+            'Authorization': `Bearer ${token}`    // ← aggiungi questo
+        },
+        body: JSON.stringify(closureDataCache)
+    })
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
   } catch (err) {
     console.info('Salvataggio su https://parthenocarpically-presymphonic-alesia.ngrok-free.dev/api/closures non disponibile, mantengo cache locale.', err);
