@@ -30,8 +30,7 @@
 		  transition: transform 0.2s;
 		}
 		.pc-marker:hover { transform: scale(1.1); }
-		.pc-marker img { width: 28px; height: 28px; border-radius: 50%; }
-
+	  
 	.contacts-menu {
 	  z-index: 101;
 	}
@@ -1317,9 +1316,8 @@ const SEDE_PC = {
   osmWayId: 1342219172,
   name: 'Sede Protezione Civile',
   subtitle: 'Castelfranco Veneto',
-  lat: 45.6882,  // Centroide way
-  lon: 11.9251,
-  iconUrl: 'data:image/svg+xml;base64,...'  // O usa logo esterno
+  lat: 45.688124,  // Centroide ESATTO way
+  lon: 11.925468
 };
 
 const SOGLIA_CFG = [
@@ -1825,11 +1823,12 @@ async function loadOSMData(forceRefresh = false) {
 
 
 const pcIcon = L.divIcon({
-  html: `<img src="https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_Internazionale_Protezione_Civile.png" alt="Protezione Civile" class="pc-logo">`,
-  iconSize: [44, 44],
-  className: 'pc-marker',
-  iconAnchor: [22, 22]
+  html: `<div class="stn-marker" style="width:26px;height:26px;background:#ff6600;"><img src="https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_Internazionale_Protezione_Civile.png" alt="PC" style="width:18px;height:18px;"></div>`,
+  iconSize: [26, 26],  // Come ARPAV
+  className: '',  // Rimuovi pc-marker per ereditare stn-marker
+  iconAnchor: [13, 13]
 });
+	
 const pcMarker = L.marker([SEDE_PC.lat, SEDE_PC.lon], { icon: pcIcon }).addTo(map);
 // Dopo la creazione di pcMarker
 const pcLayerGroup = L.layerGroup([pcMarker]).addTo(map);
@@ -2531,13 +2530,10 @@ function fetchXmlSource(url, timeoutMs) {
     .finally(() => clearTimeout(timer));
 }
 
-	function togglePCLayer(visible) {
-		  if (visible) {
-		    map.addLayer(pcLayerGroup);
-		  } else {
-		    map.removeLayer(pcLayerGroup);
-		  }
-		}
+function togglePCLayer(visible) {
+  if (visible) map.addLayer(pcLayerGroup);
+  else map.removeLayer(pcLayerGroup);
+}
 
 function firstFulfilled(promises) {
   if (typeof Promise.any === 'function') return Promise.any(promises);
