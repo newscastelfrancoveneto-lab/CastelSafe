@@ -2225,45 +2225,30 @@ const LayerSwitcher = L.Control.extend({
           <line x1="20" y1="12" x2="22" y2="12"></line>
         </svg>
       </button>
-
-      <div class="layer-control-menu">
-        <div class="layer-control-header">Livelli Mappa</div>
-        <div class="layer-control-section-title first">Idrografia</div>
-        <div class="layer-control-items">
-          <label class="layer-control-item">
-            <input type="checkbox" id="toggle-waterways" checked onchange="toggleWaterways(this.checked)">
-            <span class="layer-swatch" style="background:#2563eb"></span>
-            Corsi d'acqua
-          </label>
-        </div>
-        <div class="layer-control-section-title">Aree Protezione Civile</div>
-        <div class="layer-control-items">
-          ${Object.entries(CPA_STYLES).map(([key, style]) => `
-            <label class="layer-control-item">
-              <input type="checkbox" id="filter-${key}" checked onchange="toggleCPA('${key}')">
-              <span class="layer-swatch area" style="background:${style.fillColor}30;border-color:${style.color}"></span>
-              ${style.label}
-            </label>
-          `).join('')}
-        </div>
-
-        <div class="layer-control-section-title">Avvisi e Chiusure</div>
-        <div class="layer-control-items">
-          <label class="layer-control-item">
-            <input type="checkbox" id="toggle-closures" checked onchange="toggleClosureAlerts(this.checked)">
-            <span class="layer-swatch alert"></span>
-            Strade/aree chiuse
-          </label>
-        </div>
-      </div>
-
-	  <!-- Nel layer-control-menu, dopo gli altri item es. waterway/CPAs -->
-	  <div class="layer-control-item">
-		  <input type="checkbox" id="toggle-sede-pc" checked onchange="togglePCLayer(this.checked)">
-		  <span class="layer-swatch" style="background:#ff6600;"></span>
-		  Sede Protezione Civile
-	  </div>
 	  
+	div class="layer-control-menu">
+	  div class="layer-control-header">Livelli Mappa</div>
+	  div class="layer-control-section-title first">Idrografia</div>
+	  div class="layer-control-items">
+	    label class="layer-control-item">...</label>
+	  </div>
+	
+	  div class="layer-control-section-title">Aree Protezione Civile</div>
+	  div class="layer-control-items">
+	    label class="layer-control-item">...</label>
+	  </div>
+	
+	  div class="layer-control-section-title">Avvisi e Chiusure</div>
+	  div class="layer-control-items">
+	    label class="layer-control-item">...</label>
+	    <div class="layer-control-item">
+	      <input type="checkbox" id="toggle-sede-pc" checked onchange="togglePCLayer(this.checked)">
+	      <span class="layer-swatch" style="background:#ff6600;"></span>
+	      Sede Protezione Civile
+	    </div>
+	  </div>
+	</div>
+
     `;
 
     L.DomEvent.disableClickPropagation(container);
