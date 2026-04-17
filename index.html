@@ -1441,7 +1441,27 @@ async function loadSedePCFromOSM() {
     const lon = el.geometry.reduce((s, p) => s + p.lon, 0) / el.geometry.length;
 
     if (pcLayerGroup) pcLayerGroup.clearLayers();
+
     const marker = L.marker([lat, lon], { icon: pcIcon });
+	marker.bindPopup(`
+	  <div style="font-family:Inter,sans-serif;font-size:0.9rem">
+		<strong style="color:#ff6600;font-size:1rem">🏠 Sede Protezione Civile</strong>
+		<span style="font-size:0.8rem;color:#64748b;margin-top:4px;display:block">
+		  ${el.tags?.name ?? 'Castelfranco Veneto'}
+		</span>
+		<div style="margin-top:12px">
+		  <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}"
+			 target="_blank"
+			 style="display:inline-flex;align-items:center;gap:6px;background:var(--primary);color:#fff;
+					padding:8px 14px;border-radius:8px;text-decoration:none;font-size:0.8rem;
+					font-weight:600;transition:background 0.2s">
+			Naviga con Maps
+		  </a>
+		</div>
+	  </div>
+	`);
+	pcLayerGroup.addLayer(marker);
+	  
     marker.bindPopup(`...`); // il tuo popup
     pcLayerGroup.addLayer(marker);
 
