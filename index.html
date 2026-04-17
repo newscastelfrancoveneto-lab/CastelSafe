@@ -1311,15 +1311,6 @@ const STATIONS = [
   }
 ];
 
-const SEDE_PC = {
-  id: 'sede-pc',
-  osmWayId: 1342219172,
-  name: 'Sede Protezione Civile',
-  subtitle: 'Castelfranco Veneto',
-  lat: 45.688124,  // Centroide ESATTO way
-  lon: 11.925468
-};
-
 const SOGLIA_CFG = [
   { key: 's1', label: 'Guardia 1', color: '#eab308' },
   { key: 's2', label: 'Guardia 2', color: '#f97316' },
@@ -1426,6 +1417,48 @@ function closePanel() {
   if (activeChart) { activeChart.destroy(); activeChart = null; }
   currentId = null; currentStnRef = null;
   STATIONS.forEach(s => markerRefs[s.id]?.setIcon(buildIcon(s, false)));
+}
+
+
+async function loadSedePCFromOSM() {
+  const query = `
+    [out:json][timeout:15];
+    way(1342219172);
+    out geom qt;
+  `;
+
+  try {
+    const data = await overpassFetch(query);
+    if (!data?.elements?.length) return;
+
+    const el = data.elements[0];
+    if (el.type !== 'way' || !el.geometry?.length) return;
+
+    // Centroide della way
+    const lat = el.geometry.reduce((s, p) => s + p.lat, 0) / el.geometry.length;
+    const lon = el.geometry.reduce((s, p) => s + p.lon, 0) / el.geometry.length;
+
+    if (pcLayerGroup) pcLayerGroup.clearLayers();
+
+    const marker = L.marker([lat, lon], { icon: pcIcon });
+    marker.bindPopup(`
+      <div style="font-family:Inter,sans-serif;font-size:0.9rem">
+        <strong>${el.tags?.name || 'Sede Protezione Civile'}</strong><br>
+        <span style="font-size:0.8rem;color:#64748b">${el.tags?.['addr:street'] || ''}</span>
+        <div style="margin-top:12px">
+          <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}"
+             target="_blank"
+             style="display:inline-flex;align-items:center;gap:6px;background:#8d021f;color:#fff;padding:8px 14px;border-radius:8px;text-decoration:none;font-size:0.8rem;font-weight:600">
+            Naviga con Maps
+          </a>
+        </div>
+      </div>
+    `);
+    pcLayerGroup.addLayer(marker);
+
+  } catch(e) {
+    console.warn('Sede PC OSM non trovata:', e);
+  }
 }
 
 // --- GESTIONE NOTIFICHE ---
@@ -1821,30 +1854,18 @@ async function loadOSMData(forceRefresh = false) {
     }
 }
 
-
+// Mantieni solo pcIcon e pcLayerGroup vuoto
 const pcIcon = L.divIcon({
-  html: `<div class="stn-marker" style="width:26px;height:26px;background:#ff6600;"><img src="https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_Internazionale_Protezione_Civile.png" alt="PC" style="width:18px;height:18px;"></div>`,
-  iconSize: [26, 26],  // Come ARPAV
-  className: '',  // Rimuovi pc-marker per ereditare stn-marker
+  html: `<div class="stn-marker" style="width:26px;height:26px;background:#ff6600">
+           <img src="https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_Internazionale_Protezione_Civile.png"
+                alt="PC" style="width:18px;height:18px;">
+         </div>`,
+  iconSize: [26, 26],
+  className: '',
   iconAnchor: [13, 13]
 });
-	
-const pcMarker = L.marker([SEDE_PC.lat, SEDE_PC.lon], { icon: pcIcon }).addTo(map);
-// Dopo la creazione di pcMarker
-const pcLayerGroup = L.layerGroup([pcMarker]).addTo(map);
-pcMarker.bindPopup(`
-  <div style="font-family:Inter,sans-serif;font-size:0.9rem;">
-    <strong>${SEDE_PC.name}</strong><br>
-    <span style="font-size:0.8rem;color:#64748b;">${SEDE_PC.subtitle}</span>
-    <div style="margin-top:12px;">
-      <a href="https://www.google.com/maps/dir/?api=1&destination=${SEDE_PC.lat},${SEDE_PC.lon}" target="_blank"
-         style="display:inline-flex;align-items:center;gap:6px;background:#8d021f;color:#fff;padding:8px 14px;border-radius:8px;text-decoration:none;font-size:0.8rem;font-weight:600;">
-        Naviga con Maps
-      </a>
-    </div>
-  </div>
-`);
 
+const pcLayerGroup = L.layerGroup().addTo(map); // vuoto, riempito da OSM
 
 	
 function toggleContactsMenu(forceOpen = null) {
@@ -1916,6 +1937,7 @@ async function triggerOSMRefresh({ forceRefresh = false, animate = false } = {})
 
   try {
     await loadOSMData(forceRefresh);
+	loadSedePCFromOSM();
   } catch (err) {
     console.error("Errore durante l'aggiornamento dei dati:", err);
   } finally {
