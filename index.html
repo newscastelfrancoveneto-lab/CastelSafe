@@ -3269,29 +3269,34 @@ const supportSummary = [
   const total48h = bars.reduce((sum, v) => sum + v, 0);
 
   document.getElementById('panel-body').innerHTML =
-    `<div class="stat-row">
-      <div class="stat-card"><div class="val">${lastStep.toFixed(2)}</div><div class="lbl">Ultimo step (${unit})</div></div>
-      <div class="stat-card"><div class="val" id="precip-acc-last">—</div><div class="lbl">Accumulo 24h (${unit})</div></div>
-      <div class="stat-card"><div class="val" id="precip-acc-drying">—</div><div class="lbl">Accumulo 24h corretto (${unit})</div></div>
-      <div class="stat-card"><div class="val" id="precip-acc-peak">—</div><div class="lbl">Picco 24h (${unit})</div></div>
-      <div class="stat-card"><div class="val">${total48h.toFixed(2)}</div><div class="lbl">Totale 48h (${unit})</div></div>
-    </div>
-    <small id="precip-acc-status" style="display:block;margin:10px 4px 0;color:#64748b;font-weight:600;">Calcolo accumulo 24h in background…</small>
-    <small id="precip-drying-note" style="display:block;margin:4px 4px 0;color:#64748b;">${hasDryingSupport ? `Correzione “asciugatura” attiva con ${supportSummary}.` : 'Correzione “asciugatura” non disponibile: sensori di temperatura/radiazione non trovati per questa stazione.'}</small>
-    <div class="chart-wrap"><canvas id="sensorChart"></canvas></div>
-    <table class="data-table">
-      <thead><tr><th>Data / Ora</th><th>Precipitazione (${unit})</th><th>Accumulo 24h (${unit})</th><th>Accumulo 24h corretto (${unit})</th></tr></thead>
-      <tbody id="tbl-body"></tbody>
-    </table>`;
+  `<div class="stat-row">
+    <div class="stat-card"><div class="val">${lastStep.toFixed(2)}</div><div class="lbl">Ultimo step (${unit})</div></div>
+    <div class="stat-card"><div class="val" id="precip-acc-last">—</div><div class="lbl">Accumulo 24h (${unit})</div></div>
+    ${stn.id !== 292 ? `<div class="stat-card"><div class="val" id="precip-acc-drying">—</div><div class="lbl">Accumulo 24h corretto (${unit})</div></div>` : ''}
+    <div class="stat-card"><div class="val" id="precip-acc-peak">—</div><div class="lbl">Picco 24h (${unit})</div></div>
+    <div class="stat-card"><div class="val">${total48h.toFixed(2)}</div><div class="lbl">Totale 48h (${unit})</div></div>
+  </div>
+  <small id="precip-acc-status" style="display:block;margin:10px 4px 0;color:#64748b;font-weight:600;">Calcolo accumulo 24h in background…</small>
+  ${stn.id !== 292 ? `<small id="precip-drying-note" style="display:block;margin:4px 4px 0;color:#64748b;">${hasDryingSupport ? `Correzione "asciugatura" attiva con ${supportSummary}.` : 'Correzione "asciugatura" non disponibile: sensori di temperatura/radiazione non trovati per questa stazione.'}</small>` : ''}
+  <div class="chart-wrap"><canvas id="sensorChart"></canvas></div>
+  <table class="data-table">
+    <thead><tr>
+      <th>Data / Ora</th>
+      <th>Precipitazione (${unit})</th>
+      <th>Accumulo 24h (${unit})</th>
+      ${stn.id !== 292 ? `<th>Accumulo 24h corretto (${unit})</th>` : ''}
+    </tr></thead>
+    <tbody id="tbl-body"></tbody>
+  </table>`;
 
-  const tbody = document.getElementById('tbl-body');
-  rows.slice().reverse().forEach((r, i, src) => {
-    const reverseIdx = src.length - 1 - i;
-    const tr = document.createElement('tr');
-    if (i === 0) tr.classList.add('latest');
-    tr.innerHTML = `<td>${r.label}</td><td><strong>${bars[reverseIdx].toFixed(2)}</strong></td><td data-acc-idx="${reverseIdx}">—</td><td data-drying-idx="${reverseIdx}">—</td>`;
-    tbody.appendChild(tr);
-  });
+const tbody = document.getElementById('tbl-body');
+rows.slice().reverse().forEach((r, i, src) => {
+  const reverseIdx = src.length - 1 - i;
+  const tr = document.createElement('tr');
+  if (i === 0) tr.classList.add('latest');
+  tr.innerHTML = `<td>${r.label}</td><td><strong>${bars[reverseIdx].toFixed(2)}</strong></td><td data-acc-idx="${reverseIdx}">—</td>${stn.id !== 292 ? `<td data-drying-idx="${reverseIdx}">—</td>` : ''}`;
+  tbody.appendChild(tr);
+});
 
   if (activeChart) { activeChart.destroy(); activeChart = null; }
   const ctx = document.getElementById('sensorChart').getContext('2d');
@@ -3373,36 +3378,47 @@ const supportSummary = [
     const statusEl = document.getElementById('precip-acc-status');
     if (statusEl) statusEl.textContent = 'Accumulo 24h pronto';
 
-    activeChart.data.datasets.push({
-      label: `Precipitazione cumulata 24h (${unit})`,
-      data: accumulation,
-      yAxisID: 'y',
-      type: 'line',
-      borderColor: '#f97316',
-      backgroundColor: 'rgba(249,115,22,.12)',
-      borderWidth: 2,
-      tension: 0.2,
-      pointRadius: accumulation.length > 100 ? 0 : 2,
-      pointHoverRadius: 4,
-      fill: false,
-      order: 1
-    });
-    if (dryingAdjustedAccumulation) {
-      activeChart.data.datasets.push({
-        label: `Accumulo 24h corretto (${unit})`,
-        data: dryingAdjustedAccumulation,
-        yAxisID: 'y',
-        type: 'line',
-        borderColor: '#7c3aed',
-        backgroundColor: 'rgba(124,58,237,.12)',
-        borderWidth: 2,
-        tension: 0.2,
-        pointRadius: dryingAdjustedAccumulation.length > 100 ? 0 : 2,
-        pointHoverRadius: 4,
-        fill: false,
-        order: 0
-      });
-    }
+	// Stazione 292 (Muson): solo accumulata classica, niente sensori ambientali
+	// Stazione 102 (Castelfranco): solo accumulata corretta con temp/rad/umidità
+	const showClassic = stn.id === 292;
+	const showCorrected = stn.id === 102;
+	
+	if (showClassic) {
+	  activeChart.data.datasets.push({
+	    label: `Precipitazione cumulata 24h ${unit}`,
+	    data: accumulation,
+	    yAxisID: 'y',
+	    type: 'line',
+	    borderColor: '#f97316',
+	    backgroundColor: 'rgba(249,115,22,.12)',
+	    borderWidth: 2,
+	    tension: 0.2,
+	    pointRadius: accumulation.length > 100 ? 0 : 2,
+	    pointHoverRadius: 4,
+	    fill: false,
+	    order: 1
+	  });
+	}
+	
+	if (showCorrected && dryingAdjustedAccumulation) {
+	  activeChart.data.datasets.push({
+	    label: `Accumulo 24h corretto ${unit}`,
+	    data: dryingAdjustedAccumulation,
+	    yAxisID: 'y',
+	    type: 'line',
+	    borderColor: '#7c3aed',
+	    backgroundColor: 'rgba(124,58,237,.12)',
+	    borderWidth: 2,
+	    tension: 0.2,
+	    pointRadius: dryingAdjustedAccumulation.length > 100 ? 0 : 2,
+	    pointHoverRadius: 4,
+	    fill: false,
+	    order: 0
+	  });
+	}
+	
+	activeChart.update();
+	  
     activeChart.update();
   }, 0);
 }
