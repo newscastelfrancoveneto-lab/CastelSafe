@@ -17,6 +17,21 @@
 
   <style>
 
+	  .pc-marker {
+		  border-radius: 50%;
+		  display: flex;
+		  align-items: center;
+		  justify-content: center;
+		  border: 2px solid #fff;
+		  box-shadow: 0 2px 8px rgba(0,0,0,.4);
+		  cursor: pointer;
+		  background: #ff6600;  /* Arancione */
+		  width: 44px; height: 44px;
+		  transition: transform 0.2s;
+		}
+		.pc-marker:hover { transform: scale(1.1); }
+		.pc-marker img { width: 28px; height: 28px; border-radius: 50%; }
+
 	.contacts-menu {
 	  z-index: 101;
 	}
@@ -1297,6 +1312,16 @@ const STATIONS = [
   }
 ];
 
+const SEDE_PC = {
+  id: 'sede-pc',
+  osmWayId: 1342219172,
+  name: 'Sede Protezione Civile',
+  subtitle: 'Castelfranco Veneto',
+  lat: 45.6882,  // Centroide way
+  lon: 11.9251,
+  iconUrl: 'data:image/svg+xml;base64,...'  // O usa logo esterno
+};
+
 const SOGLIA_CFG = [
   { key: 's1', label: 'Guardia 1', color: '#eab308' },
   { key: 's2', label: 'Guardia 2', color: '#f97316' },
@@ -1798,6 +1823,31 @@ async function loadOSMData(forceRefresh = false) {
     }
 }
 
+
+const pcIcon = L.divIcon({
+  html: `<img src="https://upload.wikimedia.org/wikipedia/commons/7/70/Logo_Internazionale_Protezione_Civile.png" alt="Protezione Civile" class="pc-logo">`,
+  iconSize: [44, 44],
+  className: 'pc-marker',
+  iconAnchor: [22, 22]
+});
+const pcMarker = L.marker([SEDE_PC.lat, SEDE_PC.lon], { icon: pcIcon }).addTo(map);
+// Dopo la creazione di pcMarker
+const pcLayerGroup = L.layerGroup([pcMarker]).addTo(map);
+pcMarker.bindPopup(`
+  <div style="font-family:Inter,sans-serif;font-size:0.9rem;">
+    <strong>${SEDE_PC.name}</strong><br>
+    <span style="font-size:0.8rem;color:#64748b;">${SEDE_PC.subtitle}</span>
+    <div style="margin-top:12px;">
+      <a href="https://www.google.com/maps/dir/?api=1&destination=${SEDE_PC.lat},${SEDE_PC.lon}" target="_blank"
+         style="display:inline-flex;align-items:center;gap:6px;background:#8d021f;color:#fff;padding:8px 14px;border-radius:8px;text-decoration:none;font-size:0.8rem;font-weight:600;">
+        Naviga con Maps
+      </a>
+    </div>
+  </div>
+`);
+
+
+	
 function toggleContactsMenu(forceOpen = null) {
   const menu = document.getElementById('contacts-menu');
   const btn = document.getElementById('contacts-menu-toggle');
@@ -1945,7 +1995,7 @@ function renderCPAGeoJSON(geojson) {
 
   activeFilters.forEach(f => { if (cpaLayers[f]) cpaLayers[f].addTo(map); });
 }
-
+	
 function toggleCPA(type) {
   const cb = document.getElementById(`filter-${type}`);
   if (cb.checked) {
@@ -2207,6 +2257,14 @@ const LayerSwitcher = L.Control.extend({
           </label>
         </div>
       </div>
+
+		<!-- Nel layer-control-menu, dopo gli altri item es. waterway/CPAs -->
+		<div class="layer-control-item">
+		  <input type="checkbox" id="toggle-sede-pc" checked onchange="togglePCLayer(this.checked)">
+		  <span class="layer-swatch" style="background:#ff6600;"></span>
+		  Sede Protezione Civile
+		</div>
+	  
     `;
 
     L.DomEvent.disableClickPropagation(container);
@@ -2472,6 +2530,14 @@ function fetchXmlSource(url, timeoutMs) {
     })
     .finally(() => clearTimeout(timer));
 }
+
+	function togglePCLayer(visible) {
+		  if (visible) {
+		    map.addLayer(pcLayerGroup);
+		  } else {
+		    map.removeLayer(pcLayerGroup);
+		  }
+		}
 
 function firstFulfilled(promises) {
   if (typeof Promise.any === 'function') return Promise.any(promises);
