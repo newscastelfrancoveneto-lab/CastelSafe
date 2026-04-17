@@ -2201,19 +2201,22 @@ const LayerSwitcher = L.Control.extend({
   options: { position: 'topright' },
   onAdd: function() {
     const container = L.DomUtil.create('div', 'custom-layer-control-container');
-    
+
     container.innerHTML = `
       <button class="layer-control-toggle toggle-menu-btn" title="Livelli Mappa">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+          <polyline points="2 17 12 22 22 17"></polyline>
+          <polyline points="2 12 12 17 22 12"></polyline>
+        </svg>
       </button>
 
       <button id="refresh-osm-btn" class="layer-control-toggle" title="Aggiorna Dati Mappa">
-		  <svg id="refresh-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-			<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.74 2.74L21 8"></path>
-			<path d="M21 3v5h-5"></path>
-		  </svg>
-		</button>
-
+        <svg id="refresh-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.74 2.74L21 8"></path>
+          <path d="M21 3v5h-5"></path>
+        </svg>
+      </button>
 
       <button id="gps-btn" class="layer-control-toggle" title="La mia posizione">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -2225,30 +2228,52 @@ const LayerSwitcher = L.Control.extend({
           <line x1="20" y1="12" x2="22" y2="12"></line>
         </svg>
       </button>
-	  
-	div class="layer-control-menu">
-	  div class="layer-control-header">Livelli Mappa</div>
-	  div class="layer-control-section-title first">Idrografia</div>
-	  div class="layer-control-items">
-	    label class="layer-control-item">...</label>
-	  </div>
-	
-	  div class="layer-control-section-title">Aree Protezione Civile</div>
-	  div class="layer-control-items">
-	    label class="layer-control-item">...</label>
-	  </div>
-	
-	  div class="layer-control-section-title">Avvisi e Chiusure</div>
-	  div class="layer-control-items">
-	    label class="layer-control-item">...</label>
-	    <div class="layer-control-item">
-	      <input type="checkbox" id="toggle-sede-pc" checked onchange="togglePCLayer(this.checked)">
-	      <span class="layer-swatch" style="background:#ff6600;"></span>
-	      Sede Protezione Civile
-	    </div>
-	  </div>
-	</div>
 
+      <div class="layer-control-menu">
+        <div class="layer-control-header">Livelli Mappa</div>
+
+        <div class="layer-control-section-title first">Idrografia</div>
+        <div class="layer-control-items">
+          <label class="layer-control-item">
+            <input type="checkbox" id="toggle-waterways" checked onchange="toggleWaterways(this.checked)">
+            <span class="layer-swatch" style="background:#2563eb;"></span>
+            Corsi d'acqua
+          </label>
+        </div>
+
+        <div class="layer-control-section-title">Aree Protezione Civile</div>
+        <div class="layer-control-items">
+          <label class="layer-control-item">
+            <input type="checkbox" id="filter-waiting" checked onchange="toggleCPA('waiting')">
+            <span class="layer-swatch area" style="border-color:#166534; background:rgba(34,197,94,0.25);"></span>
+            Attesa
+          </label>
+          <label class="layer-control-item">
+            <input type="checkbox" id="filter-camp" checked onchange="toggleCPA('camp')">
+            <span class="layer-swatch area" style="border-color:#991b1b; background:rgba(239,68,68,0.25);"></span>
+            Ricovero
+          </label>
+          <label class="layer-control-item">
+            <input type="checkbox" id="filter-staging" checked onchange="toggleCPA('staging')">
+            <span class="layer-swatch area" style="border-color:#a16207; background:rgba(234,179,8,0.25);"></span>
+            Ammassamento
+          </label>
+        </div>
+
+        <div class="layer-control-section-title">Avvisi e Chiusure</div>
+        <div class="layer-control-items">
+          <label class="layer-control-item">
+            <input type="checkbox" id="toggle-closures" checked onchange="toggleClosureAlerts(this.checked)">
+            <span class="layer-swatch alert"></span>
+            Strade/aree chiuse
+          </label>
+          <label class="layer-control-item">
+            <input type="checkbox" id="toggle-sede-pc" checked onchange="togglePCLayer(this.checked)">
+            <span class="layer-swatch" style="background:#ff6600; height:16px; border-radius:4px;"></span>
+            Sede Protezione Civile
+          </label>
+        </div>
+      </div>
     `;
 
     L.DomEvent.disableClickPropagation(container);
@@ -2261,21 +2286,16 @@ const LayerSwitcher = L.Control.extend({
     osmRefreshIconRef = refreshIcon;
     const menu = container.querySelector('.layer-control-menu');
 
-    // Gestione Apertura Menu
     menuBtn.addEventListener('click', (e) => {
       e.preventDefault();
       menu.classList.toggle('open');
     });
 
-   
-	// Gestione Refresh con Animazione e blocco click multipli
-	refreshBtn.addEventListener('click', async (e) => {
-	  e.preventDefault();
-	  await triggerOSMRefresh({ forceRefresh: true, animate: true });
-});
+    refreshBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      await triggerOSMRefresh({ forceRefresh: true, animate: true });
+    });
 
-
-    // ── GPS: Posizione utente ───────────────────────────────────────────────
     const gpsBtn = container.querySelector('#gps-btn');
     let userMarker = null;
     let userCircle = null;
