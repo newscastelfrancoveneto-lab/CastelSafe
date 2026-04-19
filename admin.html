@@ -133,6 +133,7 @@
 </div>
 <script>
 const SERVER_URL = 'https://parthenocarpically-presymphonic-alesia.ngrok-free.dev';
+const CLOSURES_API_URL = 'https://parthenocarpically-presymphonic-alesia.ngrok-free.dev/api/closures';
 const AUTH_TOKEN_KEY = 'closure_admin_token';
 const STORAGE_KEY = 'closure_alerts_geojson_v1';
 const OVERPASS_ENDPOINTS = [
@@ -211,16 +212,24 @@ const osmViewportCache = new Map();
 let closureDataCache = { type:'FeatureCollection', features:[] };
 function setOsmLoaderState(isLoading, message) { const loader = document.getElementById('osmLoader'); const text = document.getElementById('osmLoaderText'); if (!loader || !text) return; loader.classList.toggle('loading', Boolean(isLoading)); text.textContent = message || (isLoading ? 'Caricamento dati OSM...' : 'Dati OSM pronti'); }
 async function loadData() {
-  try {
-    const response = await fetch(`${SERVER_URL}/api/closures`, { headers: authHeaders({ Accept:'application/json' }) });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const payload = await response.json();
-    if (payload && payload.type === 'FeatureCollection' && Array.isArray(payload.features)) {
-      closureDataCache = payload;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-      return closureDataCache;
+  const fetchAttempts = [
+    () => fetch(CLOSURES_API_URL, { headers:{ Accept:'application/json', 'ngrok-skip-browser-warning':'true' } }),
+    () => fetch(CLOSURES_API_URL, { headers: authHeaders({ Accept:'application/json' }) })
+  ];
+  for (const attempt of fetchAttempts) {
+    try {
+      const response = await attempt();
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json();
+      if (payload && payload.type === 'FeatureCollection' && Array.isArray(payload.features)) {
+        closureDataCache = payload;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        return closureDataCache;
+      }
+    } catch (err) {
+      console.info('Lettura closures da endpoint remoto non riuscita, tento fallback.', err);
     }
-  } catch (err) { console.info('Endpoint closures non disponibile, uso cache locale.', err); }
+  }
   try { closureDataCache = JSON.parse(localStorage.getItem(STORAGE_KEY)) || { type:'FeatureCollection', features:[] }; }
   catch { closureDataCache = { type:'FeatureCollection', features:[] }; }
   return closureDataCache;
@@ -231,7 +240,7 @@ async function saveData(fc) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(closureDataCache));
   const token = getToken();
   if (!token) { loginMsg.textContent = 'Sessione scaduta. Effettua di nuovo il login.'; setLogged(false); return; }
-  const response = await fetch(`${SERVER_URL}/api/closures`, {
+  const response = await fetch(CLOSURES_API_URL, {
     method:'POST',
     headers: authHeaders({ 'Content-Type':'application/json' }),
     body: JSON.stringify(closureDataCache)
