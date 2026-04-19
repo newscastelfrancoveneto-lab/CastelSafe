@@ -218,12 +218,20 @@ async function loadData() {
   ];
   for (const attempt of fetchAttempts) {
     try {
-      const response = await attempt();
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const payload = await response.json();
+
+      let fc;
       if (payload && payload.type === 'FeatureCollection' && Array.isArray(payload.features)) {
-        closureDataCache = payload;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        // formato FeatureCollection — già corretto
+        fc = payload;
+      } else if (Array.isArray(payload)) {
+        // ⬅️ la tua API restituisce un array di Feature direttamente
+        fc = { type: 'FeatureCollection', features: payload };
+      }
+      
+      if (fc) {
+        closureDataCache = fc;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(fc));
         return closureDataCache;
       }
     } catch (err) {
