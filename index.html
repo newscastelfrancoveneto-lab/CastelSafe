@@ -16,20 +16,83 @@
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 
   <style>
+  
+	.info-intro-box {
+	  background: #f8fafc;
+	  border: 1px solid #e2e8f0;
+	  border-radius: 14px;
+	  padding: 14px 16px;
+	  margin-bottom: 16px;
+	}
 
-	  .pc-marker {
-		  border-radius: 50%;
-		  display: flex;
-		  align-items: center;
-		  justify-content: center;
-		  border: 2px solid #fff;
-		  box-shadow: 0 2px 8px rgba(0,0,0,.4);
-		  cursor: pointer;
-		  background: #ff6600;  /* Arancione */
-		  width: 44px; height: 44px;
-		  transition: transform 0.2s;
-		}
-		.pc-marker:hover { transform: scale(1.1); }
+	.info-intro-box p {
+	  margin: 0;
+	  font-size: 0.88rem;
+	  color: var(--text-main);
+	  line-height: 1.65;
+	}
+
+	.info-feature-list {
+	  display: flex;
+	  flex-direction: column;
+	  gap: 10px;
+	  margin-bottom: 6px;
+	}
+
+	.info-feature-item {
+	  background: #f8fafc;
+	  border: 1px solid #e2e8f0;
+	  border-radius: 14px;
+	  padding: 12px 14px;
+	}
+
+	.info-feature-item strong {
+	  display: block;
+	  font-size: 0.86rem;
+	  color: var(--text-main);
+	  margin-bottom: 4px;
+	}
+
+	.info-feature-item p {
+	  margin: 0;
+	  font-size: 0.82rem;
+	  line-height: 1.55;
+	  color: var(--text-muted);
+	}
+
+	.info-emergency-box {
+	  margin-top: 4px;
+	  padding: 14px;
+	  background: #fff7ed;
+	  border: 1px solid #fdba74;
+	  border-radius: 14px;
+	}
+
+	.info-emergency-box p {
+	  margin: 0 0 8px 0;
+	  font-size: 0.84rem !important;
+	  color: var(--text-main) !important;
+	  line-height: 1.55 !important;
+	}
+
+	.info-emergency-box p:last-child {
+	  margin-bottom: 0;
+	}
+
+	.pc-marker {
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border: 2px solid #fff;
+		box-shadow: 0 2px 8px rgba(0,0,0,.4);
+		cursor: pointer;
+		background: #ff6600;  /* Arancione */
+		width: 44px; height: 44px;
+		transition: transform 0.2s;
+	}
+	
+	.pc-marker:hover { transform: scale(1.1); }
 	  
 	.contacts-menu {
 	  z-index: 101;
@@ -214,168 +277,168 @@
 	    }
 	}
 
-	  .allerta-note-box {
-		  margin-top: 4px;
-		  padding: 14px;
-		  background: #f8fafc;
-		  border: 1px solid #e2e8f0;
-		  border-radius: 14px;
-		}
-		
-		.allerta-note-box p {
-		  font-size: 0.8rem !important;
-		  color: var(--text-muted) !important;
-		  line-height: 1.55 !important;
-		}
+  .allerta-note-box {
+	  margin-top: 4px;
+	  padding: 14px;
+	  background: #f8fafc;
+	  border: 1px solid #e2e8f0;
+	  border-radius: 14px;
+	}
+	
+	.allerta-note-box p {
+	  font-size: 0.8rem !important;
+	  color: var(--text-muted) !important;
+	  line-height: 1.55 !important;
+	}
 
-	  .allerta-img-btn {
-		  display: block;
-		  width: 100%;
-		  margin-top: 14px;
-		  padding: 0;
-		  background: transparent;
-		  border: none;
-		  cursor: zoom-in;
-		  text-align: left;
-		}
+  .allerta-img-btn {
+	  display: block;
+	  width: 100%;
+	  margin-top: 14px;
+	  padding: 0;
+	  background: transparent;
+	  border: none;
+	  cursor: zoom-in;
+	  text-align: left;
+	}
 
-.allerta-expandable-img {
-  width: 100%;
-  display: block;
-  border-radius: 14px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.05);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
+	.allerta-expandable-img {
+	  width: 100%;
+	  display: block;
+	  border-radius: 14px;
+	  border: 1px solid #e2e8f0;
+	  background: #fff;
+	  box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+	  transition: transform 0.2s ease, box-shadow 0.2s ease;
+	}
 
-.allerta-img-btn:hover .allerta-expandable-img {
-  transform: scale(1.01);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.10);
-}
+	.allerta-img-btn:hover .allerta-expandable-img {
+	  transform: scale(1.01);
+	  box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+	}
 
-.allerta-img-hint {
-  display: inline-block;
-  margin-top: 8px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-muted);
-}
+	.allerta-img-hint {
+	  display: inline-block;
+	  margin-top: 8px;
+	  font-size: 0.78rem;
+	  font-weight: 600;
+	  color: var(--text-muted);
+	}
 
-.image-lightbox-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 10001;
-  background: rgba(15, 23, 42, 0.88);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
+	.image-lightbox-overlay {
+	  display: none;
+	  position: fixed;
+	  inset: 0;
+	  z-index: 10001;
+	  background: rgba(15, 23, 42, 0.88);
+	  backdrop-filter: blur(6px);
+	  -webkit-backdrop-filter: blur(6px);
+	  align-items: center;
+	  justify-content: center;
+	  padding: 24px;
+	}
 
-.image-lightbox-overlay.open {
-  display: flex;
-}
+	.image-lightbox-overlay.open {
+	  display: flex;
+	}
 
-.image-lightbox-img {
-  max-width: min(1100px, 100%);
-  max-height: calc(100vh - 48px);
-  width: auto;
-  height: auto;
-  border-radius: 18px;
-  background: #fff;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.35);
-  animation: popIn 0.22s ease;
-}
+	.image-lightbox-img {
+	  max-width: min(1100px, 100%);
+	  max-height: calc(100vh - 48px);
+	  width: auto;
+	  height: auto;
+	  border-radius: 18px;
+	  background: #fff;
+	  box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+	  animation: popIn 0.22s ease;
+	}
 
-.image-lightbox-close {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 40px;
-  height: 40px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.14);
-  color: #fff;
-  font-size: 1.6rem;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.2s, transform 0.2s;
-}
+	.image-lightbox-close {
+	  position: absolute;
+	  top: 16px;
+	  right: 16px;
+	  width: 40px;
+	  height: 40px;
+	  border: none;
+	  border-radius: 50%;
+	  background: rgba(255,255,255,0.14);
+	  color: #fff;
+	  font-size: 1.6rem;
+	  line-height: 1;
+	  cursor: pointer;
+	  display: flex;
+	  align-items: center;
+	  justify-content: center;
+	  transition: background 0.2s, transform 0.2s;
+	}
 
-.image-lightbox-close:hover {
-  background: rgba(255,255,255,0.24);
-  transform: scale(1.05);
-}
+	.image-lightbox-close:hover {
+	  background: rgba(255,255,255,0.24);
+	  transform: scale(1.05);
+	}
 
-@media (max-width: 640px) {
-  .image-lightbox-overlay {
-    padding: 14px;
-  }
+	@media (max-width: 640px) {
+	  .image-lightbox-overlay {
+		padding: 14px;
+	  }
 
-  .image-lightbox-img {
-    max-height: calc(100vh - 28px);
-    border-radius: 14px;
-  }
+	  .image-lightbox-img {
+		max-height: calc(100vh - 28px);
+		border-radius: 14px;
+	  }
 
-  .image-lightbox-close {
-    top: 10px;
-    right: 10px;
-  }
-}
+	  .image-lightbox-close {
+		top: 10px;
+		right: 10px;
+	  }
+	}
 
 
-	  .btn-clear-notifs {
-		  padding: 8px 14px;
-		  font-size: 0.8rem;
-		  border-radius: 999px;
-		  border: 1px solid rgba(255,255,255,0.7);
-		  background: rgba(255,255,255,0.12);
-		  color: #ffffff;
-		  cursor: pointer;
-		  min-height: 36px;
-		}
-		
-		.btn-clear-notifs:hover {
-		  background: rgba(255,255,255,0.22);
-		}
+  .btn-clear-notifs {
+	  padding: 8px 14px;
+	  font-size: 0.8rem;
+	  border-radius: 999px;
+	  border: 1px solid rgba(255,255,255,0.7);
+	  background: rgba(255,255,255,0.12);
+	  color: #ffffff;
+	  cursor: pointer;
+	  min-height: 36px;
+	}
+	
+	.btn-clear-notifs:hover {
+	  background: rgba(255,255,255,0.22);
+	}
 
 
 
 	.notification-item {
-    background: #ffffff;
-    padding: 12px;
-    border-radius: 8px;
-    border-left: 4px solid var(--primary);
-    margin-bottom: 10px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-}
+		background: #ffffff;
+		padding: 12px;
+		border-radius: 8px;
+		border-left: 4px solid var(--primary);
+		margin-bottom: 10px;
+		box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+	}
 
-.notif-title {
-    font-weight: 700;
-    font-size: 0.85rem;
-    color: #1e293b;
-    margin-bottom: 3px;
-}
+	.notif-title {
+		font-weight: 700;
+		font-size: 0.85rem;
+		color: #1e293b;
+		margin-bottom: 3px;
+	}
 
-.notif-body {
-    font-size: 0.8rem;
-    color: #475569;
-    line-height: 1.4;
-}
+	.notif-body {
+		font-size: 0.8rem;
+		color: #475569;
+		line-height: 1.4;
+	}
 
-.notif-time {
-    font-size: 0.7rem;
-    color: #94a3b8;
-    margin-top: 6px;
-    text-align: right;
-}
+	.notif-time {
+		font-size: 0.7rem;
+		color: #94a3b8;
+		margin-top: 6px;
+		text-align: right;
+	}
   
 	/* ── MENU NOTIFICHE (SIDE PANEL) ── */
 	.side-panel {
@@ -497,6 +560,7 @@
       color: #1e293b;
       pointer-events: none;
     }
+	
     .leaflet-tooltip.custom-tooltip::before { display: none; }
     /* ── BASE & TYPOGRAPHY ── */
     :root {
@@ -840,40 +904,40 @@
 		  white-space: normal;
 		}
 
-	  #allerta-help-modal .modal-box {
-		  max-width: 560px;
-		}
-		
-		#allerta-help-modal .allerta-section-title:first-of-type {
-		  margin-top: 0;
-		  padding-top: 0;
-		  border-top: none;
-		}
-		
-		#allerta-help-modal .allerta-section-body p {
-		  font-size: 0.9rem;
-		  line-height: 1.65;
-		  color: var(--text-main);
-		  margin-bottom: 10px;
-		}
-		
-		#allerta-help-modal .allerta-section-body p:last-child {
-		  margin-bottom: 0;
-		}
-		
-		#allerta-help-modal .allerta-section-body img {
-		  width: 100%;
-		  display: block;
-		  margin-top: 14px;
-		  border-radius: 14px;
-		  border: 1px solid #e2e8f0;
-		  background: #fff;
-		  box-shadow: 0 4px 14px rgba(0,0,0,0.05);
-		}
-		
-		#allerta-help-modal .allerta-section-body a {
-		  word-break: break-word;
-		}
+    #allerta-help-modal .modal-box {
+		max-width: 560px;
+	}
+	
+	#allerta-help-modal .allerta-section-title:first-of-type {
+	  margin-top: 0;
+	  padding-top: 0;
+	  border-top: none;
+	}
+	
+	#allerta-help-modal .allerta-section-body p {
+	  font-size: 0.9rem;
+	  line-height: 1.65;
+	  color: var(--text-main);
+	  margin-bottom: 10px;
+	}
+	
+	#allerta-help-modal .allerta-section-body p:last-child {
+	  margin-bottom: 0;
+	}
+	
+	#allerta-help-modal .allerta-section-body img {
+	  width: 100%;
+	  display: block;
+	  margin-top: 14px;
+	  border-radius: 14px;
+	  border: 1px solid #e2e8f0;
+	  background: #fff;
+	  box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+	}
+	
+	#allerta-help-modal .allerta-section-body a {
+	  word-break: break-word;
+	}
 			  
 	.periodo {
 	  font-size: 0.84rem;
@@ -1052,29 +1116,89 @@
   line-height: 1.55 !important;
 }
 
-  <div id="info-modal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
-    <div id="info-box" class="modal-box">
-      <button class="modal-close-btn" onclick="document.getElementById('info-modal').classList.remove('open')">✕</button>
-      <h2>Informazioni sull'app</h2>
-      <h3>ℹ️ A cosa serve</h3>
-      <p>Questa app aiuta i cittadini a consultare in modo rapido le allerte meteo regionali, i dati dei sensori ARPAV e le aree di protezione civile del Comune di Castelfranco Veneto.</p>
-	  <h3>Aree di protezione civile</h3>
-	  <h3><span class="info-area-badge" style="background:#166534">Area di attesa</span> </h3>
-      <p>Punto di raccolta sicuro per la popolazione in caso di evacuazione. Recati qui <strong>immediatamente</strong> se ricevi un'allerta di evacuazione. Rimani in attesa di istruzioni.</p>
-      <h3><span class="info-area-badge" style="background:#991b1b">Area di ricovero</span> </h3>
-      <p>Struttura attrezzata per ospitare la popolazione evacuata. Raggiungi quest'area solo se indicato dalle autorità.</p>
-      <h3><span class="info-area-badge" style="background:#a16207">Area di ammassamento</span> </h3>
-      <p>Zona riservata ai soccorritori e ai mezzi di emergenza. <strong>Non accessibile alla popolazione.</strong></p>
-      <h3>📡 Stazioni sensori ARPAV</h3>
-      <p>Livelli dei corsi d'acqua, precipitazioni e altri dati ambientali forniti da <strong>ARPAV</strong>, aggiornati ogni 30 min.<br><a href="https://www.arpa.veneto.it/dati-ambientali/dati-in-diretta/meteo-idro-nivo/pannello-meteo-segnalazioni" target="_blank">→ Dati in diretta ARPAV</a></p>
-      <h3>🚧 Avvisi strade/aree (chiusure e pericoli)</h3>
-      <p>Nella mappa trovi gli avvisi su strade e aree con limitazioni temporanee: chiusure totali, chiusure parziali, passaggi limitati e zone con pericolo (es. allagamenti, ostacoli, lavori, eventi). Apri il dettaglio dell'avviso per vedere descrizione, periodo di validità e area interessata.</p>
-      <h3>🗺️ Dati geografici</h3>
-      <p>Corsi d'acqua e aree di protezione civile estratti da <a href="https://www.openstreetmap.org" target="_blank">OpenStreetMap</a> </p>
-      <h3>🔒 Area operatori</h3>
-      <p>La pagina di gestione avvisi è riservata agli operatori autorizzati: <a href="./admin.html" target="_blank">Apri pagina admin</a>.</p>
-    </div>
+<div id="info-modal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
+  <div id="info-box" class="modal-box">
+    <button class="modal-close-btn" onclick="document.getElementById('info-modal').classList.remove('open')" title="Chiudi">×</button>
+
+    <h2>Informazioni sull'app</h2>
+
+    <h3>A cosa serve</h3>
+    <p>
+      Questa app aiuta i cittadini a consultare rapidamente il territorio di Castelfranco Veneto:
+      allerte meteo regionali, sensori ARPAV, aree di protezione civile, avvisi temporanei e contatti utili.
+    </p>
+
+    <h3>Come usare l'app</h3>
+    <p>
+      Dalla mappa puoi visualizzare le aree di protezione civile, i corsi d'acqua, gli avvisi di chiusura o pericolo,
+      la sede della Protezione Civile e i sensori ARPAV. Puoi anche usare i pulsanti rapidi per notifiche,
+      contatti di emergenza e strumenti di consultazione.
+    </p>
+
+    <h3>In caso di allerta</h3>
+    <p>
+      Per sapere cosa fare durante un'allerta o un evento alluvionale, apri il bollettino allerta e tocca il pulsante
+      <strong>?</strong> in alto a sinistra: trovi una guida rapida con spiegazione dei colori dell'allerta,
+      comportamenti consigliati e collegamenti ai materiali ufficiali.
+    </p>
+
+    <h3>Aree di protezione civile</h3>
+
+    <h3><span class="info-area-badge" style="background:#166534;">Area di attesa</span></h3>
+    <p>
+      Punto di raccolta per la popolazione in caso di evacuazione o allontanamento da zone a rischio.
+      Raggiungila solo se indicato dalle autorità o dalle procedure di emergenza.
+    </p>
+
+    <h3><span class="info-area-badge" style="background:#991b1b;">Area di ricovero</span></h3>
+    <p>
+      Struttura o spazio destinato a ospitare temporaneamente la popolazione evacuata.
+      Raggiungi quest'area solo su indicazione ufficiale.
+    </p>
+
+    <h3><span class="info-area-badge" style="background:#a16207;">Area di ammassamento</span></h3>
+    <p>
+      Zona riservata a soccorritori, mezzi e logistica di emergenza.
+      <strong>Non è destinata alla popolazione.</strong>
+    </p>
+
+    <h3>Sensori ARPAV</h3>
+    <p>
+      I dati mostrati provengono da <strong>ARPAV</strong> e includono, a seconda della stazione,
+      livelli idrometrici, precipitazioni e altri parametri ambientali disponibili.
+      <br>
+      <a href="https://www.arpa.veneto.it/dati-ambientali/dati-in-diretta/meteo-idro-nivo/pannello-meteo-segnalazioni" target="_blank" rel="noopener noreferrer">
+        Dati in diretta ARPAV
+      </a>
+    </p>
+
+    <h3>Avvisi e chiusure</h3>
+    <p>
+      Nella mappa puoi trovare avvisi relativi a strade o aree con limitazioni temporanee, chiusure,
+      passaggi ridotti o situazioni di pericolo. Apri il dettaglio per consultare descrizione,
+      periodo di validità e area interessata.
+    </p>
+
+    <h3>Dati geografici</h3>
+    <p>
+      Corsi d'acqua e parte dei dati geografici visualizzati in mappa derivano da
+      <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>.
+    </p>
+
+    <h3>Nota importante</h3>
+    <p>
+      Questa app è uno strumento informativo e di supporto alla consultazione rapida del territorio.
+      In caso di emergenza fai sempre riferimento alle comunicazioni ufficiali di Protezione Civile,
+      Regione, Comune e autorità competenti.
+    </p>
+
+    <h3>Area operatori</h3>
+    <p>
+      La pagina di gestione avvisi è riservata agli operatori autorizzati.
+      <a href="./admin.html" target="_blank" rel="noopener noreferrer">Apri pagina admin</a>
+    </p>
   </div>
+</div>
 
   <div id="map"></div>
 
