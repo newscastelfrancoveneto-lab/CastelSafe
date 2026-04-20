@@ -153,7 +153,7 @@ const OVERPASS_ENDPOINTS = [
   'https://overpass.private.coffee/api/interpreter'
 ];
 const TILE_CACHE_BUSTER = Date.now();
-const PICK_TOLERANCE_PX = 18;
+const PICK_TOLERANCE_PX = window.innerWidth <= 768 ? 34 : 24;
 const login = document.getElementById('login');
 const admin = document.getElementById('admin');
 const loginMsg = document.getElementById('loginMsg');
