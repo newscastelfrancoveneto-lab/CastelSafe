@@ -1669,16 +1669,51 @@ function osmCacheSet(key, data) {
 
 function renderWaterwayGeoJSON(geojson) {
   waterwayLayerGroup.clearLayers();
+
   L.geoJSON(geojson, {
-    filter: f => { const gt = f.geometry?.type; return gt !== 'Point' && gt !== 'MultiPoint'; },
-    style: waterwayStyle,
+    filter: f => {
+      const gt = f.geometry?.type;
+      return gt !== 'Point' && gt !== 'MultiPoint';
+    },
+
     onEachFeature: (feature, layer) => {
       const tags = feature.properties?.tags || feature.properties || {};
       const name = tags.name || tags.ref || null;
       const type = tags.waterway || '';
-      const labelMap = { river: 'Fiume', stream: 'Torrente/Rio', canal: 'Canale', drain: 'Scolo', ditch: 'Fosso' };
-      layer.bindPopup(name || labelMap[type] || "Corso d'acqua");
-      waterwayLayerGroup.addLayer(layer);
+      const labelMap = {
+        river: 'Fiume',
+        stream: 'Torrente/Rio',
+        canal: 'Canale',
+        drain: 'Scolo',
+        ditch: 'Fosso'
+      };
+
+      const popupText = name || labelMap[type] || 'Corso d’acqua';
+      const visualStyle = waterwayStyle(feature);
+
+      if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+        const hitLayer = L.polyline(layer.getLatLngs(), {
+          color: '#000000',
+          weight: Math.max((visualStyle.weight || 3) + 14, 18),
+          opacity: 0.01,
+          interactive: true
+        });
+
+        hitLayer.bindPopup(popupText);
+        hitLayer.on('click', () => hitLayer.openPopup());
+
+        layer.setStyle({
+          ...visualStyle,
+          interactive: false
+        });
+
+        waterwayLayerGroup.addLayer(hitLayer);
+        waterwayLayerGroup.addLayer(layer);
+      } else {
+        layer.setStyle(visualStyle);
+        layer.bindPopup(popupText);
+        waterwayLayerGroup.addLayer(layer);
+      }
     }
   });
 }
@@ -2040,7 +2075,7 @@ function closureAlertStyle() {
   return {
     color: '#b91c1c',
     fillColor: '#dc2626',
-    weight: 3,
+    weight: 6,
     opacity: 0.95,
     fillOpacity: 0.35,
     radius: 8
