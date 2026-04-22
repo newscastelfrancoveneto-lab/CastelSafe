@@ -3022,7 +3022,7 @@ function parseXML(xmlText, stationId) {
   } else {
     for (const s of doc.querySelectorAll('STAZIONE')) {
       const el = s.querySelector('IDSTAZ') || s.querySelector('CODSTAZ');
-      if (el?.textContent?.trim() == stationId) { staz = s; break; }
+      if (parseInt(el?.textContent?.trim(), 10) === stationId)
     }
     if (!staz) { const all = doc.querySelectorAll('STAZIONE'); if (all.length === 1) staz = all[0]; }
   }
