@@ -1457,9 +1457,12 @@ const TYPE_COLOR = {
 const TAB_LABELS = {
   LIVIDRO: 'Livello idrometrico',
   PRECCUM: 'Precipitazioni',
-  PORTATA: 'Portata'
+  PORTATA: 'Portata',
+  VENTO:   'Vento',
+  TARIA:   'Temperatura',
+  UREL:    'Umidità rel.',
+  RADGLOB: 'Radiazione'
 };
-
 const CV_BBOX = { s: 45.6230, w: 11.8730, n: 45.7020, e: 12.0020 };
 
 let activeChart = null, currentId = null, currentSensors = [];
@@ -3248,7 +3251,7 @@ function renderTabs(stn, sensors) {
     tabsEl.style.display = 'flex';
     tabsEl.innerHTML = currentSensors.map((s, i) => `
       <button class="s-tab ${i === safeIndex ? 'active' : ''}" onclick="switchTab(${i})">
-        ${TABLABELS[s.type] || s.paramnm}
+        ${TAB_LABELS[s.type] || s.paramnm}
       </button>
     `).join('');
     switchTab(safeIndex);
