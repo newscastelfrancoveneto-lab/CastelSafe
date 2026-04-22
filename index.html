@@ -3222,21 +3222,20 @@ function renderTabs(stn, sensors) {
   currentSensors = sensors || [];
 
   const tabsEl = document.getElementById('sensor-tabs');
-  tabsEl.style.display = currentSensors.length > 1 ? 'flex' : 'none';
 
   if (currentSensors.length > 1) {
     const safeIndex = Math.min(Math.max(currentTabIndex, 0), currentSensors.length - 1);
-
+    tabsEl.style.display = 'flex';
     tabsEl.innerHTML = currentSensors.map((s, i) => `
       <button class="s-tab ${i === safeIndex ? 'active' : ''}" onclick="switchTab(${i})">
         ${TABLABELS[s.type] || s.paramnm}
       </button>
     `).join('');
-
     switchTab(safeIndex);
     return;
   }
 
+  tabsEl.style.display = 'none';
   tabsEl.innerHTML = '';
   currentTabIndex = 0;
 
@@ -3245,7 +3244,8 @@ function renderTabs(stn, sensors) {
     return;
   }
 
-  showError('Nessun sensore disponibile');
+  document.getElementById('panel-body').innerHTML =
+    `<div class="placeholder"><p>Nessun sensore disponibile</p></div>`;
 }
 
 function switchTab(idx) {
