@@ -6,7 +6,7 @@ self.addEventListener('push', event => {
   const options = {
     body: data.body || '',
     tag: data.tag || 'arpav',
-    icon: '/PC_APP/icon-192.png', // usa la tua icona PWA
+    icon: 'icon-192.png', // usa la tua icona PWA
     vibrate: [200, 100, 200],
     data: { url: data.url || '/PC_APP/' }
   };
