@@ -1,6 +1,6 @@
 {
-  "name": "Sicurezza civile Castelfranco Veneto",
-  "short_name": "Sicurezza civile CV",
+  "name": "CastelSafe - ARPAV e Protezione civile",
+  "short_name": "CastelSafe",
   "start_url": "/PC_APP/",
   "scope": "/PC_APP/",
   "display": "standalone",
