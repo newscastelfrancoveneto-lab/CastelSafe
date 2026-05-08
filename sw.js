@@ -8,7 +8,7 @@ self.addEventListener('push', event => {
     tag: data.tag || 'arpav',
     icon: 'icon-192.png', // usa la tua icona PWA
     vibrate: [200, 100, 200],
-    data: { url: data.url || '/PC_APP/' }
+    data: { url: data.url || '/CastelSafe/' }
   };
 
   event.waitUntil(
@@ -24,7 +24,7 @@ self.addEventListener('notificationclick', event => {
   event.notification.close();
 
   event.waitUntil(
-    clients.openWindow(event.notification.data?.url || '/PC_APP/')
+    clients.openWindow(event.notification.data?.url || '/CastelSafe/')
   );
 });
 
