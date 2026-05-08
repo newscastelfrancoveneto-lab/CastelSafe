@@ -1,9 +1,9 @@
 {
     "owner": {
-        "username": "github-username",
-        "email": "me@example.com"
+        "username": "newscastelfrancoveneto-lab",
+        "email": "newscastelfrancoveneto@gmail.com"
     },
     "records": {
-        "CNAME": "github-username.github.io"
+        "CNAME": "newscastelfrancoveneto-lab.github.io"
     }
 }
