@@ -1,8 +1,8 @@
 {
   "name": "CastelSafe - ARPAV e Protezione civile",
   "short_name": "CastelSafe",
-  "start_url": "/PC_APP/",
-  "scope": "/PC_APP/",
+  "start_url": "/CastelSafe/",
+  "scope": "/CastelSafe/",
   "display": "standalone",
   "background_color": "#f0f4f8",
   "theme_color": "#0e8a8a",
