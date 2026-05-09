@@ -351,6 +351,13 @@
 	  background: #fff;
 	  box-shadow: 0 20px 60px rgba(0,0,0,0.35);
 	  animation: popIn 0.22s ease;
+	  touch-action: none;
+	  cursor: grab;
+	  user-select: none;
+	  transform-origin: center center;
+	}
+	.image-lightbox-img:active {
+	  cursor: grabbing;
 	}
 
 	.image-lightbox-close {
@@ -975,7 +982,7 @@
     </span>
   </div>
 
-  <div id="allerta-modal" class="modal-overlay" style="align-items: flex-end;" onclick="if(event.target===this)this.classList.remove('open')">
+  <div id="allerta-modal" class="modal-overlay" style="align-items: flex-end;" onclick="if(event.target===this){window._resetLightboxTransform && window._resetLightboxTransform(); this.classList.remove('open')}">
     <div id="allerta-box" class="modal-box">
 	  <div class="drag-handle"></div>
 	
@@ -1497,6 +1504,104 @@ function setStationRefreshState(stationId, updates) {
   };
 }
 
+// --- LIGHTBOX CON PINCH-TO-ZOOM E PAN ---
+(function() {
+  let scale = 1, maxScale = 5;
+  let originX = 0, originY = 0;
+  let lastDist = 0;
+  let panStartX = 0, panStartY = 0;
+  let isPanning = false;
+
+  function clampPan(img) {
+    const rect = img.getBoundingClientRect();
+    const parent = img.parentElement.getBoundingClientRect();
+    const overflowX = Math.max(0, (rect.width - parent.width) / 2);
+    const overflowY = Math.max(0, (rect.height - parent.height) / 2);
+    originX = Math.max(-overflowX, Math.min(overflowX, originX));
+    originY = Math.max(-overflowY, Math.min(overflowY, originY));
+  }
+
+  function applyTransform(img) {
+    img.style.transform = 'translate(' + originX + 'px, ' + originY + 'px) scale(' + scale + ')';
+  }
+
+  function resetTransform(img) {
+    if (!img) img = document.getElementById('image-lightbox-img');
+    if (!img) return;
+    scale = 1; originX = 0; originY = 0;
+    img.style.transition = 'transform 0.25s ease';
+    img.style.transform = '';
+    setTimeout(function() { img.style.transition = ''; }, 260);
+  }
+
+  function getDist(t0, t1) {
+    var dx = t1.clientX - t0.clientX, dy = t1.clientY - t0.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function attachPinchZoom(img) {
+    var lastTap = 0;
+
+    img.addEventListener('touchstart', function(e) {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        lastDist = getDist(e.touches[0], e.touches[1]);
+        isPanning = false;
+      } else if (e.touches.length === 1 && scale > 1.05) {
+        isPanning = true;
+        panStartX = e.touches[0].clientX - originX;
+        panStartY = e.touches[0].clientY - originY;
+      }
+    }, { passive: false });
+
+    img.addEventListener('touchmove', function(e) {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        var newDist = getDist(e.touches[0], e.touches[1]);
+        var delta = newDist / lastDist;
+        lastDist = newDist;
+        scale = Math.max(1, Math.min(maxScale, scale * delta));
+        clampPan(img);
+        applyTransform(img);
+      } else if (e.touches.length === 1 && isPanning && scale > 1.05) {
+        e.preventDefault();
+        originX = e.touches[0].clientX - panStartX;
+        originY = e.touches[0].clientY - panStartY;
+        clampPan(img);
+        applyTransform(img);
+      }
+    }, { passive: false });
+
+    img.addEventListener('touchend', function(e) {
+      if (e.touches.length < 2) {
+        isPanning = false;
+        // Doppio tap per reset
+        var now = Date.now();
+        if (now - lastTap < 300) {
+          resetTransform(img);
+        }
+        lastTap = now;
+      }
+      if (scale < 1.05) resetTransform(img);
+    }, { passive: false });
+  }
+
+  window._attachLightboxPinchZoom = function() {
+    var img = document.getElementById('image-lightbox-img');
+    if (img && !img._pinchAttached) {
+      attachPinchZoom(img);
+      img._pinchAttached = true;
+    }
+    // Reset ogni volta che si apre
+    scale = 1; originX = 0; originY = 0;
+    if (img) img.style.transform = '';
+  };
+
+  window._resetLightboxTransform = function() {
+    resetTransform(document.getElementById('image-lightbox-img'));
+  };
+})();
+
 function openImageLightbox(triggerEl) {
   const img = triggerEl.querySelector('img');
   if (!img) return;
@@ -1506,11 +1611,16 @@ function openImageLightbox(triggerEl) {
 
   lightboxImg.src = img.src;
   lightboxImg.alt = img.alt || 'Immagine ingrandita';
+
+  // Reset zoom e attacca pinch-to-zoom al primo utilizzo
+  window._attachLightboxPinchZoom && window._attachLightboxPinchZoom();
+
   lightbox.classList.add('open');
 }
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    window._resetLightboxTransform && window._resetLightboxTransform();
     document.getElementById('image-lightbox')?.classList.remove('open');
   }
 });
@@ -4212,7 +4322,7 @@ setInterval(checkAllertaUpdates, 60 * 1000);
     type="button"
     class="image-lightbox-close"
     aria-label="Chiudi immagine ingrandita"
-    onclick="document.getElementById('image-lightbox').classList.remove('open')"
+    onclick="window._resetLightboxTransform && window._resetLightboxTransform(); document.getElementById('image-lightbox').classList.remove('open')"
   >
     ×
   </button>
