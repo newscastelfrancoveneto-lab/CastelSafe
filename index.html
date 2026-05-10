@@ -4218,7 +4218,7 @@ initGlobalRefreshScheduler();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/PC_APP/sw.js')
+    navigator.serviceWorker.register('/CastelSafe/sw.js')
       .then(reg => console.log('Service Worker registrato!'))
       .catch(err => console.error('Errore registrazione SW', err));
   });
