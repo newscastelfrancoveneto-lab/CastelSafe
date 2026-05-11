@@ -2459,7 +2459,7 @@ function readLocalClosureAlerts() {
 
 async function loadClosureAlerts() {
   try {
-    // Fetch pubblico senza credentials (le chiusure sono dati pubblici)
+    // Fetch pubblico senza credentials (dati pubblici, no cookie)
     const url = withNgrokBypass(API_BASE + '/api/closures');
     const response = await fetch(url, {
       cache: 'no-store',
@@ -2468,15 +2468,17 @@ async function loadClosureAlerts() {
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-    const serverData = await response.json();
+    const payload = await response.json();
 
-    if (serverData && Array.isArray(serverData.features)) {
-      localStorage.setItem(CLOSURE_ALERT_STORAGE_KEY, JSON.stringify(serverData));
-      renderClosureAlerts(serverData);
-      return;
+    // L'API può restituire un array nudo [] oppure un FeatureCollection {}
+    let serverData;
+    if (payload && payload.type === 'FeatureCollection' && Array.isArray(payload.features)) {
+      serverData = payload;
+    } else if (Array.isArray(payload)) {
+      serverData = { type: 'FeatureCollection', features: payload };
+    } else {
+      throw new Error('Formato risposta non riconosciuto');
     }
-
-    throw new Error('GeoJSON non valido');
   } catch (err) {
     console.warn('API chiusure non raggiungibile, uso cache locale:', err);
 
