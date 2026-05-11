@@ -1842,8 +1842,12 @@ async function clearNotifications() {
 const bc = new BroadcastChannel('notifications-channel');
 bc.onmessage = (event) => {
   console.log("Notifica ricevuta in tempo reale:", event.data);
-  addNotificationToUI(event.data, true) // aggiunge UI + salva in localStorage
-  setTimeout(() => { if (typeof loadAllerta === 'function') loadAllerta(); }, 1000);
+  addNotificationToUI(event.data, true); // aggiunge UI + salva in localStorage
+  // Ricarica chiusure e allerta dopo una notifica push
+  setTimeout(() => {
+    if (typeof loadClosureAlerts === 'function') loadClosureAlerts();
+    if (typeof loadAllerta === 'function') loadAllerta();
+  }, 1000);
 };
 
 // Carica notifiche salvate quando la pagina è pronta
@@ -4221,6 +4225,14 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/CastelSafe/sw.js')
       .then(reg => console.log('Service Worker registrato!'))
       .catch(err => console.error('Errore registrazione SW', err));
+  });
+
+  // Ascolta messaggi diretti dal SW (es. click su notifica con app già aperta)
+  navigator.serviceWorker.addEventListener('message', event => {
+    if (event.data?.type === 'RELOAD_CLOSURES') {
+      console.log('SW → RELOAD_CLOSURES ricevuto, ricarico chiusure...');
+      if (typeof loadClosureAlerts === 'function') loadClosureAlerts();
+    }
   });
 }
 	
