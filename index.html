@@ -1842,12 +1842,8 @@ async function clearNotifications() {
 const bc = new BroadcastChannel('notifications-channel');
 bc.onmessage = (event) => {
   console.log("Notifica ricevuta in tempo reale:", event.data);
-  addNotificationToUI(event.data, true); // aggiunge UI + salva in localStorage
-  // Ricarica chiusure e allerta dopo una notifica push
-  setTimeout(() => {
-    if (typeof loadClosureAlerts === 'function') loadClosureAlerts();
-    if (typeof loadAllerta === 'function') loadAllerta();
-  }, 1000);
+  addNotificationToUI(event.data, true) // aggiunge UI + salva in localStorage
+  setTimeout(() => { if (typeof loadAllerta === 'function') loadAllerta(); }, 1000);
 };
 
 // Carica notifiche salvate quando la pagina è pronta
@@ -2463,7 +2459,13 @@ function readLocalClosureAlerts() {
 
 async function loadClosureAlerts() {
   try {
-    const response = await apiFetch('/api/closures', { cache: 'no-store' });
+    // Fetch pubblico senza credentials (le chiusure sono dati pubblici)
+    const url = withNgrokBypass(API_BASE + '/api/closures');
+    const response = await fetch(url, {
+      cache: 'no-store',
+      headers: { 'ngrok-skip-browser-warning': 'true' },
+      mode: 'cors'
+    });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const serverData = await response.json();
@@ -4225,14 +4227,6 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/CastelSafe/sw.js')
       .then(reg => console.log('Service Worker registrato!'))
       .catch(err => console.error('Errore registrazione SW', err));
-  });
-
-  // Ascolta messaggi diretti dal SW (es. click su notifica con app già aperta)
-  navigator.serviceWorker.addEventListener('message', event => {
-    if (event.data?.type === 'RELOAD_CLOSURES') {
-      console.log('SW → RELOAD_CLOSURES ricevuto, ricarico chiusure...');
-      if (typeof loadClosureAlerts === 'function') loadClosureAlerts();
-    }
   });
 }
 	
