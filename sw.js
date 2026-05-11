@@ -6,7 +6,7 @@ self.addEventListener('push', event => {
   const options = {
     body: data.body || '',
     tag: data.tag || 'arpav',
-    icon: 'icon-192.png', // usa la tua icona PWA
+    icon: 'icon-192.png',
     vibrate: [200, 100, 200],
     data: { url: data.url || '/CastelSafe/' }
   };
@@ -19,19 +19,28 @@ self.addEventListener('push', event => {
   );
 });
 
-// Click sulla notifica: apre l'app
+// Click sulla notifica: apre/focus l'app e triggera reload chiusure
 self.addEventListener('notificationclick', event => {
   event.notification.close();
 
   event.waitUntil(
-    clients.openWindow(event.notification.data?.url || '/CastelSafe/')
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+      // Manda messaggio a tutti i client aperti per ricaricare le chiusure
+      clientList.forEach(client => {
+        client.postMessage({ type: 'RELOAD_CLOSURES' });
+      });
+      // Se c'è già una finestra aperta, mettila in focus
+      for (const client of clientList) {
+        if ('focus' in client) return client.focus();
+      }
+      // Altrimenti apri una nuova finestra
+      return clients.openWindow(event.notification.data?.url || '/CastelSafe/');
+    })
   );
 });
 
 function openDB() {
   return new Promise((resolve, reject) => {
-    // IMPORTANTE: Sostituisci 'NotificheDB' con il nome esatto del database 
-    // che stai già usando nel tuo file index.html per leggere i dati.
     const request = indexedDB.open('NotificheDB', 1);
 
     request.onupgradeneeded = (event) => {
@@ -43,8 +52,6 @@ function openDB() {
 
     request.onsuccess = (event) => {
       const db = event.target.result;
-      
-      // Creiamo un wrapper che rispetta la sintassi che hai già in saveAndBroadcastNotification
       resolve({
         transaction(storeName, mode) {
           const tx = db.transaction(storeName, mode);
@@ -80,17 +87,16 @@ async function saveAndBroadcastNotification(data) {
     timestamp: new Date().toLocaleString('it-IT')
   };
 
-  // 1. Salva in IndexedDB (quando implementi openDB)
+  // 1. Salva in IndexedDB
   try {
     const db = await openDB();
     const tx = db.transaction('notifications', 'readwrite');
     tx.objectStore('notifications').add(notif);
   } catch (e) {
-    // se IndexedDB non è ancora implementata, ignoriamo l'errore
     console.error('Salvataggio IndexedDB fallito', e);
   }
 
-  // 2. Invia alla pagina aperta (se c'è)
+  // 2. Invia alla pagina aperta (se c'è), con flag per ricaricare le chiusure
   const channel = new BroadcastChannel('notifications-channel');
-  channel.postMessage(notif);
+  channel.postMessage({ ...notif, type: 'RELOAD_CLOSURES' });
 }
