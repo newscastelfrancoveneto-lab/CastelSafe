@@ -2458,48 +2458,54 @@ function readLocalClosureAlerts() {
 }
 
 async function loadClosureAlerts() {
-  try {
-    // Fetch pubblico senza credentials (dati pubblici, no cookie)
-    const url = withNgrokBypass(API_BASE + '/api/closures');
-    const response = await fetch(url, {
-      cache: 'no-store',
-      headers: { 'ngrok-skip-browser-warning': 'true' },
-      mode: 'cors'
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const CLOSURES_URL = withNgrokBypass(API_BASE + '/api/closures');
+  const fetchAttempts = [
+    () => fetch(CLOSURES_URL, { cache: 'no-store', headers: { Accept: 'application/json', 'ngrok-skip-browser-warning': 'true' } }),
+    () => fetch(CLOSURES_URL, { cache: 'no-store', headers: { Accept: 'application/json', 'ngrok-skip-browser-warning': 'true', 'Authorization': '' } })
+  ];
 
-    const payload = await response.json();
-
-    // L'API può restituire un array nudo [] oppure un FeatureCollection {}
-    let serverData;
-    if (payload && payload.type === 'FeatureCollection' && Array.isArray(payload.features)) {
-      serverData = payload;
-    } else if (Array.isArray(payload)) {
-      serverData = { type: 'FeatureCollection', features: payload };
-    } else {
-      throw new Error('Formato risposta non riconosciuto');
-    }
-  } catch (err) {
-    console.warn('API chiusure non raggiungibile, uso cache locale:', err);
-
+  let serverData = null;
+  for (const attempt of fetchAttempts) {
     try {
-      const cachedRaw = localStorage.getItem(CLOSURE_ALERT_STORAGE_KEY);
-      if (!cachedRaw) {
-        renderClosureAlerts({ type: 'FeatureCollection', features: [] });
-        return;
+      const response = await attempt();
+      if (!response.ok) continue;
+      const payload = await response.json();
+      let fc;
+      if (payload && payload.type === 'FeatureCollection' && Array.isArray(payload.features)) {
+        fc = payload;
+      } else if (Array.isArray(payload)) {
+        fc = { type: 'FeatureCollection', features: payload };
+      } else {
+        continue;
       }
+      serverData = fc;
+      break;
+    } catch (err) {
+      console.info('Tentativo fetch chiusure fallito, provo prossimo...', err);
+    }
+  }
 
+  if (serverData) {
+    localStorage.setItem(CLOSURE_ALERT_STORAGE_KEY, JSON.stringify(serverData));
+    renderClosureAlerts(serverData);
+    return;
+  }
+
+  // Fallback: cache locale
+  console.warn('API chiusure non raggiungibile, uso cache locale');
+  try {
+    const cachedRaw = localStorage.getItem(CLOSURE_ALERT_STORAGE_KEY);
+    if (cachedRaw) {
       const cachedData = JSON.parse(cachedRaw);
       if (cachedData && Array.isArray(cachedData.features)) {
         renderClosureAlerts(cachedData);
         return;
       }
-    } catch (cacheErr) {
-      console.warn('Cache chiusure non valida:', cacheErr);
     }
-
-    renderClosureAlerts({ type: 'FeatureCollection', features: [] });
+  } catch (cacheErr) {
+    console.warn('Cache chiusure non valida:', cacheErr);
   }
+  renderClosureAlerts({ type: 'FeatureCollection', features: [] });
 }
 
 function toggleClosureAlerts(visible) {
