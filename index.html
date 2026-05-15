@@ -1313,6 +1313,10 @@
 
   <div class="fab-container">
     
+	<button onclick="shareCastelSafe()" class="fab-btn" title="Condividi CastelSafe" aria-label="Condividi CastelSafe">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><path d="M8.59 13.51 15.42 17.49"></path><path d="M15.41 6.51 8.59 10.49"></path></svg>
+    </button>
+
 	<button onclick="toggleNotificationsMenu()" class="fab-btn" title="Notifiche">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
     </button>
@@ -1406,7 +1410,35 @@ function apiFetch(pathOrUrl, options = {}) {
 const XML_URL = 'https://www.arpa.veneto.it/api/risorse/data-meteo/xml/Ultime48ore.xml';
 const CSV_BASE = `${API_BASE}/api/arpav/xml/`;
 const OSM_API = 'https://api.openstreetmap.org/api/0.6/node/';
-const VAPID_PUBLIC = 'BEzNrOFRNEPdjown9Tnj2pYnQ-v464zvxjFwE_B5PEqSNIloti9MafJKsBHU1LjxTW9U2UX8TqvhP0ydySOl8Qk';
+const SHARE_TEXT = `Scarica ora CastelSafe, l'app per ricevere bollettini di protezione civile, consultare le stazioni arpav e tanto altro ancora https://newscastelfrancoveneto-lab.github.io/CastelSafe/`;
+      const SHARE_URL = 'https://newscastelfrancoveneto-lab.github.io/CastelSafe/';
+      async function shareCastelSafe() {
+        const shareData = { title: 'CastelSafe', text: SHARE_TEXT, url: SHARE_URL };
+        try {
+          if (navigator.share) {
+            await navigator.share(shareData);
+            return;
+          }
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(SHARE_TEXT);
+            alert('Testo di condivisione copiato negli appunti. Ora puoi incollarlo dove preferisci.');
+            return;
+          }
+        } catch (err) {
+          if (err && err.name === 'AbortError') return;
+        }
+        const temp = document.createElement('textarea');
+        temp.value = SHARE_TEXT;
+        temp.setAttribute('readonly', '');
+        temp.style.position = 'fixed';
+        temp.style.opacity = '0';
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand('copy');
+        document.body.removeChild(temp);
+        alert('Testo di condivisione copiato negli appunti. Ora puoi incollarlo dove preferisci.');
+      }
+      const VAPID_PUBLIC = 'BEzNrOFRNEPdjown9Tnj2pYnQ-v464zvxjFwE_B5PEqSNIloti9MafJKsBHU1LjxTW9U2UX8TqvhP0ydySOl8Qk';
 
 const STATIONS = [
   {
