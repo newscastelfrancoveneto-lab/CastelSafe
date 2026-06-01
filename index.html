@@ -316,6 +316,31 @@
 	    border: 1px solid #e2e8f0;
 	    border-radius: 12px;
 	}
+
+	@media (max-width: 640px) {
+	  .allerta-days-header {
+	    padding: 0 10px;
+	    grid-template-columns: 1fr 68px 68px;
+	  }
+	
+	  .allerta-row {
+	    grid-template-columns: 1fr 68px 68px;
+	    padding: 12px 10px;
+	  }
+	
+	  .allerta-day-col {
+	    transform: translateX(-10px);
+	  }
+	
+	  .day-lbl {
+	    font-size: 0.68rem;
+	  }
+	
+	  .bollino-lg {
+	    width: 20px;
+	    height: 20px;
+	  }
+	}
 	
 	@media (max-width: 640px) {
 	    .top-left-tools {
