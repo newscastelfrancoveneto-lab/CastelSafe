@@ -53,8 +53,7 @@
 		  display: flex;
 		  flex-direction: column;
 		  align-items: center;
-		  gap: 4px;
-		  transform: translateX(-6px);
+		  gap: 2px;
 		}
 		
 		.bollino-lg {
@@ -320,25 +319,33 @@
 	@media (max-width: 640px) {
 	  .allerta-days-header {
 	    padding: 0 10px;
-	    grid-template-columns: 1fr 68px 68px;
+	    grid-template-columns: 1fr 62px 62px;
+	    gap: 6px;
+	    text-align: center;
 	  }
 	
 	  .allerta-row {
-	    grid-template-columns: 1fr 68px 68px;
-	    padding: 12px 10px;
+	    padding: 11px 10px;
+	    grid-template-columns: 1fr 62px 62px;
+	    gap: 6px;
+	  }
+	
+	  .allerta-row-label {
+	    font-size: 0.82rem;
 	  }
 	
 	  .allerta-day-col {
-	    transform: translateX(-10px);
-	  }
-	
-	  .day-lbl {
-	    font-size: 0.68rem;
+	    transform: translateX(-4px);
+	    gap: 1px;
 	  }
 	
 	  .bollino-lg {
 	    width: 20px;
 	    height: 20px;
+	  }
+	
+	  .day-lbl {
+	    font-size: 0.66rem;
 	  }
 	}
 	
