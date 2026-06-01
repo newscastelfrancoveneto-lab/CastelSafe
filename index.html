@@ -4278,11 +4278,11 @@ function allertaBgColor(idra, idro, temp, vent, calo) {
   const vals = [idra, idro, temp, vent, calo]
     .map(v => (v || "VERDE").toUpperCase());
 
-  if (vals.includes("ROSSO")) return ALLERTACOLORS.ROSSO;
-  if (vals.includes("ARANCIONE")) return ALLERTACOLORS.ARANCIONE;
-  if (vals.includes("GIALLO")) return ALLERTACOLORS.GIALLO;
-  if (vals.includes("VERDE")) return ALLERTACOLORS.VERDE;
-  return ALLERTACOLORS.GRIGIO;
+  if (vals.includes("ROSSO")) return ALLERTA_COLORS.ROSSO;
+  if (vals.includes("ARANCIONE")) return ALLERTA_COLORS.ARANCIONE;
+  if (vals.includes("GIALLO")) return ALLERTA_COLORS.GIALLO;
+  if (vals.includes("VERDE")) return ALLERTA_COLORS.VERDE;
+  return ALLERTA_COLORS.GRIGIO;
 }
 
 let lastAllertaSignature = null;
