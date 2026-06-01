@@ -16,6 +16,58 @@
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 
   <style>
+
+	  .allerta-days-header {
+		  display: grid;
+		  grid-template-columns: 1fr 72px 72px;
+		  gap: 8px;
+		  margin-bottom: 8px;
+		  padding: 0 14px;
+		  font-size: 0.72rem;
+		  font-weight: 800;
+		  text-transform: uppercase;
+		  letter-spacing: 0.05em;
+		  color: var(--text-muted);
+		}
+		
+		.allerta-row {
+		  display: grid;
+		  grid-template-columns: 1fr 72px 72px;
+		  align-items: center;
+		  gap: 8px;
+		  padding: 12px 14px;
+		  border-radius: var(--radius-md);
+		  margin-bottom: 8px;
+		  background: #f8fafc;
+		  border: 1px solid #e2e8f0;
+		}
+		
+		.allerta-row-label {
+		  font-size: 0.85rem;
+		  font-weight: 700;
+		  color: var(--text-main);
+		}
+		
+		.allerta-day-col {
+		  display: flex;
+		  flex-direction: column;
+		  align-items: center;
+		  gap: 4px;
+		}
+		
+		.bollino-lg {
+		  width: 22px;
+		  height: 22px;
+		  border-radius: 50%;
+		  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+		}
+		
+		.day-lbl {
+		  font-size: 0.72rem;
+		  font-weight: 800;
+		  text-transform: uppercase;
+		  line-height: 1;
+		}
   
 	.info-intro-box {
 	  background: #f8fafc;
@@ -886,7 +938,6 @@
     
     .info-area-badge { display: inline-block; border-radius: 6px; padding: 3px 8px; font-size: 0.75rem; font-weight: 700; color: #fff; margin-right: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 
-    .allerta-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius-md); margin-bottom: 8px; background: #f8fafc; border: 1px solid #e2e8f0; }
     .allerta-row .bollino-lg { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
     .allerta-row .label { font-size: 0.85rem; font-weight: 600; color: var(--text-main); }
     .allerta-row .livello { font-size: 0.85rem; font-weight: 800; margin-left: auto; text-transform: uppercase; }
@@ -4379,26 +4430,26 @@ function renderAllerta(d) {
       ["Calore", "calo"],
     ];
 
-    rowsEl.innerHTML = `
-      <div class="allerta-days-header">
-        <span></span>
-        <span>Oggi</span>
-        <span>Domani</span>
-      </div>
-      ${rows.map(([label, key]) => `
-        <div class="allerta-row">
-          <span class="allerta-row-label">${label}</span>
-          <div class="allerta-day-col">
-            <div class="bollino-lg" style="background:${ALLERTA_COLORS[getLvl(oggi, key)] || "#cbd5e1"}"></div>
-            <span class="day-lbl">${getLvl(oggi, key)}</span>
-          </div>
-          <div class="allerta-day-col">
-            <div class="bollino-lg" style="background:${ALLERTA_COLORS[getLvl(domani, key)] || "#cbd5e1"}"></div>
-            <span class="day-lbl">${getLvl(domani, key)}</span>
-          </div>
-        </div>
-      `).join("")}
-    `;
+	rowsEl.innerHTML = `
+	  <div class="allerta-days-header">
+	    <span></span>
+	    <span>Oggi</span>
+	    <span>Domani</span>
+	  </div>
+	  ${rows.map(([label, key]) => `
+	    <div class="allerta-row">
+	      <span class="allerta-row-label"><strong>${label}</strong></span>
+	      <div class="allerta-day-col">
+	        <div class="bollino-lg" style="background:${ALLERTACOLORS[getLvl(oggi, key)] ?? '#cbd5e1'}"></div>
+	        <span class="day-lbl"><strong>${getLvl(oggi, key)}</strong></span>
+	      </div>
+	      <div class="allerta-day-col">
+	        <div class="bollino-lg" style="background:${ALLERTACOLORS[getLvl(domani, key)] ?? '#cbd5e1'}"></div>
+	        <span class="day-lbl"><strong>${getLvl(domani, key)}</strong></span>
+	      </div>
+	    </div>
+	  `).join('')}
+	`;
   }
 
   const meteoEl = document.getElementById("allerta-meteo");
