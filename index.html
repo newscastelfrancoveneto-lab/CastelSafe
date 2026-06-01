@@ -4274,9 +4274,15 @@ if ('serviceWorker' in navigator) {
 const ALLERTA_COLORS = { VERDE: '#10b981', GIALLO: '#eab308', ARANCIONE: '#f97316', ROSSO: '#ef4444' };
 const ALLERTA_ORDER  = ['VERDE', 'GIALLO', 'ARANCIONE', 'ROSSO'];
 
-function allertaBgColor(idr, idro, temp) {
-  const max = [idr, idro, temp].reduce((a, b) => ALLERTA_ORDER.indexOf(b) > ALLERTA_ORDER.indexOf(a) ? b : a, 'VERDE');
-  return ALLERTA_COLORS[max] || '#64748b';
+function allertaBgColor(idra, idro, temp, vent, calo) {
+  const vals = [idra, idro, temp, vent, calo]
+    .map(v => (v || "VERDE").toUpperCase());
+
+  if (vals.includes("ROSSO")) return ALLERTACOLORS.ROSSO;
+  if (vals.includes("ARANCIONE")) return ALLERTACOLORS.ARANCIONE;
+  if (vals.includes("GIALLO")) return ALLERTACOLORS.GIALLO;
+  if (vals.includes("VERDE")) return ALLERTACOLORS.VERDE;
+  return ALLERTACOLORS.GRIGIO;
 }
 
 let lastAllertaSignature = null;
@@ -4297,13 +4303,14 @@ function getAllertaGiorno(d) {
 }
 	
 function getAllertaSignature(data) {
+  if (!data) return "";
   return JSON.stringify({
-    idr: data?.idr || null,
-    idro: data?.idro || null,
-    temp: data?.temp || null,
-    periodo: data?.periodo || null,
-    meteo: data?.meteo || null,
-    suolo: data?.suolo || null
+    aggiornamento: data.aggiornamento || {},
+    oggi: data.oggi || {},
+    domani: data.domani || {},
+    fenomeni_previsti: data.fenomeni_previsti || "",
+    tendenza: data.tendenza || "",
+    aggiornato: data.aggiornato || ""
   });
 }
 
