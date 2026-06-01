@@ -4281,6 +4281,21 @@ function allertaBgColor(idr, idro, temp) {
 
 let lastAllertaSignature = null;
 
+function getAllertaGiorno(d) {
+  if (!d) return {};
+  const oggi = d.oggi || {};
+  const domani = d.domani || {};
+
+  const today = new Date();
+  const dd = String(today.getDate()).padStart(2, "0");
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const yyyy = today.getFullYear();
+  const todayStr = `${dd}/${mm}/${yyyy}`;
+
+  if ((oggi.periodo || "").includes(todayStr)) return oggi;
+  return domani || oggi;
+}
+	
 function getAllertaSignature(data) {
   return JSON.stringify({
     idr: data?.idr || null,
