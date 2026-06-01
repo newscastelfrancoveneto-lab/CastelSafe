@@ -4293,36 +4293,102 @@ function getAllertaSignature(data) {
 }
 
 function renderAllerta(d) {
-  if (!d || !d.idr) return;
-  const signature = getAllertaSignature(d);
-  lastAllertaSignature = signature;
-  const bar = document.getElementById('allerta-bar');
-  bar.classList.add('visible');
-  bar.style.background = allertaBgColor(d.idr, d.idro, d.temp);
-  updatePanelTop();
+  if (!d) return;
 
-  ['idr','idro','temp'].forEach(k => {
-    const el = document.getElementById('bar-bollino-' + k);
-    const lbl = document.getElementById('bar-label-' + k);
-    if (el) el.style.background = ALLERTA_COLORS[d[k]] || '#64748b';
-    if (lbl) lbl.textContent = { idr:'Idraulico', idro:'Idrogeologico', temp:'Temporali' }[k];
+  const agg = d.aggiornamento || {};
+  const oggi = d.oggi || {};
+  const domani = d.domani || {};
+  const giornoBarra = getAllertaGiorno(d) || oggi;
+
+  const getLvl = (obj, key) => (obj && obj[key]) ? obj[key] : "VERDE";
+
+  const barVals = {
+    idra: getLvl(giornoBarra, "idra"),
+    idro: getLvl(giornoBarra, "idro"),
+    temp: getLvl(giornoBarra, "temp"),
+    vent: getLvl(giornoBarra, "vent"),
+    calo: getLvl(giornoBarra, "calo"),
+  };
+
+  const barColor = allertaBgColor(
+    barVals.idra,
+    barVals.idro,
+    barVals.temp,
+    barVals.vent,
+    barVals.calo
+  );
+
+  const bar = document.getElementById("allerta-bar");
+  if (bar) {
+    bar.classList.add("visible");
+    bar.style.background = barColor;
+  }
+
+  [
+    ["idr", barVals.idra],
+    ["idro", barVals.idro],
+    ["temp", barVals.temp],
+    ["vento", barVals.vent],
+    ["calore", barVals.calo],
+  ].forEach(([k, v]) => {
+    const el = document.getElementById("bar-bollino-" + k);
+    if (el) el.style.background = ALLERTA_COLORS[v] || "#cbd5e1";
   });
 
-  document.getElementById('allerta-periodo').textContent = d.periodo || '';
-  document.getElementById('allerta-meteo').textContent = d.meteo || '';
-  document.getElementById('allerta-suolo').textContent = d.suolo || '';
+  const periodoEl = document.getElementById("allerta-periodo");
+  if (periodoEl) {
+    periodoEl.innerHTML = `
+      <strong>${agg.intestazione || "AVVISO DI ALLERTA"}</strong><br>
+      ${agg.num_boll ? `Bollettino ${agg.num_boll}` : ""}
+      ${(agg.data_compilazione || agg.ora_compilazione) ? "<br>" : ""}
+      ${[agg.data_compilazione, agg.ora_compilazione].filter(Boolean).join(" ")}
+    `;
+  }
 
-  const rowsEl = document.getElementById('allerta-rows');
-  rowsEl.innerHTML = [
-    { key: 'idr',  label: 'Rischio Idraulico' },
-    { key: 'idro', label: 'Rischio Idrogeologico' },
-    { key: 'temp', label: 'Rischio Idrogeologico per Temporali' }
-  ].map(r => `<div class="allerta-row">
-    <div class="bollino-lg" style="background:${ALLERTA_COLORS[d[r.key]] || '#64748b'}"></div>
-    <span class="label">${r.label}</span>
-    <span class="livello">${d[r.key] || ''}</span>
-  </div>`).join('');
+  const rowsEl = document.getElementById("allerta-rows");
+  if (rowsEl) {
+    const rows = [
+      ["Idraulico", "idra"],
+      ["Idrogeologico", "idro"],
+      ["Temporali", "temp"],
+      ["Vento", "vent"],
+      ["Calore", "calo"],
+    ];
 
+    rowsEl.innerHTML = `
+      <div class="allerta-days-header">
+        <span></span>
+        <span>Oggi</span>
+        <span>Domani</span>
+      </div>
+      ${rows.map(([label, key]) => `
+        <div class="allerta-row">
+          <span class="allerta-row-label">${label}</span>
+          <div class="allerta-day-col">
+            <div class="bollino-lg" style="background:${ALLERTA_COLORS[getLvl(oggi, key)] || "#cbd5e1"}"></div>
+            <span class="day-lbl">${getLvl(oggi, key)}</span>
+          </div>
+          <div class="allerta-day-col">
+            <div class="bollino-lg" style="background:${ALLERTA_COLORS[getLvl(domani, key)] || "#cbd5e1"}"></div>
+            <span class="day-lbl">${getLvl(domani, key)}</span>
+          </div>
+        </div>
+      `).join("")}
+    `;
+  }
+
+  const meteoEl = document.getElementById("allerta-meteo");
+  if (meteoEl) meteoEl.textContent = d.fenomeni_previsti || "";
+
+  const suoloEl = document.getElementById("allerta-suolo");
+  if (suoloEl) {
+    suoloEl.innerHTML = `
+      <p>${d.tendenza || ""}</p>
+      ${d.aggiornato ? `<p><em>Aggiornato: ${d.aggiornato}</em></p>` : ""}
+    `;
+  }
+
+  updatePanelTop();
   setTimeout(() => map.invalidateSize(), 300);
 }
 	
