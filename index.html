@@ -4440,11 +4440,11 @@ function renderAllerta(d) {
 	    <div class="allerta-row">
 	      <span class="allerta-row-label"><strong>${label}</strong></span>
 	      <div class="allerta-day-col">
-	        <div class="bollino-lg" style="background:${ALLERTACOLORS[getLvl(oggi, key)] ?? '#cbd5e1'}"></div>
+	        <div class="bollino-lg" style="background:${ALLERTA_COLORS[getLvl(oggi, key)] ?? '#cbd5e1'}"></div>
 	        <span class="day-lbl"><strong>${getLvl(oggi, key)}</strong></span>
 	      </div>
 	      <div class="allerta-day-col">
-	        <div class="bollino-lg" style="background:${ALLERTACOLORS[getLvl(domani, key)] ?? '#cbd5e1'}"></div>
+	        <div class="bollino-lg" style="background:${ALLERTA_COLORS[getLvl(domani, key)] ?? '#cbd5e1'}"></div>
 	        <span class="day-lbl"><strong>${getLvl(domani, key)}</strong></span>
 	      </div>
 	    </div>
