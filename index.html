@@ -4464,26 +4464,24 @@ function renderAllerta(d) {
       ["Ondate di calore", "calo"],
     ];
 
-	rowsEl.innerHTML = `
-	  <div class="allerta-days-header">
-	    <span></span>
-	    <span>Oggi</span>
-	    <span>Domani</span>
-	  </div>
-	  ${rows.map(([label, key]) => `
-	    <div class="allerta-row">
-	      <span class="allerta-row-label"><strong>${label}</strong></span>
-	      <div class="allerta-day-col">
-	        <div class="bollino-lg" style="background:${ALLERTA_COLORS[getLvl(oggi, key)] ?? '#cbd5e1'}"></div>
-	        <span class="day-lbl"><strong>${getLvl(oggi, key)}</strong></span>
-	      </div>
-	      <div class="allerta-day-col">
-	        <div class="bollino-lg" style="background:${ALLERTA_COLORS[getLvl(domani, key)] ?? '#cbd5e1'}"></div>
-	        <span class="day-lbl"><strong>${getLvl(domani, key)}</strong></span>
-	      </div>
-	    </div>
-	  `).join('')}
-	`;
+    const isSecondoGiorno = giornoBarra === domani;
+    const labelGiorno1 = isSecondoGiorno ? 'Ieri' : 'Oggi';
+    const labelGiorno2 = isSecondoGiorno ? 'Oggi' : 'Domani';
+
+    rowsEl.innerHTML = `<div class="allerta-days-header"><span></span><span>${labelGiorno1}</span><span>${labelGiorno2}</span></div>`
+      + rows.map(([label, key]) => `
+      <div class="allerta-row">
+        <span class="allerta-row-label"><strong>${label}</strong></span>
+        <div class="allerta-day-col">
+          <div class="bollino-lg" style="background:${ALLERTA_COLORS[getLvl(oggi, key)] || '#cbd5e1'}"></div>
+          <span class="day-lbl"><strong>${getLvl(oggi, key)}</strong></span>
+        </div>
+        <div class="allerta-day-col">
+          <div class="bollino-lg" style="background:${ALLERTA_COLORS[getLvl(domani, key)] || '#cbd5e1'}"></div>
+          <span class="day-lbl"><strong>${getLvl(domani, key)}</strong></span>
+        </div>
+      </div>
+    `).join('');
   }
 
   const meteoEl = document.getElementById("allerta-meteo");
