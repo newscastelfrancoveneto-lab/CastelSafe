@@ -100,3 +100,9 @@ async function saveAndBroadcastNotification(data) {
   const channel = new BroadcastChannel('notifications-channel');
   channel.postMessage({ ...notif, type: 'RELOAD_CLOSURES' });
 }
+
+self.addEventListener('message', event => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
