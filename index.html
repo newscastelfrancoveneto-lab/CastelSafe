@@ -4409,12 +4409,15 @@ initGlobalRefreshScheduler();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
-    const reg = await navigator.serviceWorker.register('CastelSafesw.js');
-    console.log('Service Worker registrato!');
+    const reg = await navigator.serviceWorker.register('sw-1.js');
+    console.log('Service Worker registrato');
 
-    if (reg.waiting) {
-      showUpdateBanner(reg);
-    }
+    const checkWaiting = () => {
+      if (reg.waiting) showUpdateBanner(reg);
+    };
+
+    await reg.update();
+    checkWaiting();
 
     reg.addEventListener('updatefound', () => {
       const newSW = reg.installing;
@@ -4431,7 +4434,9 @@ if ('serviceWorker' in navigator) {
       window.location.reload();
     });
 
-    await reg.update();
+    setInterval(() => {
+      reg.update().then(checkWaiting).catch(console.warn);
+    }, 30000);
   });
 }
 
@@ -4458,24 +4463,18 @@ function showUpdateBanner(reg) {
     font-weight: 600;
     max-width: calc(100vw - 24px);
   `;
+
   banner.innerHTML = `
     <span>Aggiornamento disponibile</span>
     <button id="btn-do-update" style="background:#8d021f;color:#fff;border:none;border-radius:999px;padding:6px 14px;font-weight:700;cursor:pointer;font-size:0.82rem;">Aggiorna</button>
     <button type="button" style="background:rgba(255,255,255,0.14);color:#fff;border:none;border-radius:999px;padding:6px 10px;cursor:pointer;font-size:0.82rem;" onclick="this.closest('#update-banner').remove()">✕</button>
   `;
+
   document.body.appendChild(banner);
 
-  document.getElementById('btn-do-update').addEventListener('click', async () => {
-    const waiting = reg.waiting;
-    if (waiting) {
-      waiting.postMessage({ type: 'SKIP_WAITING' });
-      waiting.addEventListener('statechange', () => {
-        if (waiting.state === 'activated') {
-          window.location.reload();
-        }
-      });
-    } else {
-      window.location.reload();
+  document.getElementById('btn-do-update').addEventListener('click', () => {
+    if (reg.waiting) {
+      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
     }
   });
 }
