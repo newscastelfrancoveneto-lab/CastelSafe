@@ -4409,7 +4409,7 @@ initGlobalRefreshScheduler();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
-    const reg = await navigator.serviceWorker.register('sw-1.js');
+    const reg = await navigator.serviceWorker.register('sw.js');
     console.log('Service Worker registrato');
 
     const checkWaiting = () => {
