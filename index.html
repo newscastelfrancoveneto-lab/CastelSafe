@@ -4409,23 +4409,30 @@ setInterval(loadClosureAlerts, 5 * 60 * 1000);  // ricarica chiusure ogni 5 min
 initGlobalRefreshScheduler();
 
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('CastelSafesw.js')
-      .then(reg => {
-        console.log('Service Worker registrato!');
+  window.addEventListener('load', async () => {
+    const reg = await navigator.serviceWorker.register('CastelSafesw.js');
+    console.log('Service Worker registrato!');
 
-        reg.addEventListener('updatefound', () => {
-          const newSW = reg.installing;
-          if (!newSW) return;
+    if (reg.waiting) {
+      showUpdateBanner(reg);
+    }
 
-          newSW.addEventListener('statechange', () => {
-            if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
-              showUpdateBanner(reg);
-            }
-          });
-        });
-      })
-      .catch(err => console.error('Errore registrazione SW', err));
+    reg.addEventListener('updatefound', () => {
+      const newSW = reg.installing;
+      if (!newSW) return;
+
+      newSW.addEventListener('statechange', () => {
+        if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+          showUpdateBanner(reg);
+        }
+      });
+    });
+
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload();
+    });
+
+    await reg.update();
   });
 }
 
