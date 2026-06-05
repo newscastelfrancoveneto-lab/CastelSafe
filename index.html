@@ -1959,10 +1959,16 @@ async function clearNotifications() {
 
 // Ascolta notifiche in arrivo dal Service Worker in tempo reale
 const bc = new BroadcastChannel('notifications-channel');
-bc.onmessage = (event) => {
-  console.log("Notifica ricevuta in tempo reale:", event.data);
-  addNotificationToUI(event.data, true) // aggiunge UI + salva in localStorage
-  setTimeout(() => { if (typeof loadAllerta === 'function') loadAllerta(); }, 1000);
+bc.onmessage = async event => {
+  const notif = event.data;
+  console.log('Notifica ricevuta in tempo reale', notif);
+  addNotificationToUI(notif, true);
+
+  // Refresh immediato della barra allerte se è una nuova allerta meteo
+  const title = (notif?.title || '').toLowerCase();
+  if (title.includes('nuova allerta meteo')) {
+    await checkAllertaUpdates();
+  }
 };
 
 // Carica notifiche salvate quando la pagina è pronta
