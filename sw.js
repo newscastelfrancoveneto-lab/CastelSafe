@@ -87,7 +87,6 @@ async function saveAndBroadcastNotification(data) {
     timestamp: new Date().toLocaleString('it-IT')
   };
 
-  // 1. Salva in IndexedDB
   try {
     const db = await openDB();
     const tx = db.transaction('notifications', 'readwrite');
@@ -96,9 +95,9 @@ async function saveAndBroadcastNotification(data) {
     console.error('Salvataggio IndexedDB fallito', e);
   }
 
-  // 2. Invia alla pagina aperta (se c'è), con flag per ricaricare le chiusure
   const channel = new BroadcastChannel('notifications-channel');
   channel.postMessage({ ...notif, type: 'RELOAD_CLOSURES' });
+  channel.close();
 }
 
 self.addEventListener('message', event => {
