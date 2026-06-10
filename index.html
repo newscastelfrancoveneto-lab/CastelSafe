@@ -1196,21 +1196,6 @@
   </div>
 </div>
 
-
-.allerta-note-box {
-  margin-top: 4px;
-  padding: 14px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-}
-
-.allerta-note-box p {
-  font-size: 0.8rem !important;
-  color: var(--text-muted) !important;
-  line-height: 1.55 !important;
-}
-
 <div id="info-modal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
   <div id="info-box" class="modal-box">
     <button class="modal-close-btn" onclick="document.getElementById('info-modal').classList.remove('open')" title="Chiudi">×</button>
@@ -1531,16 +1516,13 @@ function withNgrokBypass(url) {
 function apiFetch(pathOrUrl, options = {}) {
   const fullUrl = /^https?:/.test(pathOrUrl) ? pathOrUrl : API_BASE + pathOrUrl;
   const url = withNgrokBypass(fullUrl);
-  // CORS + NGROK forzato
   const fetchOpts = {
     ...options,
     headers: {
       ...options.headers,
-      'ngrok-skip-browser-warning': 'true',
-      'Origin': 'https://newscastelfrancoveneto-lab.github.io'  // Spoof origin
+      'ngrok-skip-browser-warning': 'true'
     },
-    mode: 'cors',
-    credentials: 'include'
+    mode: 'cors'
   };
   return fetch(url, fetchOpts);
 }
@@ -1879,20 +1861,25 @@ async function notifSave(notif) {
   } catch (e) { console.warn('IndexedDB save failed', e); }
 }
 
-// Aggiunge una notifica alla UI (non salva)
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
 function addNotificationToUI(notif, persist = true) {
   if (persist) notifSave(notif);
   const listEl = document.querySelector('.notifications-list');
   if (!listEl) return;
   const placeholder = listEl.querySelector('.notification-placeholder');
   if (placeholder) placeholder.remove();
-  
+
   const item = document.createElement('div');
   item.className = 'notification-item';
   item.innerHTML = `
-    <div class="notif-title">${notif.title}</div>
-    <div class="notif-body">${notif.body}</div>
-    <div class="notif-time">${notif.timestamp}</div>
+    <div class="notif-title">${escHtml(notif.title)}</div>
+    <div class="notif-body">${escHtml(notif.body)}</div>
+    <div class="notif-time">${escHtml(notif.timestamp)}</div>
   `;
   listEl.prepend(item);
 }
@@ -1970,9 +1957,13 @@ async function loadSavedNotifications() {
   } catch {}
 
   // Merge + deduplica (timestamp + title)
-  const all = [...notifications, ...saved.filter((n, i, arr) => 
-    arr.findIndex(m => m.timestamp === n.timestamp && m.title === n.title) === i
-  )];
+  const seen = new Set(notifications.map(n => `${n.title}-${n.timestamp}`));
+  const merged = [...notifications];
+  for (const n of saved) {
+    const key = `${n.title}-${n.timestamp}`;
+    if (!seen.has(key)) { seen.add(key); merged.push(n); }
+  }
+  const all = merged;
 
   if (all.length === 0) {
     listEl.innerHTML = '<p class="notification-placeholder">Nessuna notifica recente</p>';
@@ -1987,9 +1978,9 @@ async function loadSavedNotifications() {
       const item = document.createElement('div');
       item.className = 'notification-item';
       item.innerHTML = `
-        <div class="notif-title">${notif.title}</div>
-        <div class="notif-body">${notif.body}</div>
-        <div class="notif-time">${notif.timestamp}</div>
+        <div class="notif-title">${escHtml(notif.title)}</div>
+        <div class="notif-body">${escHtml(notif.body)}</div>
+        <div class="notif-time">${escHtml(notif.timestamp)}</div>
       `;
       listEl.appendChild(item);
     });
@@ -2016,12 +2007,24 @@ bc.onmessage = async event => {
   console.log('Notifica ricevuta in tempo reale', notif);
   addNotificationToUI(notif, true);
 
-  // Refresh immediato della barra allerte se è una nuova allerta meteo
+  if (notif?.type === 'RELOAD_CLOSURES') {
+    loadClosureAlerts();
+  }
+
   const title = (notif?.title || '').toLowerCase();
   if (title.includes('nuova allerta meteo')) {
     await checkAllertaUpdates();
   }
 };
+
+// Gestisce postMessage dal SW (es. click su notifica)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', event => {
+    if (event.data?.type === 'RELOAD_CLOSURES') {
+      loadClosureAlerts();
+    }
+  });
+}
 
 // Carica notifiche salvate quando la pagina è pronta
 if (document.readyState === 'loading') {
@@ -4327,16 +4330,6 @@ function initGlobalRefreshScheduler() {
 
 
 // ── NOTIFICHE PUSH ────────────────────────────────────────────────────────────
-function urlB64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) { outputArray[i] = rawData.charCodeAt(i); }
-  return outputArray;
-}
-
-// AGGIUNGI QUESTA FUNZIONE (prima di subscribeUser)
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding)
@@ -4399,8 +4392,8 @@ async function subscribeUser() {
 initMarkers();
 // CARICA ALLERTA SUBITO, indipendentemente da notifiche/push
 loadAllerta();
-setInterval(loadAllerta, 10 * 60 * 1000);  // Ogni 10min
-setInterval(checkAllertaUpdates, 10 * 1000); // Polling 1min
+setInterval(loadAllerta, 10 * 60 * 1000);
+setInterval(checkAllertaUpdates, 60 * 1000);
 updatePanelTop()
 
 setInterval(loadClosureAlerts, 5 * 60 * 1000);  // ricarica chiusure ogni 5 min
@@ -4645,12 +4638,6 @@ async function checkAllertaUpdates() {
     console.log('Polling allerta non disponibile', e.message);
   }
 }
-
-
-
-loadAllerta();
-setInterval(loadAllerta, 10 * 60 * 1000);
-setInterval(checkAllertaUpdates, 60 * 1000);
 
 </script>
 
