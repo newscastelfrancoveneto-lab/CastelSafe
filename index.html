@@ -2139,15 +2139,19 @@ function renderWaterwayGeoJSON(geojson) {
   });
 }
 
+// Endpoint Overpass pubblici con CORS (i russi maps.mail.ru e openstreetmap.ru non sono più attivi)
 const OVERPASS_ENDPOINTS = [
-  'https://overpass.openstreetmap.ru/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
   'https://overpass-api.de/api/interpreter'
 ];
+// Fallback: proxy sul Raspberry (raggiunge Overpass quando il browser non ci riesce)
+const OVERPASS_PROXY = API_BASE + '/api/overpass';
 
 async function overpassFetch(query) {
   const body = new URLSearchParams({ data: query });
+
+  // 1) Tentativo diretto lato client: corsa fra gli endpoint, timeout breve per fallire in fretta
   const controllers = [];
   try {
     const requests = OVERPASS_ENDPOINTS.map(endpoint => {
@@ -2157,16 +2161,28 @@ async function overpassFetch(query) {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
         body,
-        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(50000)])
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12000)])
       }).then(async response => {
         if (!response.ok) throw new Error(`${endpoint} -> HTTP ${response.status}`);
         return response.json();
       });
     });
     return await Promise.any(requests);
+  } catch (directErr) {
+    console.warn('Overpass diretto fallito, provo il proxy del server:', directErr?.message || directErr);
   } finally {
     controllers.forEach(c => c.abort());
   }
+
+  // 2) Fallback: proxy sul Raspberry
+  const proxyRes = await fetch(OVERPASS_PROXY, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', 'ngrok-skip-browser-warning': 'true' },
+    body,
+    signal: AbortSignal.timeout(50000)
+  });
+  if (!proxyRes.ok) throw new Error(`Proxy Overpass -> HTTP ${proxyRes.status}`);
+  return proxyRes.json();
 }
 
 
