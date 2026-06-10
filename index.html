@@ -2139,30 +2139,18 @@ function renderWaterwayGeoJSON(geojson) {
   });
 }
 
-const OVERPASS_PROXY = API_BASE + '/api/overpass';
-const OVERPASS_DIRECT = [
-  'https://overpass-api.de/api/interpreter',
+const OVERPASS_ENDPOINTS = [
+  'https://overpass.openstreetmap.ru/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
-  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-  'https://overpass.openstreetmap.ru/api/interpreter'
+  'https://overpass-api.de/api/interpreter'
 ];
 
 async function overpassFetch(query) {
   const body = new URLSearchParams({ data: query });
-  try {
-    const proxyRes = await fetch(OVERPASS_PROXY, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', 'ngrok-skip-browser-warning': 'true' },
-      body,
-      signal: AbortSignal.timeout(60000)
-    });
-    if (proxyRes.ok) return await proxyRes.json();
-  } catch (e) { console.warn('Overpass proxy fallito, provo diretto:', e.message); }
-
   const controllers = [];
   try {
-    const requests = OVERPASS_DIRECT.map(endpoint => {
+    const requests = OVERPASS_ENDPOINTS.map(endpoint => {
       const controller = new AbortController();
       controllers.push(controller);
       return fetch(endpoint, {
