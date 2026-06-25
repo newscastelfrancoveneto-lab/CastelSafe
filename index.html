@@ -4352,13 +4352,12 @@ async function subscribeUser() {
   try {
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
-	if (sub) await sub.unsubscribe();  // forza sempre subscription fresca
-	
-	sub = await reg.pushManager.subscribe({
-	  userVisibleOnly: true,
-	  applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC)
-	});
-    }
+    if (sub) await sub.unsubscribe();
+
+    sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC)
+    });
     
     console.log('Invio subscription:', sub.endpoint.slice(-30));
     
