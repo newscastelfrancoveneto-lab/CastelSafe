@@ -1450,7 +1450,7 @@
 // ── COSTANTI ──────────────────────────────────────────────────────────────────
 const ARPA_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="13" height="13"><rect x="3" y="3" width="1.8" height="12.4" rx=".9" fill="white"/><rect x="3" y="14.2" width="10.5" height="1.8" rx=".9" fill="white"/><path d="M4 3.5 Q9.5 0.5 14 5.5" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/><line x1="6.5" y1="4.6" x2="6.5" y2="14.2" stroke="white" stroke-width="1.1" stroke-linecap="round"/><line x1="9.2" y1="3.4" x2="9.2" y2="14.2" stroke="white" stroke-width="1.1" stroke-linecap="round"/><line x1="12" y1="5" x2="12" y2="14.2" stroke="white" stroke-width="1.1" stroke-linecap="round"/></svg>';
 
-const API_BASE = 'https://andrea.tail04be23.ts.net';
+const API_BASE = "https://andrea.tail04be23.ts.net";
 
 const PROXY = 'https://api.allorigins.win/raw?url=';
 
@@ -1508,9 +1508,7 @@ window.addEventListener('appinstalled', () => {
 });
 
 function withNgrokBypass(url) {
-  if (!url || !url.includes('ngrok-free.dev')) return url;
-  const sep = url.includes('?') ? '&' : '?';
-  return url + sep + 'ngrok-skip-browser-warning=true';
+  return url;
 }
 
 function apiFetch(pathOrUrl, options = {}) {
@@ -1520,7 +1518,6 @@ function apiFetch(pathOrUrl, options = {}) {
     ...options,
     headers: {
       ...options.headers,
-      'ngrok-skip-browser-warning': 'true'
     },
     mode: 'cors'
   };
@@ -2177,7 +2174,6 @@ async function overpassFetch(query) {
   // 2) Fallback: proxy sul Raspberry
   const proxyRes = await fetch(OVERPASS_PROXY, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', 'ngrok-skip-browser-warning': 'true' },
     body,
     signal: AbortSignal.timeout(50000)
   });
@@ -2648,8 +2644,6 @@ function readLocalClosureAlerts() {
 async function loadClosureAlerts() {
   const CLOSURES_URL = withNgrokBypass(API_BASE + '/api/closures');
   const fetchAttempts = [
-    () => fetch(CLOSURES_URL, { cache: 'no-store', headers: { Accept: 'application/json', 'ngrok-skip-browser-warning': 'true' } }),
-    () => fetch(CLOSURES_URL, { cache: 'no-store', headers: { Accept: 'application/json', 'ngrok-skip-browser-warning': 'true', 'Authorization': '' } })
   ];
 
   let serverData = null;
@@ -3065,7 +3059,6 @@ function fetchXmlSource(url, timeoutMs) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
 
-  // URL già completo (ngrok), aggiungi solo il bypass header
   const bypassUrl = withNgrokBypass(url);
 
   return fetch(bypassUrl, {
@@ -3074,7 +3067,6 @@ function fetchXmlSource(url, timeoutMs) {
     mode: 'cors',
     credentials: 'omit',           // ← era 'include', causava il blocco CORS
     headers: {
-      'ngrok-skip-browser-warning': 'true'
     }
   })
     .then(r => r.ok ? r.arrayBuffer() : Promise.reject(new Error('http')))
