@@ -2061,28 +2061,88 @@ function waterwayStyle(feature) {
   return WATERWAY_STYLES[type] || WATERWAY_STYLES.default;
 }
 
-// ── OSM CACHE (localStorage, TTL 12h) ────────────────────────────────────────
-const OSM_CACHE_TTL = 12 * 60 * 60 * 1000; // 12 ore
-const OSM_CACHE_VERSION = 'v2'; // invalida cache obsolete
+// ── OSM CACHE (IndexedDB, TTL 7gg, con fallback localStorage) ───────────────
+// I dati OSM (corsi d'acqua/aree emergenza) cambiano raramente: la cache dura
+// a lungo e viene aggiornata solo su refresh manuale o scadenza TTL.
+// IndexedDB è usata al posto di localStorage perché su mobile (specie Safari/iOS)
+// la quota di localStorage è spesso troppo piccola per i GeoJSON dell'intero
+// comune, causando scritture silenziosamente fallite e quindi ri-fetch continui.
+const OSM_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 giorni
+const OSM_CACHE_VERSION = 'v3'; // invalida cache obsolete (v2 era su localStorage)
 
 function osmCacheKey(key) {
   return `osmcache_${OSM_CACHE_VERSION}_${key}`;
 }
 
-function osmCacheGet(key) {
-  try {
-    const raw = localStorage.getItem(osmCacheKey(key));
-    if (!raw) return null;
-    const { ts, data } = JSON.parse(raw);
-    if (Date.now() - ts < OSM_CACHE_TTL) return data;
-  } catch(e) {}
-  return null;
+function openOsmCacheDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('OsmCacheDB', 1);
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains('cache')) {
+        db.createObjectStore('cache');
+      }
+    };
+    request.onsuccess = (event) => resolve(event.target.result);
+    request.onerror = (event) => reject(event.target.error);
+  });
 }
 
-function osmCacheSet(key, data) {
+async function osmCacheGet(key) {
+  const cacheKey = osmCacheKey(key);
   try {
-    localStorage.setItem(osmCacheKey(key), JSON.stringify({ ts: Date.now(), data }));
-  } catch(e) { console.warn('osmCacheSet fallito (storage pieno?):', e); }
+    const db = await openOsmCacheDB();
+    const entry = await new Promise((res, rej) => {
+      const tx = db.transaction('cache', 'readonly');
+      const req = tx.objectStore('cache').get(cacheKey);
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error);
+    });
+    if (entry && Date.now() - entry.ts < OSM_CACHE_TTL) return entry.data;
+    return null;
+  } catch (e) {
+    console.warn('osmCacheGet (IndexedDB) fallito, provo localStorage:', e);
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      if (!raw) return null;
+      const { ts, data } = JSON.parse(raw);
+      if (Date.now() - ts < OSM_CACHE_TTL) return data;
+    } catch(e2) {}
+    return null;
+  }
+}
+
+async function osmCacheSet(key, data) {
+  const cacheKey = osmCacheKey(key);
+  const entry = { ts: Date.now(), data };
+  try {
+    const db = await openOsmCacheDB();
+    await new Promise((res, rej) => {
+      const tx = db.transaction('cache', 'readwrite');
+      const req = tx.objectStore('cache').put(entry, cacheKey);
+      req.onsuccess = () => res();
+      req.onerror = () => rej(req.error);
+    });
+  } catch (e) {
+    console.warn('osmCacheSet (IndexedDB) fallito, provo localStorage:', e);
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify(entry));
+    } catch(e2) { console.warn('osmCacheSet fallito anche su localStorage (storage pieno?):', e2); }
+  }
+}
+
+async function osmCacheClear(key) {
+  const cacheKey = osmCacheKey(key);
+  try {
+    const db = await openOsmCacheDB();
+    await new Promise((res, rej) => {
+      const tx = db.transaction('cache', 'readwrite');
+      const req = tx.objectStore('cache').delete(cacheKey);
+      req.onsuccess = () => res();
+      req.onerror = () => rej(req.error);
+    });
+  } catch (e) {}
+  try { localStorage.removeItem(cacheKey); } catch(e) {}
 }
 
 function renderWaterwayGeoJSON(geojson) {
@@ -2267,8 +2327,8 @@ async function fetchOverpassWithFallback(primaryQueryBuilder) {
 
 async function loadOSMData(forceRefresh = false) {
     // Cache: se entrambi validi, renderizza e torna subito
-    const cachedW = forceRefresh ? null : osmCacheGet('waterways');
-    const cachedC = forceRefresh ? null : osmCacheGet('cpa');
+    const cachedW = forceRefresh ? null : await osmCacheGet('waterways');
+    const cachedC = forceRefresh ? null : await osmCacheGet('cpa');
     if (cachedW) renderWaterwayGeoJSON(cachedW);
     if (cachedC) renderCPAGeoJSON(cachedC);
     if (cachedW && cachedC) return;
@@ -2280,7 +2340,7 @@ async function loadOSMData(forceRefresh = false) {
           jobs.push((async () => {
             const cpaData = await fetchOverpassWithFallback(buildOverpassCPAQuery);
             const cpaFeatures = buildFeatureCollectionFromWays(cpaData.elements || [], 'cpa');
-            osmCacheSet('cpa', cpaFeatures);
+            await osmCacheSet('cpa', cpaFeatures);
             renderCPAGeoJSON(cpaFeatures);
           })());
         }
@@ -2289,7 +2349,7 @@ async function loadOSMData(forceRefresh = false) {
           jobs.push((async () => {
             const waterwayData = await fetchOverpassWithFallback(buildOverpassWaterwayQuery);
             const waterwayFeatures = buildFeatureCollectionFromWays(waterwayData.elements || [], 'waterway');
-            osmCacheSet('waterways', waterwayFeatures);
+            await osmCacheSet('waterways', waterwayFeatures);
             renderWaterwayGeoJSON(waterwayFeatures);
           })());
         }
@@ -2390,8 +2450,8 @@ async function triggerOSMRefresh({ forceRefresh = false, animate = false } = {})
   if (forceRefresh) {
     localStorage.removeItem('osmcache_waterways'); // legacy cache key
     localStorage.removeItem('osmcache_cpa'); // legacy cache key
-    localStorage.removeItem(osmCacheKey('waterways'));
-    localStorage.removeItem(osmCacheKey('cpa'));
+    await osmCacheClear('waterways');
+    await osmCacheClear('cpa');
   }
 
   try {
