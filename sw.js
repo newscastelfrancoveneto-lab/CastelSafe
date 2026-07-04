@@ -1,3 +1,9 @@
+// Versione del Service Worker: cambiare questa stringa ad OGNI deploy che
+// modifica index.html (o altri asset), anche se sw.js non cambia altrimenti.
+// È l'unico modo per cui il browser rileva una nuova versione disponibile e
+// mostra il badge "Aggiornamento disponibile" nell'app.
+const APP_VERSION = '2026-07-05-1';
+
 // Unico handler PUSH
 self.addEventListener('push', event => {
   const data = event.data?.json() || {};
