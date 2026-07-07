@@ -10,8 +10,35 @@
 
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script>
+    // Mostra sempre un feedback visivo di caricamento: senza questo, se una
+    // libreria da CDN è lenta/irraggiungibile (rete mobile debole), l'app
+    // resta bloccata sullo splash screen nativo della PWA senza alcun testo,
+    // dando l'impressione che sia "morta".
+    window.__bootStatus = function (text) {
+      var el = document.getElementById('boot-loader-text');
+      if (el) el.textContent = text;
+    };
+    window.__bootError = function (text) {
+      var el = document.getElementById('boot-loader-text');
+      var retry = document.getElementById('boot-loader-retry');
+      var spin = document.getElementById('boot-loader-spinner');
+      if (el) el.textContent = text;
+      if (spin) spin.style.display = 'none';
+      if (retry) retry.style.display = 'inline-flex';
+    };
+    window.__bootDone = function () {
+      var loader = document.getElementById('boot-loader');
+      if (loader) loader.classList.add('boot-loader-hidden');
+    };
+    // Rete di sicurezza: se dopo 15s l'app non ha ancora chiamato __bootDone,
+    // mostriamo un messaggio d'errore invece di restare bloccati in silenzio.
+    window.__bootTimeout = setTimeout(function () {
+      window.__bootError('Il caricamento sta impiegando più del previsto. Controlla la connessione e riprova.');
+    }, 15000);
+  </script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" onerror="window.__bootError('Impossibile caricare la mappa (Leaflet). Controlla la connessione e riprova.')"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js" onerror="window.__bootError('Impossibile caricare i grafici (Chart.js). Controlla la connessione e riprova.')"></script>
   <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 
@@ -1093,9 +1120,73 @@
     .leaflet-bar a:hover { background-color: #f8fafc !important; color: var(--primary) !important; }
     .leaflet-control-attribution { border-radius: 4px 0 0 0; background: rgba(255,255,255,0.8) !important; backdrop-filter: blur(4px); color: var(--text-muted) !important; font-size: 10px !important; }
 
+    /* ── SCHERMATA DI CARICAMENTO INIZIALE ── */
+    #boot-loader {
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      background: var(--primary, #8d021f);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      padding: 24px;
+      text-align: center;
+      transition: opacity 0.35s ease;
+    }
+    #boot-loader.boot-loader-hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #boot-loader img {
+      width: 84px;
+      height: 84px;
+      border-radius: 20px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    }
+    #boot-loader-spinner {
+      width: 30px;
+      height: 30px;
+      border: 3px solid rgba(255,255,255,0.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    #boot-loader-text {
+      color: #fff;
+      font-family: 'Inter', 'Segoe UI', system-ui, Arial, sans-serif;
+      font-size: 0.92rem;
+      font-weight: 600;
+      max-width: 320px;
+      line-height: 1.5;
+    }
+    #boot-loader-retry {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 20px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.7);
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    #boot-loader-retry:hover {
+      background: rgba(255,255,255,0.22);
+    }
   </style>
 </head>
 <body>
+
+<div id="boot-loader">
+  <img src="icon-192.png" alt="CastelSafe" />
+  <div id="boot-loader-spinner"></div>
+  <div id="boot-loader-text">Caricamento in corso…</div>
+  <button id="boot-loader-retry" onclick="location.reload()">Riprova</button>
+</div>
 
 <div id="app">
 
@@ -2198,6 +2289,7 @@ if (document.readyState === 'loading') {
 }
 
 // ── MAPPA ─────────────────────────────────────────────────────────────────────
+window.__bootStatus && window.__bootStatus('Caricamento mappa…');
 const map = L.map('map', { center: [45.6640, 11.9580], zoom: 13, zoomControl: false });
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
@@ -4615,12 +4707,25 @@ async function subscribeUser() {
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
+window.__bootStatus && window.__bootStatus('Caricamento dati Protezione Civile…');
 initMarkers();
 // CARICA ALLERTA SUBITO, indipendentemente da notifiche/push
 loadAllerta();
 setInterval(loadAllerta, 10 * 60 * 1000);
 setInterval(checkAllertaUpdates, 60 * 1000);
 updatePanelTop()
+
+// Nasconde la schermata di caricamento non appena la mappa ha disegnato le
+// prime tile (segnale affidabile che l'app è utilizzabile), con un fallback
+// sul 'load' della finestra nel caso la mappa sia già in cache e non emetta
+// mai l'evento 'load' dei tile.
+if (window.__bootTimeout) clearTimeout(window.__bootTimeout);
+map.whenReady(() => {
+  window.__bootDone && window.__bootDone();
+});
+window.addEventListener('load', () => {
+  window.__bootDone && window.__bootDone();
+});
 
 setInterval(loadClosureAlerts, 5 * 60 * 1000);  // ricarica chiusure ogni 5 min
 
