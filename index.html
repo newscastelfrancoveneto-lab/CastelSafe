@@ -1031,6 +1031,52 @@
 	#allerta-help-modal .allerta-section-body a {
 	  word-break: break-word;
 	}
+
+	.risk-accordion {
+	  margin-top: 22px;
+	  padding-top: 14px;
+	  border-top: 1px solid #e2e8f0;
+	}
+
+	.risk-accordion-item {
+	  border-bottom: 1px solid #e2e8f0;
+	}
+	.risk-accordion-item:first-child { border-top: none; }
+
+	.risk-accordion-item summary {
+	  list-style: none;
+	  cursor: pointer;
+	  display: flex;
+	  align-items: center;
+	  gap: 10px;
+	  padding: 14px 2px;
+	  font-size: 0.9rem;
+	  font-weight: 700;
+	  color: var(--text-main);
+	  -webkit-tap-highlight-color: transparent;
+	}
+	.risk-accordion-item summary::-webkit-details-marker { display: none; }
+	.risk-accordion-item summary::marker { content: ''; }
+
+	.risk-accordion-label { flex: 1; }
+
+	.risk-accordion-chevron {
+	  color: var(--text-muted);
+	  flex-shrink: 0;
+	  transition: transform 0.2s;
+	  display: flex;
+	}
+	.risk-accordion-item[open] .risk-accordion-chevron { transform: rotate(90deg); }
+
+	.risk-accordion-body {
+	  padding: 0 2px 18px;
+	}
+	.risk-accordion-body .allerta-section-title {
+	  margin: 16px 0 8px;
+	  padding-top: 0;
+	  border-top: none;
+	}
+	.risk-accordion-body .allerta-section-title:first-child { margin-top: 0; }
 			  
 	.periodo {
 	  font-size: 0.84rem;
@@ -1142,55 +1188,175 @@
       </p>
     </div>
 
-    <div class="allerta-section-title">Durante l’allerta</div>
-    <div class="allerta-section-body">
-      <p>
-        Dopo aver letto attentamente il bollettino regionale, assicurati di aver attivato le notifiche dell’app, per ricevere in tempo reale gli allarmi dei torrenti o delle precipitazioni.
-        <br><br>
-        Consulta le
-        <a href="https://www.comune.castelfrancoveneto.tv.it/wp-content/uploads/2024/09/Procedure-Emergenza.pdf" target="_blank" rel="noopener noreferrer">
-          procedure di emergenza
-        </a>
-        e la
-        <a href="https://www.comune.castelfrancoveneto.tv.it/wp-content/uploads/2024/09/rischio-idrogeologico.pdf" target="_blank" rel="noopener noreferrer">
-          mappa del rischio idrogeologico
-        </a>.
-        <br><br>
-        Segui ogni indicazione ufficiale del Comune.
-        <br><br>
-        <strong>Non</strong> dormire nei piani seminterrati e <strong>non</strong> soggiornarvi.
-        <br><br>
-        Proteggi i locali che si trovano al piano strada, chiudi le porte di cantine, seminterrati o garage <strong>solo se</strong> non ti esponi a pericoli.
-        <br><br>
-        Se devi viaggiare, verifica dall’app se sono presenti chiusure stradali, in modo da evitare zone allagate e traffico inutile.
-        <br><br>
-        Valuta bene se mettere al sicuro l’auto o altri beni: può essere <strong>pericoloso</strong>.
-      </p>
-    </div>
+    <div class="risk-accordion">
 
-    <div class="allerta-section-title">Durante l’alluvione</div>
-    <div class="allerta-section-body">
-      <p>Se sei in casa, spostati ai piani alti e chiudi porte e finestre. Chiudi il gas, disattiva l'impianto elettrico solo se non rischi di bagnarti. Non usare ascensori né toccare apparecchi elettrici con mani o piedi bagnati.<br><br><strong>Non provare a raggiungere casa</strong> su strade "alternative pulite": anche se sembrano sicure, rischi voragini, correnti o intrappolamento (20-30 cm d'acqua bastano per auto o pedoni). Allontanati dalle zone allagate verso aree elevate o di attesa indicate dal Comune/app.<br><br>Segui solo le autorità. <strong>Non improvvisare!</strong></p>
-    </div>
+      <details class="risk-accordion-item" open>
+        <summary>
+          <span class="risk-accordion-label">Rischio idraulico e idrogeologico (alluvione)</span>
+          <span class="risk-accordion-chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
+        </summary>
+        <div class="risk-accordion-body">
+          <div class="allerta-section-title">Durante l’allerta</div>
+          <div class="allerta-section-body">
+            <p>
+              Dopo aver letto attentamente il bollettino regionale, assicurati di aver attivato le notifiche dell’app, per ricevere in tempo reale gli allarmi dei torrenti o delle precipitazioni.
+              <br><br>
+              Consulta le
+              <a href="https://www.comune.castelfrancoveneto.tv.it/wp-content/uploads/2024/09/Procedure-Emergenza.pdf" target="_blank" rel="noopener noreferrer">
+                procedure di emergenza
+              </a>
+              e la
+              <a href="https://www.comune.castelfrancoveneto.tv.it/wp-content/uploads/2024/09/rischio-idrogeologico.pdf" target="_blank" rel="noopener noreferrer">
+                mappa del rischio idrogeologico
+              </a>.
+              <br><br>
+              Segui ogni indicazione ufficiale del Comune.
+              <br><br>
+              <strong>Non</strong> dormire nei piani seminterrati e <strong>non</strong> soggiornarvi.
+              <br><br>
+              Proteggi i locali che si trovano al piano strada, chiudi le porte di cantine, seminterrati o garage <strong>solo se</strong> non ti esponi a pericoli.
+              <br><br>
+              Se devi viaggiare, verifica dall’app se sono presenti chiusure stradali, in modo da evitare zone allagate e traffico inutile.
+              <br><br>
+              Valuta bene se mettere al sicuro l’auto o altri beni: può essere <strong>pericoloso</strong>.
+            </p>
+          </div>
 
-    <div class="allerta-section-title">Dopo l’alluvione</div>
-    <div class="allerta-section-body">
-      <p>Attendi l'allerta cessato dalle autorità prima di rientrare. Verifica con un tecnico gas, elettricità e acqua: non bere dal rubinetto, getta cibi contaminati dal fango.<br><br>Attento a pericoli residui come voragini, cavi scoperti, detriti o edifici instabili. Non transitare vicino a zone allagate o con fango.<br><br>Segnala danni al Comune e consulta le procedure ufficiali per i rimborsi. <strong>Priorità: sicurezza e comunicazioni ufficiali.</strong></p>
+          <div class="allerta-section-title">Durante l’alluvione</div>
+          <div class="allerta-section-body">
+            <p>Se sei in casa, spostati ai piani alti e chiudi porte e finestre. Chiudi il gas, disattiva l'impianto elettrico solo se non rischi di bagnarti. Non usare ascensori né toccare apparecchi elettrici con mani o piedi bagnati.<br><br><strong>Non provare a raggiungere casa</strong> su strade "alternative pulite": anche se sembrano sicure, rischi voragini, correnti o intrappolamento (20-30 cm d'acqua bastano per auto o pedoni). Allontanati dalle zone allagate verso aree elevate o di attesa indicate dal Comune/app.<br><br>Segui solo le autorità. <strong>Non improvvisare!</strong></p>
+          </div>
+
+          <div class="allerta-section-title">Dopo l’alluvione</div>
+          <div class="allerta-section-body">
+            <p>Attendi l'allerta cessato dalle autorità prima di rientrare. Verifica con un tecnico gas, elettricità e acqua: non bere dal rubinetto, getta cibi contaminati dal fango.<br><br>Attento a pericoli residui come voragini, cavi scoperti, detriti o edifici instabili. Non transitare vicino a zone allagate o con fango.<br><br>Segnala danni al Comune e consulta le procedure ufficiali per i rimborsi. <strong>Priorità: sicurezza e comunicazioni ufficiali.</strong></p>
+          </div>
+
+          <p style="margin-top:12px;">
+            Fonte:
+            <a href="https://www.iononrischio.gov.it/it/preparati/alluvione/cosa-fare" target="_blank" rel="noopener noreferrer">
+              Io non rischio - Alluvione
+            </a>
+          </p>
+        </div>
+      </details>
+
+      <details class="risk-accordion-item">
+        <summary>
+          <span class="risk-accordion-label">Temporali forti (fulmini e grandine)</span>
+          <span class="risk-accordion-chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
+        </summary>
+        <div class="risk-accordion-body">
+          <div class="allerta-section-title">Prima</div>
+          <div class="allerta-section-body">
+            <p>Se è prevista allerta per temporali, evita di programmare attività all'aperto (escursioni, sport, lavori in quota) e resta aggiornato sull'evoluzione meteo tramite l'app.</p>
+          </div>
+
+          <div class="allerta-section-title">Durante</div>
+          <div class="allerta-section-body">
+            <p>Se sei all'aperto, cerca riparo in un edificio o in auto con i finestrini chiusi. <strong>Evita</strong> alberi isolati, pali, tralicci, specchi d'acqua e aree aperte esposte ai fulmini; se sei in acqua o in barca, raggiungi subito la riva.<br><br>In casa, chiudi porte e finestre; evita di usare apparecchi elettrici collegati alla rete e, se possibile, scollega le spine dei dispositivi sensibili.<br><br>Presta attenzione alla grandine e alle raffiche improvvise: possono danneggiare vetri, tetti e veicoli in sosta.</p>
+          </div>
+
+          <div class="allerta-section-title">Dopo</div>
+          <div class="allerta-section-body">
+            <p>Segnala eventuali danni al Comune ed evita zone con alberi o rami pericolanti o cavi elettrici a terra.</p>
+          </div>
+        </div>
+      </details>
+
+      <details class="risk-accordion-item">
+        <summary>
+          <span class="risk-accordion-label">Vento forte</span>
+          <span class="risk-accordion-chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
+        </summary>
+        <div class="risk-accordion-body">
+          <div class="allerta-section-title">Prima</div>
+          <div class="allerta-section-body">
+            <p>Metti al sicuro oggetti, ombrelloni, tende e mobili da giardino che potrebbero essere sollevati dal vento; verifica impalcature, coperture provvisorie e grondaie non ben fissate.</p>
+          </div>
+
+          <div class="allerta-section-title">Durante</div>
+          <div class="allerta-section-body">
+            <p>Evita di sostare sotto alberi, impalcature, cartelloni pubblicitari, cornicioni e linee elettriche. Se sei alla guida, modera la velocità (soprattutto su ponti, viadotti e strade esposte) e presta attenzione a rami caduti o detriti sulla carreggiata. Evita spostamenti non necessari.</p>
+          </div>
+
+          <div class="allerta-section-title">Dopo</div>
+          <div class="allerta-section-body">
+            <p>Segnala alberi o rami pericolanti e danni a strutture; non avvicinarti a cavi elettrici caduti a terra.</p>
+          </div>
+        </div>
+      </details>
+
+      <details class="risk-accordion-item">
+        <summary>
+          <span class="risk-accordion-label">Ondate di calore</span>
+          <span class="risk-accordion-chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
+        </summary>
+        <div class="risk-accordion-body">
+          <div class="allerta-section-title">Come comportarsi</div>
+          <div class="allerta-section-body">
+            <p>Evita di uscire ed esporti al sole nelle ore più calde della giornata (indicativamente 12-18). Bevi molta acqua durante il giorno, evita alcolici e bevande molto zuccherate o fredde, indossa abiti leggeri e chiari.<br><br><strong>Non lasciare mai</strong> bambini o animali in auto, nemmeno per pochi minuti.<br><br>Presta attenzione a persone anziane, bambini piccoli e malati cronici: mantieni le abitazioni fresche arieggiandole nelle ore più fresche (mattina presto, sera) e tenendo chiuse tapparelle/tende nelle ore calde.</p>
+          </div>
+
+          <div class="allerta-section-title">In caso di malore</div>
+          <div class="allerta-section-body">
+            <p>Se noti crampi, capogiri, cute calda e secca o confusione in qualcuno, spostalo subito al fresco, bagnalo con acqua fresca e chiama il <strong>112/118</strong>.</p>
+          </div>
+        </div>
+      </details>
+
+      <details class="risk-accordion-item">
+        <summary>
+          <span class="risk-accordion-label">Terremoto</span>
+          <span class="risk-accordion-chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
+        </summary>
+        <div class="risk-accordion-body">
+          <div class="allerta-section-title">Prima</div>
+          <div class="allerta-section-body">
+            <p>Fissa alla parete mobili, librerie e scaffali alti che potrebbero ribaltarsi. Individua in casa i punti più sicuri (sotto architravi robusti o vicino a muri portanti, lontano da vetri e mobili alti) e tieni a portata di mano una torcia e una radio a pile.</p>
+          </div>
+
+          <div class="allerta-section-title">Durante</div>
+          <div class="allerta-section-body">
+            <p>Se sei in casa, ripara sotto un tavolo robusto tenendoti lontano da vetri, finestre e mobili alti; non usare ascensori.<br><br>Se sei all'aperto, allontanati da edifici, alberi e linee elettriche.<br><br>Se sei alla guida, fermati lontano da ponti, gallerie ed edifici.</p>
+          </div>
+
+          <div class="allerta-section-title">Dopo</div>
+          <div class="allerta-section-body">
+            <p>Esci con prudenza controllando che non ci siano crolli o pericoli lungo il percorso. Se senti odore di gas, chiudi subito il rubinetto e non accendere fiamme o interruttori. Allontanati da edifici danneggiati e segui solo le indicazioni ufficiali delle autorità.</p>
+          </div>
+
+          <p style="margin-top:12px;">
+            Fonte:
+            <a href="https://www.iononrischio.gov.it/" target="_blank" rel="noopener noreferrer">
+              Io non rischio
+            </a>
+          </p>
+        </div>
+      </details>
+
+      <details class="risk-accordion-item">
+        <summary>
+          <span class="risk-accordion-label">Rischio industriale</span>
+          <span class="risk-accordion-chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
+        </summary>
+        <div class="risk-accordion-body">
+          <div class="allerta-section-title">In caso di allarme (sirena)</div>
+          <div class="allerta-section-body">
+            <p>Al segnale di allarme (suono continuo), <strong>chiuditi subito</strong> in un edificio: chiudi porte e finestre e spegni impianti di aerazione o condizionamento.<br><br>Ascolta radio, TV locali e le notifiche ufficiali del Comune per le istruzioni specifiche sull'evento in corso.<br><br>Non uscire ed evita di intasare le linee telefoniche, salvo reale pericolo di vita, finché non viene comunicato il <strong>cessato allarme</strong>.<br><br>Segui solo le indicazioni delle autorità competenti: non improvvisare percorsi di fuga autonomi, a meno che non venga esplicitamente disposta l'evacuazione.</p>
+          </div>
+        </div>
+      </details>
+
     </div>
 
     <div class="allerta-section-title">Nota</div>
     <div class="allerta-section-body allerta-note-box">
       <p>
-        Le indicazioni di comportamento presenti in questa sezione sono ispirate ai materiali ufficiali della campagna nazionale <strong>Io non rischio</strong> e hanno finalità esclusivamente informative.
+        Le indicazioni di comportamento presenti in questa sezione sono ispirate ai materiali ufficiali della campagna nazionale <strong>Io non rischio</strong> e alle linee guida di Protezione Civile e hanno finalità esclusivamente informative.
       </p>
       <p>
         In caso di emergenza fai sempre riferimento alle comunicazioni ufficiali di Protezione Civile, Regione, Comune e autorità competenti.
-      </p>
-      <p>
-        Fonte:
-        <a href="https://www.iononrischio.gov.it/it/preparati/alluvione/cosa-fare" target="_blank" rel="noopener noreferrer">
-          Io non rischio - Alluvione
-        </a>
       </p>
     </div>
   </div>
