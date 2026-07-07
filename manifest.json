@@ -4,7 +4,7 @@
   "start_url": "/CastelSafe/",
   "scope": "/CastelSafe/",
   "display": "standalone",
-  "background_color": "#f0f4f8",
+  "background_color": "#8d021f",
   "theme_color": "#0e8a8a",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
