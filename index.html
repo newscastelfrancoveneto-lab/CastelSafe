@@ -929,7 +929,7 @@
     .modal-close-btn {
       position: absolute; top: 16px; right: 16px;
       background: #f1f5f9; border: none; border-radius: 50%;
-      width: 32px; height: 32px; font-size: 1rem; cursor: pointer;
+      width: 32px; height: 32px; font-size: 1rem; line-height: 1; padding: 0; cursor: pointer;
       display: flex; align-items: center; justify-content: center; color: var(--text-muted); transition: background 0.2s;
     }
 
@@ -1198,7 +1198,7 @@
 
 <div id="info-modal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
   <div id="info-box" class="modal-box">
-    <button class="modal-close-btn" onclick="document.getElementById('info-modal').classList.remove('open')" title="Chiudi">×</button>
+    <button class="modal-close-btn" onclick="document.getElementById('info-modal').classList.remove('open')" title="Chiudi">✕</button>
 
     <h2>Informazioni sull'app</h2>
 
@@ -2009,7 +2009,7 @@ bc.onmessage = async event => {
   }
 
   const title = (notif?.title || '').toLowerCase();
-  if (title.includes('nuova allerta meteo')) {
+  if (title.includes('allerta')) {
     await checkAllertaUpdates();
   }
 };
@@ -2019,6 +2019,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', event => {
     if (event.data?.type === 'RELOAD_CLOSURES') {
       loadClosureAlerts();
+      checkAllertaUpdates();
     }
   });
 }
@@ -4456,6 +4457,28 @@ setInterval(checkAllertaUpdates, 60 * 1000);
 updatePanelTop()
 
 setInterval(loadClosureAlerts, 5 * 60 * 1000);  // ricarica chiusure ogni 5 min
+
+// Quando l'app torna in primo piano (es. riapertura da background su mobile)
+// i setInterval possono essere stati sospesi/throttlati dal sistema e non aver
+// ancora "recuperato" il giro mancato: forziamo qui un refresh immediato del
+// bollettino allerta e delle chiusure, così non serve più chiudere del tutto
+// la PWA per vedere i dati aggiornati.
+let lastForegroundRefresh = 0;
+function refreshOnForeground() {
+  const now = Date.now();
+  if (now - lastForegroundRefresh < 5000) return; // evita refresh ravvicinati
+  lastForegroundRefresh = now;
+  checkAllertaUpdates();
+  loadClosureAlerts();
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) refreshOnForeground();
+});
+// Safari/iOS può ripristinare la pagina dalla bfcache (bandiera "persisted")
+// senza sempre passare da visibilitychange: copriamo anche questo caso.
+window.addEventListener('pageshow', event => {
+  if (event.persisted) refreshOnForeground();
+});
 
 initGlobalRefreshScheduler();
 

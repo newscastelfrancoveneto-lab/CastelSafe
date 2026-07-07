@@ -2,17 +2,51 @@
 // modifica index.html (o altri asset), anche se sw.js non cambia altrimenti.
 // È l'unico modo per cui il browser rileva una nuova versione disponibile e
 // mostra il badge "Aggiornamento disponibile" nell'app.
-const APP_VERSION = '2026-07-05-1';
+const APP_VERSION = '2026-07-07-1';
+
+// Cache dedicata alle icone usate dalle notifiche: le pre-carichiamo così
+// sono sempre disponibili anche se la rete è debole/assente nel momento
+// esatto in cui arriva la push (es. durante un evento meteo), evitando che
+// il sistema mostri un'icona generica al posto di quella dell'app.
+const ICON_CACHE = 'castelsafe-icons-' + APP_VERSION;
+const ICON_URLS = ['icon-192.png', 'icon-512.png'];
+
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(ICON_CACHE).then(cache => cache.addAll(ICON_URLS)).catch(() => {})
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k.startsWith('castelsafe-icons-') && k !== ICON_CACHE).map(k => caches.delete(k)))
+    )
+  );
+});
+
+// Serve le icone dalla cache locale quando disponibili, evitando di dipendere
+// dalla rete per mostrare l'icona nelle notifiche.
+self.addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
+  if (ICON_URLS.some(name => url.pathname.endsWith(name))) {
+    event.respondWith(
+      caches.match(event.request).then(cached => cached || fetch(event.request))
+    );
+  }
+});
 
 // Unico handler PUSH
 self.addEventListener('push', event => {
   const data = event.data?.json() || {};
 
+  const iconUrl = new URL('icon-192.png', self.registration.scope).href;
   const title = data.title || 'Nuova Allerta';
   const options = {
     body: data.body || '',
     tag: data.tag || 'arpav',
-    icon: 'icon-192.png',
+    icon: iconUrl,
+    badge: iconUrl,
     vibrate: [200, 100, 200],
     data: { url: data.url || '/CastelSafe/' }
   };
