@@ -37,10 +37,14 @@
       window.__bootError('Il caricamento sta impiegando più del previsto. Controlla la connessione e riprova.');
     }, 15000);
   </script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" onerror="window.__bootError('Impossibile caricare la mappa (Leaflet). Controlla la connessione e riprova.')"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js" onerror="window.__bootError('Impossibile caricare i grafici (Chart.js). Controlla la connessione e riprova.')"></script>
-  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+  <!-- Le librerie da CDN vengono caricate più avanti, subito prima dello
+       script principale: così il browser non deve aspettare che finiscano
+       di scaricarsi prima di iniziare a disegnare il <body> (schermata di
+       caricamento inclusa). Su rete mobile lenta, tenerle qui in <head>
+       teneva la pagina completamente bianca finché non arrivavano. -->
+  <script>
+    window.__bootStatus && window.__bootStatus('Caricamento librerie…');
+  </script>
 
   <style>
 
@@ -1701,6 +1705,10 @@
   </div>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" onerror="window.__bootError('Impossibile caricare la mappa (Leaflet). Controlla la connessione e riprova.')"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js" onerror="window.__bootError('Impossibile caricare i grafici (Chart.js). Controlla la connessione e riprova.')"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 
 <script>
 
