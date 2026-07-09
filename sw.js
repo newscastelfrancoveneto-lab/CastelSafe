@@ -2,7 +2,7 @@
 // modifica index.html (o altri asset), anche se sw.js non cambia altrimenti.
 // È l'unico modo per cui il browser rileva una nuova versione disponibile e
 // mostra il badge "Aggiornamento disponibile" nell'app.
-const APP_VERSION = '2026-07-07-5';
+const APP_VERSION = '2026-07-10-1';
 
 // Cache dedicata alle icone usate dalle notifiche: le pre-carichiamo così
 // sono sempre disponibili anche se la rete è debole/assente nel momento
@@ -38,7 +38,13 @@ self.addEventListener('fetch', event => {
 
 // Unico handler PUSH
 self.addEventListener('push', event => {
-  const data = event.data?.json() || {};
+  let data = {};
+  try {
+    data = event.data?.json() || {};
+  } catch (e) {
+    console.error('Payload push non valido (non JSON):', e);
+    data = { title: 'Nuova Allerta', body: event.data?.text() || '' };
+  }
 
   const iconUrl = new URL('icon-192.png', self.registration.scope).href;
   const title = data.title || 'Nuova Allerta';
@@ -144,4 +150,34 @@ self.addEventListener('message', event => {
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
+});
+
+// Il browser può invalidare/ruotare la subscription push in autonomia
+// (scadenza, rotazione chiavi FCM, ecc.). Senza ri-sottoscrivere e
+// ri-inviare al backend, l'app resta con permesso "concesso" ma non
+// riceve più nulla: da qui il bug "notifiche smesse di funzionare".
+const API_BASE = 'https://andrea.tail04be23.ts.net';
+const VAPID_PUBLIC = 'BEzNrOFRNEPdjown9Tnj2pYnQ-v464zvxjFwE_B5PEqSNIloti9MafJKsBHU1LjxTW9U2UX8TqvhP0ydySOl8Qk';
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
+}
+
+self.addEventListener('pushsubscriptionchange', event => {
+  event.waitUntil(
+    self.registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC)
+    }).then(sub =>
+      fetch(API_BASE + '/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sub),
+        mode: 'cors'
+      })
+    ).catch(e => console.error('Ri-subscribe fallita:', e))
+  );
 });
