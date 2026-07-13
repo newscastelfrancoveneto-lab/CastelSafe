@@ -2,7 +2,7 @@
 // modifica index.html (o altri asset), anche se sw.js non cambia altrimenti.
 // È l'unico modo per cui il browser rileva una nuova versione disponibile e
 // mostra il badge "Aggiornamento disponibile" nell'app.
-const APP_VERSION = '2026-07-10-1';
+const APP_VERSION = '2026-07-13-1';
 
 // Cache dedicata alle icone usate dalle notifiche: le pre-carichiamo così
 // sono sempre disponibili anche se la rete è debole/assente nel momento
@@ -51,6 +51,7 @@ self.addEventListener('push', event => {
   const options = {
     body: data.body || '',
     tag: data.tag || 'arpav',
+    renotify: data.renotify || false,
     icon: iconUrl,
     badge: iconUrl,
     vibrate: [200, 100, 200],
