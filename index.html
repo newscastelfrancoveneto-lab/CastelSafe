@@ -960,18 +960,8 @@
 
     /* ── Richiamo attenzione campanella notifiche non attive ── */
     .fab-btn.bell-attention {
-      position: relative;
       color: #dc2626;
       animation: bell-shake 2.4s ease-in-out infinite;
-    }
-    .fab-btn.bell-attention::after {
-      content: '';
-      position: absolute;
-      top: 2px; right: 2px;
-      width: 10px; height: 10px;
-      background: #dc2626;
-      border-radius: 50%;
-      border: 2px solid #fff;
     }
     @keyframes bell-shake {
       0%, 100% { transform: rotate(0); }
