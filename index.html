@@ -819,31 +819,39 @@
 
     .chart-wrap { position: relative; height: 200px; margin-bottom: 16px; }
 
+    .chart-box { position: relative; }
+    .chart-toolbar { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+
     .chart-fullscreen-btn {
-      position: absolute; top: 4px; right: 4px; z-index: 5;
       width: 32px; height: 32px; border-radius: 8px; border: 1px solid #e2e8f0;
-      background: rgba(255,255,255,0.9); color: var(--text-main);
+      background: #fff; color: var(--text-main);
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; font-size: 1rem; line-height: 1; padding: 0;
       box-shadow: 0 1px 3px rgba(0,0,0,0.12);
     }
-    .chart-fullscreen-btn:hover { background: #fff; }
+    .chart-fullscreen-btn:hover { background: #f8fafc; }
 
+    body.chart-fullscreen-active .chart-box {
+      position: fixed; inset: 0; z-index: 100000; background: #fff;
+      display: flex; flex-direction: column;
+      padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
+                max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    }
     body.chart-fullscreen-active .chart-wrap {
-      position: fixed; inset: 0; height: 100vh; height: 100dvh; width: 100vw;
-      margin: 0; background: #fff; z-index: 100000;
+      flex: 1; height: auto; width: auto; margin: 0;
+    }
+    body.chart-fullscreen-active .chart-toolbar {
+      margin-bottom: 4px; flex: none;
+    }
+    body.chart-fullscreen-active .chart-fullscreen-btn {
+      width: 40px; height: 40px; font-size: 1.2rem;
     }
     body.chart-fullscreen-active .stat-row,
     body.chart-fullscreen-active .data-table,
     body.chart-fullscreen-active .soglie-legend,
     body.chart-fullscreen-active #precip-acc-status,
-    body.chart-fullscreen-active .chart-wrap ~ * {
+    body.chart-fullscreen-active .chart-box ~ * {
       display: none !important;
-    }
-    body.chart-fullscreen-active .chart-fullscreen-btn {
-      top: max(8px, env(safe-area-inset-top));
-      right: max(8px, env(safe-area-inset-right));
-      width: 40px; height: 40px; font-size: 1.2rem;
     }
 
     /* ── TABELLA ── */
@@ -1904,17 +1912,17 @@ const TYPE_COLOR = {
 };
 
 function chartFullscreenBtnHtml() {
-  return `<button type="button" class="chart-fullscreen-btn" onclick="toggleChartFullscreen()" title="Schermo intero">⛶</button>`;
+  return `<div class="chart-toolbar"><button type="button" class="chart-fullscreen-btn" onclick="toggleChartFullscreen()" title="Schermo intero">⛶</button></div>`;
 }
 
 async function toggleChartFullscreen() {
-  const wrap = document.querySelector('.chart-wrap');
-  if (!wrap) return;
+  const box = document.querySelector('.chart-box');
+  if (!box) return;
   const active = document.body.classList.contains('chart-fullscreen-active');
 
   if (!active) {
     document.body.classList.add('chart-fullscreen-active');
-    try { await wrap.requestFullscreen?.(); } catch (e) {}
+    try { await box.requestFullscreen?.(); } catch (e) {}
     try { await screen.orientation?.lock?.('landscape'); } catch (e) {}
   } else {
     document.body.classList.remove('chart-fullscreen-active');
@@ -1922,7 +1930,7 @@ async function toggleChartFullscreen() {
     if (document.fullscreenElement) { try { await document.exitFullscreen(); } catch (e) {} }
   }
 
-  const btn = wrap.querySelector('.chart-fullscreen-btn');
+  const btn = box.querySelector('.chart-fullscreen-btn');
   if (btn) btn.textContent = document.body.classList.contains('chart-fullscreen-active') ? '✕' : '⛶';
 
   setTimeout(() => activeChart?.resize(), 150);
@@ -1932,7 +1940,7 @@ document.addEventListener('fullscreenchange', () => {
   if (!document.fullscreenElement && document.body.classList.contains('chart-fullscreen-active')) {
     document.body.classList.remove('chart-fullscreen-active');
     try { screen.orientation?.unlock?.(); } catch (e) {}
-    const btn = document.querySelector('.chart-wrap .chart-fullscreen-btn');
+    const btn = document.querySelector('.chart-box .chart-fullscreen-btn');
     if (btn) btn.textContent = '⛶';
     setTimeout(() => activeChart?.resize(), 150);
   }
@@ -3833,7 +3841,7 @@ function renderWindCombined(stn, sensor) {
 
   document.getElementById('panel-body').innerHTML = `
     ${statHtml}
-    <div class="chart-wrap">${chartFullscreenBtnHtml()}<canvas id="sensorChart"></canvas></div>
+    <div class="chart-box">${chartFullscreenBtnHtml()}<div class="chart-wrap"><canvas id="sensorChart"></canvas></div></div>
     <table class="data-table">
       <thead><tr><th>Ora</th><th>Velocità (${sensor.unitnm})</th><th>Provenienza</th></tr></thead>
       <tbody>${tableRows}</tbody>
@@ -4238,7 +4246,7 @@ document.getElementById('panel-body').innerHTML =
     <div class="stat-card"><div class="val">${total48h.toFixed(2)}</div><div class="lbl">Totale 48h (${unit})</div></div>
   </div>
   <small id="precip-acc-status" style="display:block;margin:10px 4px 0;color:#64748b;font-weight:600;">Calcolo accumulo 24h in background…</small>
-  <div class="chart-wrap">${chartFullscreenBtnHtml()}<canvas id="sensorChart"></canvas></div>
+  <div class="chart-box">${chartFullscreenBtnHtml()}<div class="chart-wrap"><canvas id="sensorChart"></canvas></div></div>
   <table class="data-table">
     <thead><tr>
       <th>Data / Ora</th>
@@ -4445,7 +4453,7 @@ function renderSensor(stn, sensor) {
       <div class="stat-card"><div class="val">${avg}</div><div class="lbl">Media (${unit})</div></div>
     </div>
     ${legendHtml}
-    <div class="chart-wrap">${chartFullscreenBtnHtml()}<canvas id="sensorChart"></canvas></div>
+    <div class="chart-box">${chartFullscreenBtnHtml()}<div class="chart-wrap"><canvas id="sensorChart"></canvas></div></div>
     <table class="data-table">
       <thead><tr><th>Data / Ora</th><th>${sensor.paramnm} (${unit})</th></tr></thead>
       <tbody id="tbl-body"></tbody>
