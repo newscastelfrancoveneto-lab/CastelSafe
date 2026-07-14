@@ -2,7 +2,7 @@
 // modifica index.html (o altri asset), anche se sw.js non cambia altrimenti.
 // È l'unico modo per cui il browser rileva una nuova versione disponibile e
 // mostra il badge "Aggiornamento disponibile" nell'app.
-const APP_VERSION = '2026-07-13-1';
+const APP_VERSION = '2026-07-14-1';
 
 // Cache dedicata alle icone usate dalle notifiche: le pre-carichiamo così
 // sono sempre disponibili anche se la rete è debole/assente nel momento
@@ -70,6 +70,15 @@ self.addEventListener('push', event => {
 // Click sulla notifica: apre/focus l'app e triggera reload chiusure
 self.addEventListener('notificationclick', event => {
   event.notification.close();
+
+  if (event.notification.data?.type === 'app-update') {
+    event.waitUntil(
+      self.registration.waiting
+        ? Promise.resolve(self.registration.waiting.postMessage({ type: 'SKIP_WAITING' }))
+        : Promise.resolve()
+    );
+    return;
+  }
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {

@@ -4794,7 +4794,26 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+let updateNotificationShown = false;
+
+function notifyUpdateAvailable(reg) {
+  if (updateNotificationShown) return;
+  if (Notification.permission !== 'granted') return;
+  updateNotificationShown = true;
+
+  reg.showNotification('Aggiornamento disponibile', {
+    body: 'È disponibile una nuova versione di CastelSafe. Tocca per aggiornare.',
+    tag: 'app-update',
+    renotify: false,
+    icon: 'icon-192.png',
+    badge: 'badge-96.png',
+    data: { type: 'app-update' }
+  });
+}
+
 function showUpdateBanner(reg) {
+  notifyUpdateAvailable(reg);
+
   if (document.getElementById('update-banner')) return;
 
   const banner = document.createElement('div');
