@@ -9,7 +9,7 @@ const APP_VERSION = '2026-07-13-1';
 // esatto in cui arriva la push (es. durante un evento meteo), evitando che
 // il sistema mostri un'icona generica al posto di quella dell'app.
 const ICON_CACHE = 'castelsafe-icons-' + APP_VERSION;
-const ICON_URLS = ['icon-192.png', 'icon-512.png'];
+const ICON_URLS = ['icon-192.png', 'icon-512.png', 'badge-96.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -47,13 +47,14 @@ self.addEventListener('push', event => {
   }
 
   const iconUrl = new URL('icon-192.png', self.registration.scope).href;
+  const badgeUrl = new URL('badge-96.png', self.registration.scope).href;
   const title = data.title || 'Nuova Allerta';
   const options = {
     body: data.body || '',
     tag: data.tag || 'arpav',
     renotify: data.renotify || false,
     icon: iconUrl,
-    badge: iconUrl,
+    badge: badgeUrl,
     vibrate: [200, 100, 200],
     data: { url: data.url || '/CastelSafe/' }
   };
