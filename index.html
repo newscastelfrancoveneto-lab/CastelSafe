@@ -834,11 +834,16 @@
     body.chart-fullscreen-active .chart-box {
       position: fixed; inset: 0; z-index: 100000; background: #fff;
       display: flex; flex-direction: column;
+      box-sizing: border-box; overflow: hidden;
       padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
                 max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
     }
     body.chart-fullscreen-active .chart-wrap {
-      flex: 1; height: auto; width: auto; margin: 0;
+      flex: 1 1 0; min-height: 0; min-width: 0;
+      height: auto; width: auto; margin: 0; overflow: hidden;
+    }
+    body.chart-fullscreen-active .chart-wrap canvas {
+      max-width: 100%; max-height: 100%;
     }
     body.chart-fullscreen-active .chart-toolbar {
       margin-bottom: 4px; flex: none;
