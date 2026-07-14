@@ -613,6 +613,17 @@
 	  transition: transform 0.2s, background 0.2s;
 	}
 
+	.btn-rect-rounded.btn-attention {
+	  animation: btn-pulse-attention 1.8s ease-in-out infinite;
+	}
+	@keyframes btn-pulse-attention {
+	  0%, 100% { box-shadow: 0 4px 12px rgba(141, 2, 31, 0.2), 0 0 0 0 rgba(141, 2, 31, 0.5); }
+	  50% { box-shadow: 0 4px 12px rgba(141, 2, 31, 0.2), 0 0 0 8px rgba(141, 2, 31, 0); }
+	}
+	@media (prefers-reduced-motion: reduce) {
+	  .btn-rect-rounded.btn-attention { animation: none; }
+	}
+
 	.btn-rect-rounded:active {
 	  transform: scale(0.98);
 	}
@@ -3156,6 +3167,8 @@ async function updateSubscribeButton() {
     btn.textContent = 'Attiva Notifiche Push';
     btn.style.background = 'var(--primary)';
   }
+
+  btn.classList.toggle('btn-attention', Notification.permission === 'default');
 
   updateBellAttention();
 }
