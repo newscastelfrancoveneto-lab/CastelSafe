@@ -947,6 +947,35 @@
     .fab-btn.primary { background: #0e8a8a; color: #fff; }
     .fab-btn.primary:hover { background: #096b6b; }
 
+    /* ── Richiamo attenzione campanella notifiche non attive ── */
+    .fab-btn.bell-attention {
+      position: relative;
+      color: #dc2626;
+      animation: bell-shake 2.4s ease-in-out infinite;
+    }
+    .fab-btn.bell-attention::after {
+      content: '';
+      position: absolute;
+      top: 2px; right: 2px;
+      width: 10px; height: 10px;
+      background: #dc2626;
+      border-radius: 50%;
+      border: 2px solid #fff;
+    }
+    @keyframes bell-shake {
+      0%, 100% { transform: rotate(0); }
+      4% { transform: rotate(15deg); }
+      8% { transform: rotate(-15deg); }
+      12% { transform: rotate(10deg); }
+      16% { transform: rotate(-10deg); }
+      20% { transform: rotate(5deg); }
+      24% { transform: rotate(-5deg); }
+      28% { transform: rotate(0); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .fab-btn.bell-attention { animation: none; }
+    }
+
     /* ── BARRA ALLERTA ── */
     #allerta-bar {
       display: none;
@@ -1689,7 +1718,7 @@
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><path d="M8.59 13.51 15.42 17.49"></path><path d="M15.41 6.51 8.59 10.49"></path></svg>
     </button>
 
-	<button onclick="toggleNotificationsMenu()" class="fab-btn" title="Notifiche">
+	<button id="btn-bell" onclick="toggleNotificationsMenu()" class="fab-btn" title="Notifiche">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
     </button>
 
@@ -3127,7 +3156,19 @@ async function updateSubscribeButton() {
     btn.textContent = 'Attiva Notifiche Push';
     btn.style.background = 'var(--primary)';
   }
+
+  updateBellAttention();
 }
+
+// Anima la campanella per attirare l'attenzione finché le notifiche non sono attive
+function updateBellAttention() {
+  const bell = document.getElementById('btn-bell');
+  if (!bell) return;
+  const needsAttention = ('Notification' in window) && Notification.permission === 'default';
+  bell.classList.toggle('bell-attention', needsAttention);
+}
+
+document.addEventListener('DOMContentLoaded', updateBellAttention);
 
 
 // ── LAYER SWITCHER UNIFICATO (CUSTOM COLLAPSIBLE) ─────────────────────────────
