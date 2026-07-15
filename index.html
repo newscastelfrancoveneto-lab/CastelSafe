@@ -1251,6 +1251,232 @@
     #boot-loader-retry:hover {
       background: rgba(255,255,255,0.22);
     }
+
+    /* ── PULSANTE METEO (FAB su mappa) ── */
+    #weather-btn {
+      position: relative;
+      overflow: hidden;
+    }
+    #weather-btn.weather-stale { opacity: 0.55; }
+    .weather-icon-mini {
+      width: 36px; height: 36px; position: relative; display: block;
+    }
+    .weather-icon-mini svg { width: 100%; height: 100%; display: block; }
+
+    /* Animazioni icona meteo (condivise mini + card) */
+    .w-sun-core { transform-origin: center; animation: w-sun-pulse 3.2s cubic-bezier(.4,0,.2,1) infinite; }
+    .w-sun-rays { transform-origin: center; animation: w-sun-spin 20s linear infinite; }
+    @keyframes w-sun-pulse {
+      0%,100% { transform: scale(1); filter: brightness(1); }
+      50%     { transform: scale(1.1); filter: brightness(1.12); }
+    }
+    @keyframes w-sun-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    .w-loading-pulse { transform-origin: center; animation: w-loading-pulse 1.6s ease-in-out infinite; }
+    @keyframes w-loading-pulse {
+      0%,100% { opacity: .55; }
+      50%     { opacity: 1; }
+    }
+    .w-loading-dots circle { animation: w-loading-dot 1.2s ease-in-out infinite; }
+    .w-loading-dots circle:nth-child(2) { animation-delay: .15s; }
+    .w-loading-dots circle:nth-child(3) { animation-delay: .3s; }
+    @keyframes w-loading-dot {
+      0%, 80%, 100% { opacity: .3; transform: translateY(0); }
+      40%           { opacity: 1; transform: translateY(-2px); }
+    }
+
+    .w-moon-core { transform-origin: center; animation: w-moon-glow 4s ease-in-out infinite; }
+    @keyframes w-moon-glow {
+      0%,100% { transform: scale(1); filter: brightness(1); }
+      50%     { transform: scale(1.05); filter: brightness(1.15); }
+    }
+    .w-star { animation: w-star-twinkle 2.2s ease-in-out infinite; transform-origin: center; }
+    @keyframes w-star-twinkle {
+      0%,100% { opacity: .25; transform: scale(.8); }
+      50%     { opacity: 1; transform: scale(1.15); }
+    }
+
+    .w-cloud { animation: w-cloud-drift 5s ease-in-out infinite; transform-origin: center; }
+    @keyframes w-cloud-drift {
+      0%,100% { transform: translate(0,0); }
+      50%     { transform: translate(2.5px,-1px); }
+    }
+
+    .w-rain-drop { animation: w-rain-fall 1.05s cubic-bezier(.55,0,.85,.35) infinite; transform-origin: center; }
+    @keyframes w-rain-fall {
+      0%   { transform: translateY(-3px) scaleY(.7); opacity: 0; }
+      18%  { opacity: 1; }
+      70%  { opacity: .9; }
+      100% { transform: translateY(7px) scaleY(1.15); opacity: 0; }
+    }
+
+    .w-snow-flake { animation: w-snow-fall 2.6s ease-in-out infinite; transform-origin: center; }
+    @keyframes w-snow-fall {
+      0%   { transform: translate(0,-2px) rotate(0deg); opacity: .35; }
+      50%  { transform: translate(1.5px,2px) rotate(120deg); opacity: 1; }
+      100% { transform: translate(-1.5px,6px) rotate(240deg); opacity: .35; }
+    }
+
+    /* Il fulmine "cade" (clip-path che scopre dall'alto verso il basso, fluido),
+       lampeggia, poi "risale" scomparendo di nuovo verso l'alto, altrettanto fluido. */
+    .w-bolt {
+      transform-origin: center;
+      animation: w-bolt-strike 3.6s ease-in-out infinite;
+    }
+    @keyframes w-bolt-strike {
+      0%    { clip-path: inset(0 0 100% 0); opacity: 0; filter: brightness(1); }
+      4%    { opacity: 1; }
+      /* Caduta fluida da 100% a 0% */
+      15%   { clip-path: inset(0 0 0% 0);  filter: brightness(1.8); }
+      /* Caduto per intero: resta fermo qui a lungo per far notare bene il lampeggio */
+      19%   { filter: brightness(1); }
+      24%   { filter: brightness(1.6); }
+      28%   { filter: brightness(1); }
+      33%   { filter: brightness(1.5); }
+      37%   { filter: brightness(1); }
+      60%   { clip-path: inset(0 0 0% 0);  opacity: 1; filter: brightness(1); }
+      /* Risalita fluida verso l'alto */
+      80%   { clip-path: inset(100% 0 0 0); opacity: 0; }
+      100%  { clip-path: inset(0 0 100% 0); opacity: 0; }
+    }
+
+    .w-fog-line { animation: w-fog-drift 3.4s ease-in-out infinite; transform-origin: center; }
+    .w-fog-line:nth-child(2) { animation-delay: .4s; }
+    .w-fog-line:nth-child(3) { animation-delay: .8s; }
+    @keyframes w-fog-drift {
+      0%,100% { transform: translateX(-2px); opacity: .5; }
+      50%     { transform: translateX(2px); opacity: 1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .w-sun-core, .w-sun-rays, .w-cloud, .w-rain-drop, .w-snow-flake, .w-bolt, .w-fog-line,
+      .w-moon-core, .w-star, .w-loading-pulse, .w-loading-dots circle {
+        animation: none !important;
+      }
+    }
+
+    /* ── MODALE PREVISIONI METEO ── */
+    #weather-modal .modal-box {
+      max-width: 640px; padding: 0; overflow: hidden;
+      display: flex; flex-direction: column; max-height: 88vh;
+    }
+    #weather-modal .modal-close-btn {
+      background: rgba(255,255,255,.22); color: #fff; z-index: 2;
+    }
+    #weather-modal .modal-close-btn:hover { background: rgba(255,255,255,.35); color: #fff; }
+
+    .weather-hero {
+      position: relative;
+      padding: 26px 22px 28px;
+      color: #fff;
+      /* Stessa palette verde acqua usata nel pannello dati ARPAV (stazioni) */
+      background: linear-gradient(135deg, #0e8a8a, #096b6b);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .weather-hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(120% 90% at 15% 0%, rgba(255,255,255,.16), transparent 60%);
+      pointer-events: none;
+    }
+
+    .weather-hero-top {
+      position: relative; display: flex; align-items: center; gap: 14px;
+    }
+    .weather-hero-icon {
+      width: 66px; height: 66px; flex-shrink: 0;
+      filter: drop-shadow(0 4px 10px rgba(0,0,0,0.2));
+    }
+    .weather-hero-zone { font-size: 1.05rem; font-weight: 800; letter-spacing: -0.01em; }
+    .weather-hero-subtitle { font-size: 0.76rem; opacity: 0.85; margin-top: 2px; }
+    .weather-hero-cielo { font-size: 0.86rem; font-weight: 600; margin-top: 8px; opacity: 0.96; }
+    .weather-hero-temp { font-size: 1.9rem; font-weight: 800; margin-top: 2px; letter-spacing: -0.02em; }
+    .weather-hero-temp span { font-size: 1rem; font-weight: 600; opacity: 0.85; margin-left: 6px; }
+
+    .weather-body { padding: 14px 20px 20px; overflow-y: auto; }
+
+    .weather-emission {
+      font-size: 0.76rem; color: #096b6b;
+      background: #e0f2f1; border: 1px solid #b2dfdb; border-radius: 12px;
+      padding: 9px 14px;
+    }
+    .weather-emission.weather-emission-stale {
+      background: #fff7ed; color: #b45309; border-color: #fdba74;
+    }
+    .weather-emission strong { color: #096b6b; }
+    .weather-emission.weather-emission-stale strong { color: #9a3412; }
+    .weather-emission, .weather-attribution { display: flex; align-items: center; gap: 6px; }
+    .w-inline-icon { width: 14px; height: 14px; flex-shrink: 0; vertical-align: -2px; }
+    .weather-day-card .wd-prob .w-inline-icon { width: 11px; height: 11px; }
+
+    .weather-days-scroller {
+      display: flex; gap: 12px; overflow-x: auto;
+      padding: 18px 20px 16px;
+      margin: 14px -20px 0;
+      background: #f8fafc;
+      border-top: 1px solid #e2e8f0;
+      border-bottom: 1px solid #e2e8f0;
+      scroll-padding-left: 20px;
+      -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
+    }
+    .weather-day-card {
+      scroll-snap-align: start;
+      flex: 0 0 auto; width: 152px;
+      position: relative;
+      background: #fff;
+      border: 1px solid #e2e8f0; border-radius: 18px;
+      box-shadow: 0 2px 10px rgba(15,23,42,0.05);
+      padding: 18px 12px 14px; text-align: center;
+      animation: w-card-in .4s cubic-bezier(.2,.8,.2,1) both;
+      transition: transform .2s ease, box-shadow .2s ease;
+      overflow: hidden;
+    }
+    .weather-day-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+      background: #0e8a8a;
+    }
+    .weather-day-card.wd-current {
+      background: #f0faf9;
+      border-color: #b2dfdb;
+    }
+    .weather-day-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 26px rgba(15,23,42,0.12);
+    }
+    @keyframes w-card-in {
+      from { opacity: 0; transform: translateY(14px) scale(.96); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .weather-day-card .wd-label { font-size: 0.8rem; font-weight: 800; text-transform: uppercase; color: var(--text-main); letter-spacing: .03em; }
+    .weather-day-card .wd-fascia {
+      display: inline-block; margin-top: 4px; margin-bottom: 6px;
+      font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+      color: #096b6b; background: #e0f2f1;
+      border-radius: 999px; padding: 2px 8px;
+    }
+    .weather-day-card .wd-icon { width: 56px; height: 56px; margin: 2px auto 6px; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.1)); }
+    .weather-day-card .wd-cielo { font-size: 0.78rem; color: var(--text-main); font-weight: 600; line-height: 1.3; min-height: 2.4em; }
+    .weather-day-card .wd-temp { font-size: 1.05rem; font-weight: 800; color: var(--text-main); margin-top: 8px; }
+    .weather-day-card .wd-prec { font-size: 0.72rem; color: var(--text-muted); margin-top: 6px; line-height: 1.4; min-height: 2em; }
+    .weather-day-card .wd-prob {
+      display: inline-flex; align-items: center; gap: 3px;
+      margin-top: 8px; font-size: 0.7rem; font-weight: 700; color: #fff;
+      background: #0e8a8a; border-radius: 999px; padding: 3px 10px;
+    }
+    .weather-day-card .wd-attend { font-size: 0.64rem; color: var(--text-muted); margin-top: 8px; font-style: italic; }
+
+    .weather-attribution {
+      margin-top: 14px; font-size: 0.72rem; color: var(--text-muted);
+      display: flex; align-items: flex-start; gap: 6px; line-height: 1.5;
+    }
+    .weather-error-box { margin: 14px 20px 0; }
+
+    @media (max-width: 640px) {
+      .weather-hero { padding: 22px 18px 24px; }
+      .weather-body { padding: 14px 16px 16px; }
+      .weather-days-scroller { padding: 18px 16px 10px; margin: 0 -16px; }
+    }
   </style>
 </head>
 <body>
@@ -1608,6 +1834,37 @@
       La pagina di gestione avvisi è riservata agli operatori autorizzati.
       <a href="./admin.html" target="_blank" rel="noopener noreferrer">Apri pagina admin</a>
     </p>
+  </div>
+</div>
+
+<div id="weather-modal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal-box">
+    <button class="modal-close-btn" onclick="document.getElementById('weather-modal').classList.remove('open')" title="Chiudi">✕</button>
+
+    <div id="weather-hero" class="weather-hero">
+      <div class="weather-hero-top">
+        <div id="weather-modal-icon" class="weather-hero-icon"></div>
+        <div>
+          <div class="weather-hero-zone">Treviso e pianura orientale</div>
+          <div class="weather-hero-subtitle">Previsioni ARPAV · Castelfranco Veneto</div>
+        </div>
+      </div>
+      <div id="weather-hero-cielo" class="weather-hero-cielo">Caricamento…</div>
+      <div id="weather-hero-temp" class="weather-hero-temp"></div>
+    </div>
+
+    <div class="weather-body">
+      <div id="weather-emission" class="weather-emission">Caricamento previsioni…</div>
+
+      <div id="weather-days-scroller" class="weather-days-scroller"></div>
+
+      <div id="weather-error" class="weather-error-box"></div>
+
+      <div class="weather-attribution">
+        <svg class="w-inline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="19" r="1.3" fill="currentColor" stroke="none"/><path d="M8.2 19a3.8 3.8 0 0 1 7.6 0"/><path d="M5 19a7 7 0 0 1 14 0"/></svg>
+        Fonte: <strong>ARPAV</strong> (CC BY 3.0) — previsioni non validate per la zona, non sostituiscono i bollettini di allerta ufficiali.
+      </div>
+    </div>
   </div>
 </div>
 
@@ -3208,6 +3465,10 @@ const LayerSwitcher = L.Control.extend({
         </svg>
       </button>
 
+      <button id="weather-btn" class="layer-control-toggle" title="Previsioni meteo">
+        <span id="weather-btn-icon" class="weather-icon-mini"></span>
+      </button>
+
       <div class="layer-control-menu">
         <div class="layer-control-header">Livelli Mappa</div>
 
@@ -3301,6 +3562,13 @@ const LayerSwitcher = L.Control.extend({
     });
 
     map.on('click', () => menu.classList.remove('open'));
+
+    const weatherBtn = container.querySelector('#weather-btn');
+    weatherBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openWeatherModal();
+    });
+
     return container;
   }
 });
@@ -3600,6 +3868,449 @@ async function fetchText(url, maxRetries = 2, delayMs = 800, options = {}) {
     if (!bypassCache) delete xmlInFlight[cacheKey];
   }
 }
+
+
+// ── METEO ARPAV: bollettino previsioni (bottone + modale) ─────────────────────
+const WEATHER_XML_URL = 'https://meteo.arpa.veneto.it/meteo/bollettini/it/xml/bollettino_utenti.xml';
+const WEATHER_ZONE_NAME = "Treviso e pianura orientale";
+const WEATHER_STALE_MS = 26 * 60 * 60 * 1000; // 26h, come da guardia raccomandata
+const WEATHER_REFRESH_MS = 20 * 60 * 1000;
+const WEATHER_MESI = {
+  gennaio: 1, febbraio: 2, marzo: 3, aprile: 4, maggio: 5, giugno: 6,
+  luglio: 7, agosto: 8, settembre: 9, ottobre: 10, novembre: 11, dicembre: 12
+};
+
+let weatherState = null; // { emissione: Date, scadenze: [...] }
+let weatherLoadingPromise = null;
+
+async function fetchWeatherXml() {
+  const cacheKey = WEATHER_XML_URL;
+  const cached = xmlCache[cacheKey];
+  if (cached && (Date.now() - cached.ts) < ARPAV_CACHE_MAX_AGE_MS) return cached.data;
+
+  const bust = `${WEATHER_XML_URL}?t=${Date.now()}`;
+  try {
+    const text = await fetchXmlSource(bust, 9000);
+    setArpavCache(cacheKey, text);
+    return text;
+  } catch (_) {
+    // Fallback via proxy CORS se la chiamata diretta fallisce
+    for (const proxy of PROXIES) {
+      try {
+        const r = await fetch(proxy + encodeURIComponent(bust), { signal: AbortSignal.timeout(9000) });
+        if (!r.ok) continue;
+        const buf = await r.arrayBuffer();
+        const text = decodeXml(buf);
+        if (text) { setArpavCache(cacheKey, text); return text; }
+      } catch (_) {}
+    }
+    const stale = getPersistentArpavCacheEntry(cacheKey, ARPAV_CACHE_FALLBACK_MAX_AGE_MS);
+    if (stale?.data) return stale.data;
+    throw new Error('Impossibile caricare le previsioni ARPAV');
+  }
+}
+
+function parseWeatherXml(text) {
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  if (doc.querySelector('parsererror')) throw new Error('XML previsioni non valido');
+
+  const emissioneRaw = doc.querySelector('data_emissione')?.getAttribute('date') || '';
+  const emMatch = emissioneRaw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4}) alle (\d{1,2}):(\d{2})/);
+  const emissione = emMatch
+    ? new Date(+emMatch[3], +emMatch[2] - 1, +emMatch[1], +emMatch[4], +emMatch[5])
+    : null;
+
+  const zone = Array.from(doc.querySelectorAll('meteogramma'))
+    .find(m => m.getAttribute('name') === WEATHER_ZONE_NAME);
+  if (!zone) throw new Error(`Zona "${WEATHER_ZONE_NAME}" non trovata nel bollettino`);
+
+  const scadenze = Array.from(zone.querySelectorAll('scadenza')).map(s => {
+    const raw = s.getAttribute('data') || '';
+    const m = raw.match(/^(\w+)\s+(\d{1,2})\s+(\w+)(?:\s+(mattina|pomeriggio))?$/i);
+
+    const p = {};
+    s.querySelectorAll('previsione').forEach(e => {
+      p[e.getAttribute('title')] = e.getAttribute('value') || '';
+    });
+
+    let data = null;
+    if (m && emissione) {
+      const giorno = +m[2];
+      const mese = WEATHER_MESI[m[3].toLowerCase()];
+      let anno = emissione.getFullYear();
+      if (mese && mese < (emissione.getMonth() + 1)) anno += 1; // rollover capodanno
+      if (mese) data = new Date(anno, mese - 1, giorno);
+    }
+
+    const tempRaw = p['Temperatura'] || '';
+    const tempMatch = tempRaw.match(/(min|max)\s+(\d+)(?:\/(\d+))?\s*C/i);
+
+    const probRaw = p["Probabilita' precipitazione"] || '';
+    const prob = probRaw.endsWith('%') ? parseInt(probRaw, 10) : null;
+
+    return {
+      dataLabel: raw,
+      data,
+      giornoSettimana: m ? m[1] : '',
+      fascia: m ? (m[4] || null) : null,
+      simbolo: p['Simbolo'] || '',
+      cielo: p['Cielo'] || '',
+      temp: tempMatch ? { tipo: tempMatch[1], lo: +tempMatch[2], hi: +(tempMatch[3] || tempMatch[2]) } : null,
+      precipitazioni: p['Precipitazioni'] || '',
+      quotaNeve: p['Quota neve'] || '',
+      probabilita: prob,
+      attendibilita: p["Attendibilita'"] || ''
+    };
+  });
+
+  return { emissione, scadenze };
+}
+
+async function loadWeather(force = false) {
+  if (weatherLoadingPromise && !force) return weatherLoadingPromise;
+  weatherLoadingPromise = (async () => {
+    const text = await fetchWeatherXml();
+    const parsed = parseWeatherXml(text);
+    weatherState = parsed;
+    renderWeatherButton();
+    if (document.getElementById('weather-modal')?.classList.contains('open')) {
+      renderWeatherModal();
+    }
+    return parsed;
+  })().finally(() => { weatherLoadingPromise = null; });
+  return weatherLoadingPromise;
+}
+
+// Classifica cielo/precipitazioni testuali in una categoria icona
+function weatherIconCategory(cielo, prec) {
+  const t = `${cielo} ${prec}`.toLowerCase();
+  if (/temporal/.test(t)) return 'temporale';
+  if (/neve/.test(t)) return 'neve';
+  if (/nebbia|foschia/.test(t)) return 'nebbia';
+  if (/rovesci|pioggia|piovosc/.test(t)) return 'pioggia';
+  if (/coperto|nuvoloso/.test(t)) return 'nuvoloso';
+  if (/poco nuvoloso|variabile|schiarit/.test(t)) return 'poco-nuvoloso';
+  if (/sereno/.test(t)) return 'sereno';
+  return 'poco-nuvoloso';
+}
+
+// Piccole icone SVG inline per sostituire le emoji nell'interfaccia
+const WEATHER_GLYPHS = {
+  calendar: `<svg class="w-inline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="16" y1="2.5" x2="16" y2="6.5"/></svg>`,
+  warning: `<svg class="w-inline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 22 20.5H2z"/><line x1="12" y1="9.5" x2="12" y2="14"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/></svg>`,
+  drop: `<svg class="w-inline-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5c3.5 5 7 9 7 13a7 7 0 0 1-14 0c0-4 3.5-8 7-13z"/></svg>`,
+  broadcast: `<svg class="w-inline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="19" r="1.3" fill="currentColor" stroke="none"/><path d="M8.2 19a3.8 3.8 0 0 1 7.6 0"/><path d="M5 19a7 7 0 0 1 14 0"/></svg>`
+};
+
+let weatherIconUid = 0;
+
+// Numero di gocce/fiocchi in scena in base alla probabilità di pioggia (0-100).
+// Senza dato disponibile si usa una densità media di default.
+function weatherDropCount(prob, min, max) {
+  if (prob == null) return Math.round((min + max) / 2);
+  const t = Math.max(0, Math.min(100, prob)) / 100;
+  return Math.max(min, Math.min(max, Math.round(min + t * (max - min))));
+}
+
+// Icona per il bottone mentre le previsioni non sono ancora arrivate:
+// una nuvola con un piccolo sole, in stile identico alle altre icone ma
+// grigia e pulsante, cosi si capisce che e' meteo "in caricamento" e non
+// una condizione reale (es. sempre "poco nuvoloso").
+function weatherLoadingIconSvg() {
+  return `
+    <svg viewBox="-6 -6 60 60" fill="none">
+      <defs>
+        <linearGradient id="wload-cloud" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#e2e8f0"/>
+          <stop offset="100%" stop-color="#cbd5e1"/>
+        </linearGradient>
+      </defs>
+      <g class="w-loading-pulse">
+        <circle cx="18" cy="15" r="7.5" fill="none" stroke="#cbd5e1" stroke-width="2.2" stroke-dasharray="3 4"/>
+        <path d="M14 37a8 8 0 0 1 1-16 10 10 0 0 1 19 3 7 7 0 0 1-2 13H14z" fill="url(#wload-cloud)"/>
+      </g>
+      <g class="w-loading-dots" fill="#94a3b8">
+        <circle cx="15" cy="40" r="1.6"/>
+        <circle cx="24" cy="40" r="1.6"/>
+        <circle cx="33" cy="40" r="1.6"/>
+      </g>
+    </svg>`;
+}
+
+function weatherIconSvg(category, prob = null) {
+  const uid = `w${(weatherIconUid++).toString(36)}`;
+  const defs = `
+    <defs>
+      <radialGradient id="${uid}-sun" cx="35%" cy="30%" r="75%">
+        <stop offset="0%" stop-color="#fde68a"/>
+        <stop offset="55%" stop-color="#fbbf24"/>
+        <stop offset="100%" stop-color="#f59e0b"/>
+      </radialGradient>
+      <radialGradient id="${uid}-moon" cx="38%" cy="32%" r="75%">
+        <stop offset="0%" stop-color="#f1f5f9"/>
+        <stop offset="55%" stop-color="#cbd5e1"/>
+        <stop offset="100%" stop-color="#94a3b8"/>
+      </radialGradient>
+      <linearGradient id="${uid}-cloud" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#f1f5f9"/>
+        <stop offset="100%" stop-color="#cbd5e1"/>
+      </linearGradient>
+      <linearGradient id="${uid}-cloud-dark" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#94a3b8"/>
+        <stop offset="100%" stop-color="#64748b"/>
+      </linearGradient>
+      <linearGradient id="${uid}-drop" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#60a5fa"/>
+        <stop offset="100%" stop-color="#2563eb"/>
+      </linearGradient>
+      <filter id="${uid}-glow" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDeviation="1.6" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>`;
+
+  // Nuvola "piena" (rettangolo arrotondato + gobbe) con un ingombro orizzontale
+  // noto (~x:6-40), così gocce/fiocchi possono restare sempre al suo interno.
+  const cloudShape = (fillRef, y = 24, extraClass = '') => `
+    <g class="w-cloud ${extraClass}">
+      <rect x="6" y="${y}" width="32" height="12" rx="6" fill="${fillRef}"/>
+      <circle cx="14" cy="${y}" r="7" fill="${fillRef}"/>
+      <circle cx="23" cy="${y - 6}" r="10" fill="${fillRef}"/>
+      <circle cx="33" cy="${y}" r="7" fill="${fillRef}"/>
+    </g>`;
+
+  // Gocce/fiocchi distribuiti dentro [xMin, xMax], sempre entro i bordi della nuvola.
+  const spreadX = (n, xMin, xMax) => {
+    const xs = [];
+    for (let i = 0; i < n; i++) xs.push(n === 1 ? (xMin + xMax) / 2 : xMin + ((xMax - xMin) / (n - 1)) * i);
+    return xs;
+  };
+
+  const rainDrops = (n, y0, y1, xMin = 13, xMax = 33) =>
+    spreadX(n, xMin, xMax).map((x, i) => `
+      <g class="w-rain-drop" style="animation-delay:${(i * 0.16).toFixed(2)}s">
+        <line x1="${x.toFixed(1)}" y1="${y0}" x2="${(x - 1.5).toFixed(1)}" y2="${y1}" stroke="url(#${uid}-drop)"
+              stroke-width="2.6" stroke-linecap="round"/>
+      </g>`).join('');
+
+  const snowFlakes = (n, xMin = 13, xMax = 33) =>
+    spreadX(n, xMin, xMax).map((x, i) => `
+      <circle class="w-snow-flake" style="animation-delay:${(i * 0.35).toFixed(2)}s"
+              cx="${x.toFixed(1)}" cy="${37 + (i % 2 ? 2 : -2)}" r="2.3" fill="#bfdbfe"/>`).join('');
+
+  const sunRays = (cx, cy, len, count, stroke) => {
+    let out = '';
+    for (let i = 0; i < count; i++) {
+      const a = (Math.PI * 2 * i) / count;
+      const r1 = len, r2 = len + 6;
+      out += `<line x1="${(cx + Math.cos(a) * r1).toFixed(1)}" y1="${(cy + Math.sin(a) * r1).toFixed(1)}"
+                    x2="${(cx + Math.cos(a) * r2).toFixed(1)}" y2="${(cy + Math.sin(a) * r2).toFixed(1)}"
+                    stroke="${stroke}" stroke-width="2.4" stroke-linecap="round"/>`;
+    }
+    return out;
+  };
+
+  // Luna a falce con un paio di stelle che sfarfallano, per il "sereno" notturno
+  const moonAndStars = (cx, cy, r, stars) => `
+    <g class="w-moon-core">
+      <path d="M${cx - r * 0.35} ${cy - r}
+               a${r} ${r} 0 1 0 0 ${r * 2}
+               a${r * 0.78} ${r * 0.78} 0 0 1 0 -${r * 2}z"
+            fill="url(#${uid}-moon)" filter="url(#${uid}-glow)"/>
+    </g>
+    <g fill="#f8fafc">
+      ${stars.map((s, i) => `<circle class="w-star" style="animation-delay:${(i * 0.6).toFixed(2)}s" cx="${s[0]}" cy="${s[1]}" r="${s[2]}"/>`).join('')}
+    </g>`;
+
+  const svgs = {
+    'sereno': `
+      <svg viewBox="-6 -6 60 60" fill="none">
+        ${defs}
+        <g class="w-sun-rays">${sunRays(24, 24, 12, 8, '#f59e0b')}</g>
+        <circle class="w-sun-core" cx="24" cy="24" r="11" fill="url(#${uid}-sun)" filter="url(#${uid}-glow)"/>
+      </svg>`,
+    'sereno-notte': `
+      <svg viewBox="-6 -6 60 60" fill="none">
+        ${defs}
+        ${moonAndStars(23, 22, 11, [[38, 10, 1.4], [10, 16, 1], [40, 30, 1]])}
+      </svg>`,
+    'poco-nuvoloso': `
+      <svg viewBox="-6 -6 60 60" fill="none">
+        ${defs}
+        <g class="w-sun-rays">${sunRays(18, 17, 8, 6, '#f59e0b')}</g>
+        <circle class="w-sun-core" cx="18" cy="17" r="7.5" fill="url(#${uid}-sun)" filter="url(#${uid}-glow)"/>
+        <path class="w-cloud" d="M14 39a8 8 0 0 1 1-16 10 10 0 0 1 19 3 7 7 0 0 1-2 13H14z" fill="url(#${uid}-cloud)"/>
+      </svg>`,
+    'poco-nuvoloso-notte': `
+      <svg viewBox="-6 -6 60 60" fill="none">
+        ${defs}
+        ${moonAndStars(17, 16, 7, [[36, 8, 1.2], [6, 12, 0.9]])}
+        <path class="w-cloud" d="M14 39a8 8 0 0 1 1-16 10 10 0 0 1 19 3 7 7 0 0 1-2 13H14z" fill="url(#${uid}-cloud)"/>
+      </svg>`,
+    'nuvoloso': `
+      <svg viewBox="-6 -6 60 60" fill="none">
+        ${defs}
+        ${cloudShape(`url(#${uid}-cloud)`, 24)}
+      </svg>`,
+    'pioggia': `
+      <svg viewBox="-6 -6 60 60" fill="none">
+        ${defs}
+        ${cloudShape(`url(#${uid}-cloud)`, 20)}
+        ${rainDrops(weatherDropCount(prob, 2, 6), 34, 43)}
+      </svg>`,
+    'temporale': `
+      <svg viewBox="-6 -6 60 60" fill="none">
+        ${defs}
+        ${cloudShape(`url(#${uid}-cloud-dark)`, 19)}
+        ${(() => {
+          const n = weatherDropCount(prob, 2, 4);
+          const left = Math.ceil(n / 2), right = n - left;
+          return rainDrops(left, 32, 39, 14, 18) + rainDrops(right, 32, 39, 28, 32);
+        })()}
+        <polygon class="w-bolt" points="26,23 19,36 24,36 21,44 33,29 27,29 30,23"
+                 fill="#fbbf24" filter="url(#${uid}-glow)"/>
+      </svg>`,
+    'neve': `
+      <svg viewBox="-6 -6 60 60" fill="none">
+        ${defs}
+        ${cloudShape(`url(#${uid}-cloud)`, 20)}
+        ${snowFlakes(weatherDropCount(prob, 3, 6), 13, 33)}
+      </svg>`,
+    'nebbia': `
+      <svg viewBox="-6 -6 60 60" fill="none">
+        ${defs}
+        <circle cx="20" cy="14" r="8" fill="url(#${uid}-cloud)" opacity=".8"/>
+        <g stroke="#94a3b8" stroke-width="2.6" stroke-linecap="round">
+          <line class="w-fog-line" x1="6" y1="25" x2="42" y2="25"/>
+          <line class="w-fog-line" x1="10" y1="32" x2="38" y2="32"/>
+          <line class="w-fog-line" x1="6" y1="39" x2="42" y2="39"/>
+        </g>
+      </svg>`
+  };
+  return svgs[category] || svgs['poco-nuvoloso'];
+}
+
+function isWeatherStale() {
+  if (!weatherState?.emissione) return true;
+  return (Date.now() - weatherState.emissione.getTime()) > WEATHER_STALE_MS;
+}
+
+// Giorno/notte in base all'orario reale del dispositivo (approssimazione fissa,
+// non calcola alba/tramonto): usato solo per l'icona del meteo "adesso" nel
+// bottone, non per le schede giorno/pomeriggio che sono previsioni diurne.
+function isNightNow() {
+  const h = new Date().getHours();
+  return h < 6 || h >= 21;
+}
+
+function nightAwareCategory(cat) {
+  if (isNightNow() && (cat === 'sereno' || cat === 'poco-nuvoloso')) return `${cat}-notte`;
+  return cat;
+}
+
+function renderWeatherButton() {
+  const iconEl = document.getElementById('weather-btn-icon');
+  const btnEl = document.getElementById('weather-btn');
+  if (!iconEl) return;
+
+  if (!weatherState?.scadenze?.length) {
+    iconEl.innerHTML = weatherLoadingIconSvg();
+    return;
+  }
+  const first = weatherState.scadenze[0];
+  const cat = weatherIconCategory(first.cielo, first.precipitazioni);
+  iconEl.innerHTML = weatherIconSvg(nightAwareCategory(cat), first.probabilita);
+  btnEl?.classList.toggle('weather-stale', isWeatherStale());
+}
+
+function formatWeatherDayLabel(s) {
+  if (!s.data) return s.giornoSettimana || s.dataLabel;
+  const giorni = ['dom','lun','mar','mer','gio','ven','sab'];
+  return `${giorni[s.data.getDay()]} ${s.data.getDate()}`;
+}
+
+function renderWeatherModal() {
+  const emEl = document.getElementById('weather-emission');
+  const iconEl = document.getElementById('weather-modal-icon');
+  const heroEl = document.getElementById('weather-hero');
+  const cieloEl = document.getElementById('weather-hero-cielo');
+  const tempEl = document.getElementById('weather-hero-temp');
+  const scrollerEl = document.getElementById('weather-days-scroller');
+  const errEl = document.getElementById('weather-error');
+  if (!emEl || !scrollerEl) return;
+
+  errEl.innerHTML = '';
+
+  if (!weatherState?.scadenze?.length) {
+    emEl.textContent = 'Nessuna previsione disponibile.';
+    cieloEl.textContent = '';
+    tempEl.textContent = '';
+    scrollerEl.innerHTML = '';
+    return;
+  }
+
+  const stale = isWeatherStale();
+  const first = weatherState.scadenze[0];
+  const firstCat = weatherIconCategory(first.cielo, first.precipitazioni);
+  iconEl.innerHTML = weatherIconSvg(nightAwareCategory(firstCat), first.probabilita);
+
+  cieloEl.textContent = first.cielo || '—';
+  tempEl.innerHTML = first.temp
+    ? `${first.temp.lo}${first.temp.hi !== first.temp.lo ? '–' + first.temp.hi : ''}°<span>${first.temp.tipo === 'max' ? 'max' : 'min'}${first.fascia ? ' ' + first.fascia : ''}</span>`
+    : '';
+
+  const emStr = weatherState.emissione
+    ? weatherState.emissione.toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : 'sconosciuta';
+
+  emEl.classList.toggle('weather-emission-stale', stale);
+  emEl.innerHTML = stale
+    ? `${WEATHER_GLYPHS.warning}<strong>Dato non aggiornato</strong> — emesso il ${emStr}`
+    : `${WEATHER_GLYPHS.calendar}Emesso il <strong>${emStr}</strong>`;
+
+  scrollerEl.innerHTML = weatherState.scadenze.map((s, i) => {
+    const cat = weatherIconCategory(s.cielo, s.precipitazioni);
+    const tempStr = s.temp
+      ? `${s.temp.tipo === 'max' ? 'Max' : 'Min'} ${s.temp.lo}${s.temp.hi !== s.temp.lo ? '/' + s.temp.hi : ''}°C`
+      : '';
+    return `
+      <div class="weather-day-card${i === 0 ? ' wd-current' : ''}" style="animation-delay:${i * 0.05}s">
+        <div class="wd-label">${formatWeatherDayLabel(s)}</div>
+        <div class="wd-fascia">${s.fascia ? (s.fascia === 'mattina' ? 'Mattina' : 'Pomeriggio') : 'Giornata'}</div>
+        <div class="wd-icon">${weatherIconSvg(cat, s.probabilita)}</div>
+        <div class="wd-cielo">${s.cielo || '—'}</div>
+        ${tempStr ? `<div class="wd-temp">${tempStr}</div>` : ''}
+        ${s.precipitazioni ? `<div class="wd-prec">${s.precipitazioni}</div>` : ''}
+        ${s.probabilita != null ? `<div class="wd-prob">${WEATHER_GLYPHS.drop}${s.probabilita}%</div>` : ''}
+        ${s.attendibilita ? `<div class="wd-attend">Attendibilità: ${s.attendibilita}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function openWeatherModal() {
+  document.getElementById('weather-modal')?.classList.add('open');
+  if (weatherState) {
+    renderWeatherModal();
+  } else {
+    document.getElementById('weather-modal-icon').innerHTML = weatherLoadingIconSvg();
+    document.getElementById('weather-hero-cielo').textContent = 'Caricamento…';
+    document.getElementById('weather-hero-temp').textContent = '';
+    document.getElementById('weather-emission').textContent = 'Caricamento previsioni…';
+    document.getElementById('weather-days-scroller').innerHTML = '';
+  }
+  loadWeather().catch(err => {
+    const errEl = document.getElementById('weather-error');
+    if (errEl) errEl.innerHTML = `<div class="error-box">${err.message || 'Errore nel caricamento delle previsioni ARPAV.'}</div>`;
+    if (!weatherState) document.getElementById('weather-emission').textContent = 'Previsioni non disponibili.';
+  });
+}
+
+const weatherBtnIconInit = document.getElementById('weather-btn-icon');
+if (weatherBtnIconInit) weatherBtnIconInit.innerHTML = weatherLoadingIconSvg();
+
+loadWeather().catch(() => {});
+setInterval(() => loadWeather(true).catch(() => {}), WEATHER_REFRESH_MS);
 
 
 function scheduleStaleRetry(stn, sensors) {
