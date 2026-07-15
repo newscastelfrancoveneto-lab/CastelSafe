@@ -835,9 +835,17 @@
     .chart-wrap { position: relative; height: 200px; margin-bottom: 16px; }
 
     .chart-box { position: relative; }
-    .chart-toolbar { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+    .chart-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+
+    .chart-source-badge {
+      font-size: 0.7rem; font-weight: 600; color: var(--text-muted);
+      background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 999px;
+      padding: 3px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    body.chart-fullscreen-active .chart-source-badge { display: none; }
 
     .chart-fullscreen-btn {
+      flex-shrink: 0;
       width: 32px; height: 32px; border-radius: 8px; border: 1px solid #e2e8f0;
       background: #fff; color: var(--text-main);
       display: flex; align-items: center; justify-content: center;
@@ -1196,6 +1204,11 @@
     .leaflet-bar { border: none !important; box-shadow: var(--shadow-soft) !important; border-radius: 8px !important; overflow: hidden; }
     .leaflet-bar a { background-color: #fff !important; color: var(--text-main) !important; width: 36px !important; height: 36px !important; line-height: 36px !important; transition: background 0.2s; }
     .leaflet-bar a:hover { background-color: #f8fafc !important; color: var(--primary) !important; }
+    /* Leaflet mette gli angoli bottom flush a bottom:0: su Android con la
+       barra dei gesti, controlli qui (es. zoom, bottomright) finivano mezzi
+       coperti/tagliati. Li solleviamo della safe-area, come già fatto per
+       l'attribuzione qui sotto. */
+    .leaflet-bottom { bottom: max(10px, env(safe-area-inset-bottom)) !important; }
     /* Pillola centrata in basso, staccata dal flusso degli angoli Leaflet:
        resta sempre leggibile/cliccabile (richiesto dalla licenza OSM) ma non
        compete più con gli angoli della mappa. Il gap tra bottom qui (safe-area)
@@ -2231,7 +2244,10 @@ const TYPE_COLOR = {
 };
 
 function chartFullscreenBtnHtml() {
-  return `<div class="chart-toolbar"><button type="button" class="chart-fullscreen-btn" onclick="toggleChartFullscreen()" title="Schermo intero">⛶</button></div>`;
+  return `<div class="chart-toolbar">
+    <span class="chart-source-badge">Fonte: ARPAV</span>
+    <button type="button" class="chart-fullscreen-btn" onclick="toggleChartFullscreen()" title="Schermo intero">⛶</button>
+  </div>`;
 }
 
 async function toggleChartFullscreen() {
