@@ -716,7 +716,11 @@
     body { font-family: 'Inter', 'Segoe UI', system-ui, Arial, sans-serif; color: var(--text-main); }
 
     /* ── STRUTTURA PRINCIPALE ── */
-    #app { display: flex; flex-direction: column; height: 100vh; position: relative; background: transparent; }
+    /* 100vh su Android/Chrome mobile include l'area dietro la barra degli
+       indirizzi dinamica: il contenuto risultava più alto dello schermo
+       visibile e la roba in fondo (zoom, attribuzione) finiva fuori vista
+       finché la barra non si nascondeva. 100dvh segue l'altezza reale visibile. */
+    #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; position: relative; background: transparent; }
     #map { position: absolute; inset: 0; z-index: 0; }
 
     /* ── PANNELLO DATI (FULLSCREEN) ── */
@@ -1192,7 +1196,30 @@
     .leaflet-bar { border: none !important; box-shadow: var(--shadow-soft) !important; border-radius: 8px !important; overflow: hidden; }
     .leaflet-bar a { background-color: #fff !important; color: var(--text-main) !important; width: 36px !important; height: 36px !important; line-height: 36px !important; transition: background 0.2s; }
     .leaflet-bar a:hover { background-color: #f8fafc !important; color: var(--primary) !important; }
-    .leaflet-control-attribution { border-radius: 4px 0 0 0; background: rgba(255,255,255,0.8) !important; backdrop-filter: blur(4px); color: var(--text-muted) !important; font-size: 10px !important; }
+    /* Pillola centrata in basso, staccata dal flusso degli angoli Leaflet:
+       resta sempre leggibile/cliccabile (richiesto dalla licenza OSM) ma non
+       compete più con gli angoli della mappa. Il gap tra bottom qui (safe-area)
+       e i banner installa/aggiorna (bottom:80px) evita che questi ci finiscano sopra. */
+    .leaflet-control-attribution {
+      position: fixed !important;
+      left: 50% !important; right: auto !important; top: auto !important;
+      bottom: max(10px, env(safe-area-inset-bottom)) !important;
+      transform: translateX(-50%);
+      margin: 0 !important;
+      z-index: 500;
+      background: rgba(255,255,255,0.92) !important;
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+      border: 1px solid rgba(15,23,42,0.06);
+      border-radius: 999px !important;
+      padding: 5px 14px !important;
+      box-shadow: 0 2px 10px rgba(15,23,42,0.12);
+      color: var(--text-muted) !important;
+      font-size: 10.5px !important;
+      line-height: 1.4;
+      max-width: calc(100vw - 24px);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .leaflet-control-attribution a { color: var(--text-muted) !important; text-decoration: underline; }
 
     /* ── SCHERMATA DI CARICAMENTO INIZIALE ── */
     #boot-loader {
