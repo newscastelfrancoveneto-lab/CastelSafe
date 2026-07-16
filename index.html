@@ -4025,10 +4025,10 @@ const WEATHER_MESI = {
 let weatherState = null; // { emissione: Date, scadenze: [...] }
 let weatherLoadingPromise = null;
 
-async function fetchWeatherXml() {
+async function fetchWeatherXml(force = false) {
   const cacheKey = WEATHER_XML_URL;
   const cached = xmlCache[cacheKey];
-  if (cached && (Date.now() - cached.ts) < ARPAV_CACHE_MAX_AGE_MS) return cached.data;
+  if (!force && cached && (Date.now() - cached.ts) < ARPAV_CACHE_MAX_AGE_MS) return cached.data;
 
   const bust = `${WEATHER_XML_URL}?t=${Date.now()}`;
   try {
@@ -4111,7 +4111,7 @@ function parseWeatherXml(text) {
 async function loadWeather(force = false) {
   if (weatherLoadingPromise && !force) return weatherLoadingPromise;
   weatherLoadingPromise = (async () => {
-    const text = await fetchWeatherXml();
+    const text = await fetchWeatherXml(force);
     const parsed = parseWeatherXml(text);
     weatherState = parsed;
     renderWeatherButton();
