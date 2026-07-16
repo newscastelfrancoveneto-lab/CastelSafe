@@ -4067,12 +4067,24 @@ function parseArpavDate(raw, fallbackYear) {
   return new Date(anno, +m[2] - 1, +m[1], +m[4], +m[5]);
 }
 
+// Estrae l'attributo "date" direttamente dal testo XML grezzo, senza
+// passare dal DOM: serve da fallback per data_emissione/data_aggiornamento,
+// perché querySelector su documenti XML può non trovare l'elemento se il
+// bollettino dichiara un namespace di default (i selettori CSS "semplici"
+// non lo attraversano senza prefisso `*|`).
+function extractDateAttrFromRawXml(text, tagName) {
+  const m = text.match(new RegExp(`<${tagName}\\b[^>]*\\bdate\\s*=\\s*"([^"]*)"`));
+  return m ? m[1] : '';
+}
+
 function parseWeatherXml(text) {
   const doc = new DOMParser().parseFromString(text, 'application/xml');
   if (doc.querySelector('parsererror')) throw new Error('XML previsioni non valido');
 
-  const emissioneRaw = doc.querySelector('data_emissione')?.getAttribute('date') || '';
-  const aggiornamentoRaw = doc.querySelector('data_aggiornamento')?.getAttribute('date') || '';
+  const emissioneRaw = doc.querySelector('data_emissione')?.getAttribute('date')
+    || extractDateAttrFromRawXml(text, 'data_emissione');
+  const aggiornamentoRaw = doc.querySelector('data_aggiornamento')?.getAttribute('date')
+    || extractDateAttrFromRawXml(text, 'data_aggiornamento');
   const emissioneBase = parseArpavDate(emissioneRaw, new Date().getFullYear());
   const aggiornamento = parseArpavDate(aggiornamentoRaw, emissioneBase ? emissioneBase.getFullYear() : new Date().getFullYear());
   // usiamo il più recente dei due come riferimento "quanto e' fresco il dato"
