@@ -955,6 +955,67 @@
     }
     #btn-load-cpa:hover { background: #0f172a; }
 
+    /* ── RADAR-DPC ── */
+    .radar-toggle-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px;
+      padding: 11px 14px; margin-bottom: 14px;
+    }
+    .radar-toggle-row .lbl { font-size: 0.85rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px; }
+    .radar-toggle-btn {
+      width: 46px; height: 26px; border-radius: 999px; border: none; background: #cbd5e1;
+      position: relative; cursor: pointer; flex-shrink: 0; transition: background .2s;
+    }
+    .radar-toggle-btn::after {
+      content: ''; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px;
+      border-radius: 50%; background: #fff; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.3);
+    }
+    .radar-toggle-btn.active { background: var(--primary); }
+    .radar-toggle-btn.active::after { transform: translateX(20px); }
+
+    #radar-timeline-bar {
+      display: none; position: relative; z-index: 9; order: 1; flex-shrink: 0;
+      background: rgba(255,255,255,.96); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      padding: 8px 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+    #radar-timeline-bar.visible { display: block; }
+    .radar-tl-row { display: flex; align-items: center; gap: 8px; }
+    .radar-tl-play {
+      width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--primary);
+      color: #fff; flex-shrink: 0; display: flex; align-items: center; justify-content: center; cursor: pointer;
+    }
+    #radar-tl-slider { flex: 1; accent-color: var(--primary); }
+    .radar-tl-info { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
+    #radar-tl-stale { color: #fff; background: #dc2626; padding: 1px 6px; border-radius: 4px; font-size: 0.65rem; font-weight: 700; display: none; margin-left: 4px; }
+    #radar-unavailable {
+      display: none; font-size: 0.72rem; font-weight: 700; color: #b91c1c; background: #fef2f2;
+      border: 1px solid #fecaca; border-radius: 8px; padding: 4px 8px; margin-top: 6px; text-align: center;
+    }
+    .radar-scale-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+    #radar-scale-gradient { flex: 1; height: 10px; border-radius: 4px; }
+    .radar-scale-labels { display: flex; justify-content: space-between; font-size: 0.62rem; color: var(--text-muted); margin-top: 1px; }
+    .radar-attribution { font-size: 0.6rem; color: var(--text-muted); text-align: right; margin-top: 3px; }
+    @media (max-width: 420px) {
+      .radar-tl-info { display: none; }
+    }
+
+    #radar-opacity-bar {
+      display: none; position: fixed; left: 20px; top: 200px; z-index: 100;
+      background: rgba(255,255,255,.9); border-radius: 999px; padding: 10px 4px;
+      box-shadow: var(--shadow-soft); flex-direction: column; align-items: center; gap: 6px;
+      width: 32px;
+    }
+    #radar-opacity-bar.visible { display: flex; }
+    #radar-opacity-bar input[type="range"] {
+      writing-mode: vertical-lr; direction: rtl; width: 20px; height: 110px; accent-color: var(--primary);
+    }
+    #radar-opacity-bar .radar-opa-val { font-size: 0.6rem; font-weight: 700; color: var(--text-muted); }
+
+    /* offset controlli fissi quando la timeline radar occupa spazio in alto */
+    body.radar-bar-open .top-left-tools { top: 106px; }
+    body.radar-bar-open .leaflet-top { margin-top: 94px !important; }
+
     /* ── FABS (Pulsanti Fluttuanti) ── */
     .fab-container { position: fixed; bottom: 24px; left: 16px; z-index: 100; display: flex; flex-direction: column; gap: 12px; }
     
@@ -1893,6 +1954,20 @@
     </div>
 
     <div class="weather-body">
+      <div class="radar-toggle-row">
+        <span class="lbl">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9.2"/>
+            <circle cx="12" cy="12" r="5"/>
+            <path d="M12 2.8 A9.2 9.2 0 0 1 21.2 12" stroke-opacity=".35" stroke-width="3.4"/>
+            <path d="M12 12 L18.4 5.6"/>
+            <circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none"/>
+            <circle cx="8.4" cy="15.6" r="1.3" fill="currentColor" stroke="none"/>
+          </svg>
+          Radar precipitazioni
+        </span>
+        <button id="radar-toggle-btn" class="radar-toggle-btn" type="button" role="switch" aria-checked="false" aria-label="Attiva/disattiva layer radar" onclick="toggleRadarLayer()"></button>
+      </div>
       <div id="weather-emission" class="weather-emission">Caricamento previsioni…</div>
 
       <div id="weather-days-scroller" class="weather-days-scroller"></div>
@@ -1906,6 +1981,26 @@
     </div>
   </div>
 </div>
+
+  <div id="radar-timeline-bar">
+    <div class="radar-tl-row">
+      <button id="radar-tl-play" class="radar-tl-play" title="Play/pausa" aria-label="Play/pausa animazione radar" onclick="radarTogglePlay()">▶</button>
+      <input id="radar-tl-slider" type="range" min="0" max="0" value="0" oninput="radarStop(); radarShow(+this.value)">
+      <span id="radar-tl-info" class="radar-tl-info">–</span>
+      <span id="radar-tl-stale">NON AGGIORNATO</span>
+    </div>
+    <div class="radar-scale-row">
+      <div id="radar-scale-gradient"></div>
+    </div>
+    <div id="radar-scale-labels" class="radar-scale-labels"></div>
+    <div id="radar-unavailable">Radar non disponibile: impossibile contattare Protezione Civile</div>
+    <div class="radar-attribution">Radar-DPC — CC BY-SA</div>
+  </div>
+
+  <div id="radar-opacity-bar">
+    <span class="radar-opa-val" id="radar-opa-val">80%</span>
+    <input id="radar-opa-slider" type="range" min="0" max="100" value="80" orient="vertical" oninput="radarSetOpacity(+this.value)">
+  </div>
 
   <div id="map"></div>
 
@@ -4232,6 +4327,26 @@ function weatherIconSvg(category, prob = null) {
   return svgs[category] || svgs['poco-nuvoloso'];
 }
 
+// Le scadenze del bollettino restano "mattina/pomeriggio di oggi/domani..."
+// così come emesse: se il bollettino non è ancora stato riemesso dopo la
+// mezzanotte, la prima scadenza è ancora quella di ieri. Filtriamo quindi
+// quelle già passate rispetto all'ora reale del dispositivo, così l'area in
+// alto e l'anteprima nel pulsante mostrano sempre la previsione corrente.
+function isScadenzaPast(s, now) {
+  if (!s.data) return false; // data non interpretabile: non escludere
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const sDay = new Date(s.data.getFullYear(), s.data.getMonth(), s.data.getDate());
+  if (sDay < today) return true;
+  if (sDay > today) return false;
+  if (s.fascia === 'mattina' && now.getHours() >= 14) return true;
+  return false;
+}
+function weatherUpcomingScadenze() {
+  const all = weatherState?.scadenze || [];
+  const upcoming = all.filter(s => !isScadenzaPast(s, new Date()));
+  return upcoming.length ? upcoming : all.slice(-1); // mai una lista vuota
+}
+
 function isWeatherStale() {
   if (!weatherState?.emissione) return true;
   return (Date.now() - weatherState.emissione.getTime()) > WEATHER_STALE_MS;
@@ -4259,7 +4374,7 @@ function renderWeatherButton() {
     iconEl.innerHTML = weatherLoadingIconSvg();
     return;
   }
-  const first = weatherState.scadenze[0];
+  const first = weatherUpcomingScadenze()[0];
   const cat = weatherIconCategory(first.cielo, first.precipitazioni);
   iconEl.innerHTML = weatherIconSvg(nightAwareCategory(cat), first.probabilita);
   btnEl?.classList.toggle('weather-stale', isWeatherStale());
@@ -4292,7 +4407,8 @@ function renderWeatherModal() {
   }
 
   const stale = isWeatherStale();
-  const first = weatherState.scadenze[0];
+  const upcoming = weatherUpcomingScadenze();
+  const first = upcoming[0];
   const firstCat = weatherIconCategory(first.cielo, first.precipitazioni);
   iconEl.innerHTML = weatherIconSvg(nightAwareCategory(firstCat), first.probabilita);
 
@@ -4310,7 +4426,7 @@ function renderWeatherModal() {
     ? `${WEATHER_GLYPHS.warning}<strong>Dato non aggiornato</strong> — emesso il ${emStr}`
     : `${WEATHER_GLYPHS.calendar}Emesso il <strong>${emStr}</strong>`;
 
-  scrollerEl.innerHTML = weatherState.scadenze.map((s, i) => {
+  scrollerEl.innerHTML = upcoming.map((s, i) => {
     const cat = weatherIconCategory(s.cielo, s.precipitazioni);
     const tempStr = s.temp
       ? `${s.temp.tipo === 'max' ? 'Max' : 'Min'} ${s.temp.lo}${s.temp.hi !== s.temp.lo ? '/' + s.temp.hi : ''}°C`
@@ -5888,6 +6004,202 @@ async function checkAllertaUpdates() {
     await loadAllerta(d);
   } catch (e) {
     console.log('Polling allerta non disponibile', e.message);
+  }
+}
+
+// ── RADAR-DPC (VMI) ──────────────────────────────────────────────────────
+// Fonte: Radar-DPC - CC BY-SA. Endpoint tile NON documentato: puo' cambiare
+// senza preavviso. Nessun proxy backend (per scelta): le chiamate partono
+// direttamente dal browser verso radar-api.protezionecivile.it e S3, quindi
+// possono fallire per CORS - in quel caso mostriamo la banda "non disponibile".
+const RADAR_API = 'https://radar-api.protezionecivile.it';
+const RADAR_TILE_BASE = 'https://s3-prod-dpc-radar-webp-cache.s3.eu-south-1.amazonaws.com';
+const RADAR_MAX_NATIVE = 7;
+const RADAR_STEP = 5 * 60000;
+const RADAR_N_FRAMES = 12;
+const RADAR_POLL_MS = 60000;
+// dBZ = R/2 - 19  (confermata sui GeoTIFF VMI: R=58 -> 10.0 dBZ, R=162 -> 62.0 dBZ)
+const radarDecode = R => R / 2 - 19;
+const RADAR_STOPS = [
+  [10, [ 90,190,255]], [25, [  0,205,150]], [35, [ 45,195, 45]],
+  [45, [240,230, 50]], [52, [250,150, 30]], [58, [225, 45, 45]], [65, [185, 45,185]]
+];
+const RADAR_LABELS = [10, 25, 35, 45, 55, 65];
+
+function radarPalette(v) {
+  const S = RADAR_STOPS;
+  if (v <= S[0][0]) return S[0][1];
+  for (let i = 1; i < S.length; i++) {
+    if (v <= S[i][0]) {
+      const [a, ca] = S[i - 1], [b, cb] = S[i], f = (v - a) / (b - a);
+      return [0, 1, 2].map(k => Math.round(ca[k] + f * (cb[k] - ca[k])));
+    }
+  }
+  return S[S.length - 1][1];
+}
+function radarDrawLegend() {
+  const S = RADAR_STOPS, lo = S[0][0], hi = S[S.length - 1][0];
+  const stops = [];
+  for (let i = 0; i <= 20; i++) {
+    const v = lo + (hi - lo) * i / 20, c = radarPalette(v);
+    stops.push(`rgb(${c[0]},${c[1]},${c[2]}) ${(100 * i / 20).toFixed(0)}%`);
+  }
+  document.getElementById('radar-scale-gradient').style.background = `linear-gradient(90deg, ${stops.join(',')})`;
+  document.getElementById('radar-scale-labels').innerHTML =
+    RADAR_LABELS.map(x => `<span>${x}</span>`).join('') + '<span>dBZ</span>';
+}
+
+const radarPad = n => String(n).padStart(2, '0');
+function radarPathFor(t) {
+  const d = new Date(t);
+  return `${d.getUTCFullYear()}/${radarPad(d.getUTCMonth() + 1)}/${radarPad(d.getUTCDate())}`
+       + `/${radarPad(d.getUTCHours())}${radarPad(d.getUTCMinutes())}`;
+}
+
+const RadarLayer = L.GridLayer.extend({
+  createTile(coords, done) {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 256;
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    const t = this.options.frame;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0);
+      try {
+        const d = ctx.getImageData(0, 0, 256, 256), p = d.data;
+        for (let i = 0; i < p.length; i += 4) {
+          if (!p[i + 3] || p[i] === 0) { p[i + 3] = 0; continue; }
+          const c = radarPalette(radarDecode(p[i]));
+          p[i] = c[0]; p[i + 1] = c[1]; p[i + 2] = c[2]; p[i + 3] = 255; // opacita' -> layer.setOpacity
+        }
+        ctx.putImageData(d, 0, 0);
+      } catch (e) {
+        // tile cross-origin non leggibile (niente proxy): mostriamo il raw non ricolorato
+      }
+      done(null, cv);
+    };
+    img.onerror = () => done(null, cv);
+    img.src = `${RADAR_TILE_BASE}/VMI/${radarPathFor(t)}/${coords.z}/${coords.x}/${coords.y}/vmi.webp`;
+    return cv;
+  }
+});
+
+let radarActive = false;
+let radarFrames = [], radarLayers = [], radarCur = 0, radarTimer = null, radarPollTimer = null;
+let radarOpacity = 0.8;
+
+function radarMkLayer(t) {
+  const l = new RadarLayer({ frame: t, maxNativeZoom: RADAR_MAX_NATIVE, minZoom: 5, opacity: 0 });
+  l.addTo(map);
+  return l;
+}
+function radarPushFrame(t) { radarFrames.push(t); radarLayers.push(radarMkLayer(t)); }
+function radarHeadFrame(t) { radarFrames.unshift(t); radarLayers.unshift(radarMkLayer(t)); }
+function radarDropOldest() { radarFrames.shift(); map.removeLayer(radarLayers.shift()); }
+
+function radarRebuild(last, n) {
+  while (radarFrames.length) radarDropOldest();
+  for (let i = n - 1; i >= 0; i--) radarPushFrame(last - i * RADAR_STEP);
+  radarShow(radarFrames.length - 1);
+}
+function radarSync(last, n) {
+  if (!radarFrames.length) return radarRebuild(last, n);
+  const curT = radarFrames[radarCur];
+  const gap = (last - radarFrames[radarFrames.length - 1]) / RADAR_STEP;
+  if (gap < 0 || gap > n) return radarRebuild(last, n);
+  while (radarFrames[radarFrames.length - 1] < last) radarPushFrame(radarFrames[radarFrames.length - 1] + RADAR_STEP);
+  while (radarFrames.length > n) radarDropOldest();
+  while (radarFrames.length < n) radarHeadFrame(radarFrames[0] - RADAR_STEP);
+  const i = radarFrames.indexOf(curT);
+  radarShow(i >= 0 ? i : radarFrames.length - 1);
+}
+function radarShow(i) {
+  if (!radarFrames.length) return;
+  radarCur = (i + radarFrames.length) % radarFrames.length;
+  radarLayers.forEach((l, k) => l.setOpacity(k === radarCur ? radarOpacity : 0));
+  const slider = document.getElementById('radar-tl-slider');
+  slider.max = radarFrames.length - 1;
+  slider.value = radarCur;
+  const t = radarFrames[radarCur], d = new Date(t), age = Math.round((Date.now() - t) / 60000);
+  document.getElementById('radar-tl-info').textContent =
+    `${radarPad(d.getUTCHours())}${radarPad(d.getUTCMinutes())}Z · ${age} min fa`;
+  document.getElementById('radar-tl-stale').style.display =
+    (radarCur === radarFrames.length - 1 && age > 30) ? 'inline-block' : 'none';
+}
+function radarTogglePlay() { radarTimer ? radarStop() : radarPlay(); }
+function radarPlay() {
+  if (radarTimer) return;
+  document.getElementById('radar-tl-play').textContent = '❚❚';
+  const tick = () => {
+    const wasLast = radarCur === radarFrames.length - 1;
+    radarShow(radarCur + 1);
+    radarTimer = setTimeout(tick, wasLast ? 1200 : 450);
+  };
+  radarTimer = setTimeout(tick, 450);
+}
+function radarStop() {
+  clearTimeout(radarTimer); radarTimer = null;
+  const btn = document.getElementById('radar-tl-play');
+  if (btn) btn.textContent = '▶';
+}
+function radarSetOpacity(pct) {
+  radarOpacity = pct / 100;
+  document.getElementById('radar-opa-val').textContent = pct + '%';
+  if (radarLayers[radarCur]) radarLayers[radarCur].setOpacity(radarOpacity);
+}
+
+function radarPositionOpacityBar() {
+  const phoneBtn = document.getElementById('contacts-menu-toggle');
+  const fab = document.querySelector('.fab-container');
+  const bar = document.getElementById('radar-opacity-bar');
+  if (!phoneBtn || !fab || !bar) return;
+  const top = phoneBtn.getBoundingClientRect().bottom + 16;
+  const bottom = window.innerHeight - fab.getBoundingClientRect().top + 16;
+  bar.style.top = top + 'px';
+  bar.style.bottom = bottom + 'px';
+}
+
+async function radarPoll(force) {
+  try {
+    const r = await fetch(`${RADAR_API}/findLastProductByType?type=VMI`);
+    if (!r.ok) throw new Error('http ' + r.status);
+    const j = await r.json();
+    if (!j.lastProducts || !j.lastProducts.length) throw new Error('nessun prodotto');
+    document.getElementById('radar-unavailable').style.display = 'none';
+    const last = j.lastProducts[0].time;
+    if (force) return radarRebuild(last, RADAR_N_FRAMES);
+    radarSync(last, RADAR_N_FRAMES);
+  } catch (e) {
+    document.getElementById('radar-unavailable').style.display = 'block';
+    console.log('Radar-DPC non raggiungibile', e.message);
+  }
+}
+
+function toggleRadarLayer() {
+  radarActive = !radarActive;
+  const btn = document.getElementById('radar-toggle-btn');
+  btn.classList.toggle('active', radarActive);
+  btn.setAttribute('aria-checked', String(radarActive));
+
+  if (radarActive) {
+    document.getElementById('radar-timeline-bar').classList.add('visible');
+    document.getElementById('radar-opacity-bar').classList.add('visible');
+    document.body.classList.add('radar-bar-open');
+    radarPositionOpacityBar();
+    radarDrawLegend();
+    radarPoll(true);
+    radarPollTimer = setInterval(() => radarPoll(false), RADAR_POLL_MS);
+    window.addEventListener('resize', radarPositionOpacityBar);
+  } else {
+    radarStop();
+    clearInterval(radarPollTimer); radarPollTimer = null;
+    window.removeEventListener('resize', radarPositionOpacityBar);
+    while (radarFrames.length) radarDropOldest();
+    document.getElementById('radar-timeline-bar').classList.remove('visible');
+    document.getElementById('radar-opacity-bar').classList.remove('visible');
+    document.getElementById('radar-unavailable').style.display = 'none';
+    document.body.classList.remove('radar-bar-open');
   }
 }
 
