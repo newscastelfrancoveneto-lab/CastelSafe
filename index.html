@@ -932,6 +932,12 @@
       transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); transform-origin: top right;  
     }
     .layer-control-menu.open { opacity: 1; visibility: visible; transform: translateX(0) scale(1); }
+
+    /* Il menu layer vive dentro #map (stacking context "appiattito" a un solo
+       livello): nessuno z-index interno può farlo salire sopra elementi fuori
+       da #map come la pillola timeline del radar. Più semplice: quando il
+       menu è aperto, la pillola si fa da parte. */
+    body.layer-menu-open #radar-timeline-bar { opacity: 0; pointer-events: none; }
     
     .layer-control-header { font-weight: 700; font-size: 0.9rem; margin-bottom: 10px; color: var(--text-main); border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }
     .layer-control-section-title { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: .05em; margin: 12px 0 6px; }
@@ -983,6 +989,7 @@
       font-family: 'Inter', system-ui, sans-serif;
     }
     #radar-timeline-bar.visible { display: block; }
+    #radar-timeline-bar { transition: opacity .15s; }
     .radar-tl-row { display: flex; align-items: center; gap: 6px; }
     .radar-tl-play {
       width: 26px; height: 26px; border-radius: 50%; border: none; background: var(--primary);
@@ -2805,6 +2812,17 @@ window.__bootStatus && window.__bootStatus('Caricamento mappa…');
 const map = L.map('map', { center: [45.6640, 11.9580], zoom: 13, zoomControl: false });
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
+// Dopo il reload innescato da un aggiornamento SW (o dopo l'installazione
+// PWA), il viewport può assestarsi (barra indirizzi/safe-area) DOPO che
+// Leaflet ha già calcolato le dimensioni della mappa: i controlli (es. zoom)
+// restano quindi posizionati sulla misura vecchia finché qualcosa non
+// richiama invalidateSize() - prima non c'era nessun listener di resize
+// globale, per questo i pulsanti sembravano "fuori schermo" finché non si
+// chiudeva/riapriva l'app (che rifà da capo il calcolo).
+window.addEventListener('resize', () => map.invalidateSize());
+window.addEventListener('orientationchange', () => map.invalidateSize());
+[150, 500, 1200].forEach(ms => setTimeout(() => map.invalidateSize(), ms));
+
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '<a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap</a>', 
   maxZoom: 19
@@ -3671,6 +3689,12 @@ const LayerSwitcher = L.Control.extend({
     menuBtn.addEventListener('click', (e) => {
       e.preventDefault();
       menu.classList.toggle('open');
+      // #map incapsula il controllo di livello CSS di leaflet (tutto ciò
+      // che c'è dentro #map è "appiattito" a un solo livello di z-index
+      // rispetto ai fratelli fuori da #map): la barra timeline del radar,
+      // essendo fuori da #map, lo copre sempre indipendentemente dallo
+      // z-index interno del menu. La nascondiamo mentre il menu è aperto.
+      document.body.classList.toggle('layer-menu-open', menu.classList.contains('open'));
     });
 
     refreshBtn.addEventListener('click', async (e) => {
@@ -3703,7 +3727,10 @@ const LayerSwitcher = L.Control.extend({
       alert('Impossibile rilevare la posizione. Controlla i permessi GPS del browser.');
     });
 
-    map.on('click', () => menu.classList.remove('open'));
+    map.on('click', () => {
+      menu.classList.remove('open');
+      document.body.classList.remove('layer-menu-open');
+    });
 
     const weatherBtn = container.querySelector('#weather-btn');
     weatherBtn.addEventListener('click', (e) => {
