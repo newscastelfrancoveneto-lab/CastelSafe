@@ -1414,6 +1414,17 @@
       50%     { transform: translate(2.5px,-1px); }
     }
 
+    /* Nuvoletta secondaria, più piccola e trasparente, che attraversa
+       lentamente l'icona da un lato all'altro dietro la nuvola principale. */
+    .w-cloud-wisp { animation: w-cloud-wisp-pass 9s linear infinite; }
+    @keyframes w-cloud-wisp-pass {
+      0%   { transform: translate(-26px, 2px); opacity: 0; }
+      12%  { opacity: .4; }
+      50%  { transform: translate(20px, -1px); opacity: .4; }
+      88%  { opacity: .4; }
+      100% { transform: translate(46px, 2px); opacity: 0; }
+    }
+
     .w-rain-drop { animation: w-rain-fall 1.05s cubic-bezier(.55,0,.85,.35) infinite; transform-origin: center; }
     @keyframes w-rain-fall {
       0%   { transform: translateY(-3px) scaleY(.7); opacity: 0; }
@@ -1461,7 +1472,7 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .w-sun-core, .w-sun-rays, .w-cloud, .w-rain-drop, .w-snow-flake, .w-bolt, .w-fog-line,
+      .w-sun-core, .w-sun-rays, .w-cloud, .w-cloud-wisp, .w-rain-drop, .w-snow-flake, .w-bolt, .w-fog-line,
       .w-moon-core, .w-star, .w-loading-pulse, .w-loading-dots circle {
         animation: none !important;
       }
@@ -4309,6 +4320,17 @@ function weatherIconSvg(category, prob = null) {
       <circle cx="33" cy="${y}" r="7" fill="${fillRef}"/>
     </g>`;
 
+  // Nuvoletta di sfondo più piccola e semi-trasparente: va inserita PRIMA
+  // della nuvola principale nel markup (così viene disegnata dietro) e
+  // attraversa lentamente l'icona grazie a .w-cloud-wisp (vedi CSS).
+  const cloudWisp = (y = 30) => `
+    <g class="w-cloud-wisp">
+      <rect x="0" y="${y}" width="17" height="6.5" rx="3.2" fill="#cbd5e1"/>
+      <circle cx="4" cy="${y}" r="3.6" fill="#cbd5e1"/>
+      <circle cx="9" cy="${y - 3}" r="5" fill="#cbd5e1"/>
+      <circle cx="14.5" cy="${y}" r="3.6" fill="#cbd5e1"/>
+    </g>`;
+
   // Gocce/fiocchi distribuiti dentro [xMin, xMax], sempre entro i bordi della nuvola.
   const spreadX = (n, xMin, xMax) => {
     const xs = [];
@@ -4369,17 +4391,20 @@ function weatherIconSvg(category, prob = null) {
         ${defs}
         <g class="w-sun-rays">${sunRays(18, 17, 8, 6, '#f59e0b')}</g>
         <circle class="w-sun-core" cx="18" cy="17" r="7.5" fill="url(#${uid}-sun)" filter="url(#${uid}-glow)"/>
+        ${cloudWisp(32)}
         <path class="w-cloud" d="M14 39a8 8 0 0 1 1-16 10 10 0 0 1 19 3 7 7 0 0 1-2 13H14z" fill="url(#${uid}-cloud)"/>
       </svg>`,
     'poco-nuvoloso-notte': `
       <svg viewBox="-6 -6 60 60" fill="none">
         ${defs}
         ${moonAndStars(17, 16, 7, [[36, 8, 1.2], [6, 12, 0.9]])}
+        ${cloudWisp(32)}
         <path class="w-cloud" d="M14 39a8 8 0 0 1 1-16 10 10 0 0 1 19 3 7 7 0 0 1-2 13H14z" fill="url(#${uid}-cloud)"/>
       </svg>`,
     'nuvoloso': `
       <svg viewBox="-6 -6 60 60" fill="none">
         ${defs}
+        ${cloudWisp(30)}
         ${cloudShape(`url(#${uid}-cloud)`, 24)}
       </svg>`,
     'pioggia': `
