@@ -1408,10 +1408,14 @@
       50%     { opacity: 1; transform: scale(1.15); }
     }
 
-    .w-cloud { animation: w-cloud-drift 5s ease-in-out infinite; transform-origin: center; }
+    /* .w-cloud-sway avvolge nuvola + eventuale pioggia/fulmine/neve, così
+       oscillano insieme e non si "staccano" dal bordo della nuvola durante
+       il movimento (le gocce/il fulmine non sono dentro il <g> della nuvola,
+       sono elementi fratelli nello stesso SVG). */
+    .w-cloud-sway { animation: w-cloud-drift 3.2s ease-in-out infinite; transform-origin: center; }
     @keyframes w-cloud-drift {
-      0%,100% { transform: translate(0,0); }
-      50%     { transform: translate(2.5px,-1px); }
+      0%,100% { transform: translate(-5px,0); }
+      50%     { transform: translate(5px,-1px); }
     }
 
     /* Nuvoletta secondaria, più piccola e trasparente, che attraversa
@@ -1472,7 +1476,7 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .w-sun-core, .w-sun-rays, .w-cloud, .w-cloud-wisp, .w-rain-drop, .w-snow-flake, .w-bolt, .w-fog-line,
+      .w-sun-core, .w-sun-rays, .w-cloud-sway, .w-cloud-wisp, .w-rain-drop, .w-snow-flake, .w-bolt, .w-fog-line,
       .w-moon-core, .w-star, .w-loading-pulse, .w-loading-dots circle {
         animation: none !important;
       }
@@ -4392,44 +4396,54 @@ function weatherIconSvg(category, prob = null) {
         <g class="w-sun-rays">${sunRays(18, 17, 8, 6, '#f59e0b')}</g>
         <circle class="w-sun-core" cx="18" cy="17" r="7.5" fill="url(#${uid}-sun)" filter="url(#${uid}-glow)"/>
         ${cloudWisp(32)}
-        <path class="w-cloud" d="M14 39a8 8 0 0 1 1-16 10 10 0 0 1 19 3 7 7 0 0 1-2 13H14z" fill="url(#${uid}-cloud)"/>
+        <g class="w-cloud-sway">
+          <path class="w-cloud" d="M14 39a8 8 0 0 1 1-16 10 10 0 0 1 19 3 7 7 0 0 1-2 13H14z" fill="url(#${uid}-cloud)"/>
+        </g>
       </svg>`,
     'poco-nuvoloso-notte': `
       <svg viewBox="-6 -6 60 60" fill="none">
         ${defs}
         ${moonAndStars(17, 16, 7, [[36, 8, 1.2], [6, 12, 0.9]])}
         ${cloudWisp(32)}
-        <path class="w-cloud" d="M14 39a8 8 0 0 1 1-16 10 10 0 0 1 19 3 7 7 0 0 1-2 13H14z" fill="url(#${uid}-cloud)"/>
+        <g class="w-cloud-sway">
+          <path class="w-cloud" d="M14 39a8 8 0 0 1 1-16 10 10 0 0 1 19 3 7 7 0 0 1-2 13H14z" fill="url(#${uid}-cloud)"/>
+        </g>
       </svg>`,
     'nuvoloso': `
       <svg viewBox="-6 -6 60 60" fill="none">
         ${defs}
         ${cloudWisp(30)}
-        ${cloudShape(`url(#${uid}-cloud)`, 24)}
+        <g class="w-cloud-sway">${cloudShape(`url(#${uid}-cloud)`, 24)}</g>
       </svg>`,
     'pioggia': `
       <svg viewBox="-6 -6 60 60" fill="none">
         ${defs}
-        ${cloudShape(`url(#${uid}-cloud)`, 20)}
-        ${rainDrops(weatherDropCount(prob, 2, 6), 34, 43)}
+        <g class="w-cloud-sway">
+          ${cloudShape(`url(#${uid}-cloud)`, 20)}
+          ${rainDrops(weatherDropCount(prob, 2, 6), 34, 43)}
+        </g>
       </svg>`,
     'temporale': `
       <svg viewBox="-6 -6 60 60" fill="none">
         ${defs}
-        ${cloudShape(`url(#${uid}-cloud-dark)`, 19)}
-        ${(() => {
-          const n = weatherDropCount(prob, 2, 4);
-          const left = Math.ceil(n / 2), right = n - left;
-          return rainDrops(left, 32, 39, 14, 18) + rainDrops(right, 32, 39, 28, 32);
-        })()}
-        <polygon class="w-bolt" points="26,23 19,36 24,36 21,44 33,29 27,29 30,23"
-                 fill="#fbbf24" filter="url(#${uid}-glow)"/>
+        <g class="w-cloud-sway">
+          ${cloudShape(`url(#${uid}-cloud-dark)`, 19)}
+          ${(() => {
+            const n = weatherDropCount(prob, 2, 4);
+            const left = Math.ceil(n / 2), right = n - left;
+            return rainDrops(left, 32, 39, 14, 18) + rainDrops(right, 32, 39, 28, 32);
+          })()}
+          <polygon class="w-bolt" points="26,23 19,36 24,36 21,44 33,29 27,29 30,23"
+                   fill="#fbbf24" filter="url(#${uid}-glow)"/>
+        </g>
       </svg>`,
     'neve': `
       <svg viewBox="-6 -6 60 60" fill="none">
         ${defs}
-        ${cloudShape(`url(#${uid}-cloud)`, 20)}
-        ${snowFlakes(weatherDropCount(prob, 3, 6), 13, 33)}
+        <g class="w-cloud-sway">
+          ${cloudShape(`url(#${uid}-cloud)`, 20)}
+          ${snowFlakes(weatherDropCount(prob, 3, 6), 13, 33)}
+        </g>
       </svg>`,
     'nebbia': `
       <svg viewBox="-6 -6 60 60" fill="none">
