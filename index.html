@@ -4065,7 +4065,7 @@ async function fetchWeatherXml(force = false) {
 // fallire un regex con \s letterale. Qui estraiamo solo le sequenze di cifre,
 // nell'ordine in cui compaiono (giorno, mese, [anno], ora, minuto): qualunque
 // separatore/carattere in mezzo, visibile o no, non ha più importanza.
-function parseArpavDate(raw, fallbackYear) {
+function parseArpavBollettinoDate(raw, fallbackYear) {
   if (!raw) return null;
   const nums = raw.match(/\d+/g);
   if (!nums || nums.length < 4) return null;
@@ -4104,8 +4104,8 @@ function parseWeatherXml(text) {
     // Stampiamo un pezzo del testo grezzo per capire cosa è realmente arrivato.
     console.warn('ARPAV: tag data_emissione non trovato nel testo scaricato. Estratto:', text.slice(0, 400));
   }
-  const emissioneBase = parseArpavDate(emissioneRaw, new Date().getFullYear());
-  const aggiornamento = parseArpavDate(aggiornamentoRaw, emissioneBase ? emissioneBase.getFullYear() : new Date().getFullYear());
+  const emissioneBase = parseArpavBollettinoDate(emissioneRaw, new Date().getFullYear());
+  const aggiornamento = parseArpavBollettinoDate(aggiornamentoRaw, emissioneBase ? emissioneBase.getFullYear() : new Date().getFullYear());
   // usiamo il più recente dei due come riferimento "quanto e' fresco il dato"
   const emissione = (aggiornamento && (!emissioneBase || aggiornamento >= emissioneBase)) ? aggiornamento : emissioneBase;
   const emissioneEAggiornamento = !!aggiornamento && emissioneBase && aggiornamento.getTime() !== emissioneBase.getTime();
