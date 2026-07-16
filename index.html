@@ -4059,12 +4059,24 @@ async function fetchWeatherXml(force = false) {
 // un giorno; data_aggiornamento e' l'ultimo refresh reale ed e' quella da
 // mostrare come "quanto e' fresco il dato" - senza, l'app segnava sempre
 // l'emissione originale anche quando ARPAV aveva gia' pubblicato l'update.
+// Non usa più un match letterale su "alle"/spazi: il testo ARPAV, generato da
+// un sistema automatico, può contenere spazi invisibili non standard (es.
+// zero-width) tra i token che sembrano spazi normali ma non lo sono e fanno
+// fallire un regex con \s letterale. Qui estraiamo solo le sequenze di cifre,
+// nell'ordine in cui compaiono (giorno, mese, [anno], ora, minuto): qualunque
+// separatore/carattere in mezzo, visibile o no, non ha più importanza.
 function parseArpavDate(raw, fallbackYear) {
   if (!raw) return null;
-  const m = raw.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\s+alle\s+(\d{1,2})[.:](\d{2})/);
-  if (!m) return null;
-  const anno = m[3] ? +m[3] : fallbackYear;
-  return new Date(anno, +m[2] - 1, +m[1], +m[4], +m[5]);
+  const nums = raw.match(/\d+/g);
+  if (!nums || nums.length < 4) return null;
+  let giorno, mese, anno, ora, minuto;
+  if (nums.length >= 5 && nums[2].length === 4) {
+    [giorno, mese, anno, ora, minuto] = nums;
+  } else {
+    [giorno, mese, ora, minuto] = nums;
+    anno = fallbackYear;
+  }
+  return new Date(+anno, +mese - 1, +giorno, +ora, +minuto);
 }
 
 // Estrae l'attributo "date" direttamente dal testo XML grezzo, senza
