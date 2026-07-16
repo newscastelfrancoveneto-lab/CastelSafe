@@ -4052,15 +4052,32 @@ async function fetchWeatherXml(force = false) {
   }
 }
 
+// Formati visti nell'XML ARPAV:
+//   data_emissione:     "15/07/2026 alle 13:00"  (anno presente, orario con ':')
+//   data_aggiornamento: "16/07 alle 09.00"        (senza anno, orario con '.')
+// data_emissione e' quella del bollettino "base" e puo' restare vecchia di
+// un giorno; data_aggiornamento e' l'ultimo refresh reale ed e' quella da
+// mostrare come "quanto e' fresco il dato" - senza, l'app segnava sempre
+// l'emissione originale anche quando ARPAV aveva gia' pubblicato l'update.
+function parseArpavDate(raw, fallbackYear) {
+  if (!raw) return null;
+  const m = raw.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\s+alle\s+(\d{1,2})[.:](\d{2})/);
+  if (!m) return null;
+  const anno = m[3] ? +m[3] : fallbackYear;
+  return new Date(anno, +m[2] - 1, +m[1], +m[4], +m[5]);
+}
+
 function parseWeatherXml(text) {
   const doc = new DOMParser().parseFromString(text, 'application/xml');
   if (doc.querySelector('parsererror')) throw new Error('XML previsioni non valido');
 
   const emissioneRaw = doc.querySelector('data_emissione')?.getAttribute('date') || '';
-  const emMatch = emissioneRaw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4}) alle (\d{1,2}):(\d{2})/);
-  const emissione = emMatch
-    ? new Date(+emMatch[3], +emMatch[2] - 1, +emMatch[1], +emMatch[4], +emMatch[5])
-    : null;
+  const aggiornamentoRaw = doc.querySelector('data_aggiornamento')?.getAttribute('date') || '';
+  const emissioneBase = parseArpavDate(emissioneRaw, new Date().getFullYear());
+  const aggiornamento = parseArpavDate(aggiornamentoRaw, emissioneBase ? emissioneBase.getFullYear() : new Date().getFullYear());
+  // usiamo il più recente dei due come riferimento "quanto e' fresco il dato"
+  const emissione = (aggiornamento && (!emissioneBase || aggiornamento >= emissioneBase)) ? aggiornamento : emissioneBase;
+  const emissioneEAggiornamento = !!aggiornamento && emissioneBase && aggiornamento.getTime() !== emissioneBase.getTime();
 
   const zone = Array.from(doc.querySelectorAll('meteogramma'))
     .find(m => m.getAttribute('name') === WEATHER_ZONE_NAME);
@@ -4105,7 +4122,7 @@ function parseWeatherXml(text) {
     };
   });
 
-  return { emissione, scadenze };
+  return { emissione, isAggiornamento: emissioneEAggiornamento, scadenze };
 }
 
 async function loadWeather(force = false) {
@@ -4426,10 +4443,11 @@ function renderWeatherModal() {
     ? weatherState.emissione.toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : 'sconosciuta';
 
+  const emLabel = weatherState.isAggiornamento ? 'Aggiornato il' : 'Emesso il';
   emEl.classList.toggle('weather-emission-stale', stale);
   emEl.innerHTML = stale
-    ? `${WEATHER_GLYPHS.warning}<strong>Dato non aggiornato</strong> — emesso il ${emStr}`
-    : `${WEATHER_GLYPHS.calendar}Emesso il <strong>${emStr}</strong>`;
+    ? `${WEATHER_GLYPHS.warning}<strong>Dato non aggiornato</strong> — ${emLabel.toLowerCase()} ${emStr}`
+    : `${WEATHER_GLYPHS.calendar}${emLabel} <strong>${emStr}</strong>`;
 
   scrollerEl.innerHTML = upcoming.map((s, i) => {
     const cat = weatherIconCategory(s.cielo, s.precipitazioni);
