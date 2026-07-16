@@ -973,29 +973,33 @@
     .radar-toggle-btn.active { background: var(--primary); }
     .radar-toggle-btn.active::after { transform: translateX(20px); }
 
+    /* Pillola flottante: posizionata via JS (radarPositionTimelineBar) alla
+       stessa altezza del pulsante telefono e del pulsante layer, nello spazio
+       libero tra i due - non li sposta né ci si sovrappone. */
     #radar-timeline-bar {
-      display: none; position: relative; z-index: 9; order: 1; flex-shrink: 0;
+      display: none; position: fixed; z-index: 90; max-width: 340px;
       background: rgba(255,255,255,.96); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-      padding: 8px 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      border-radius: 14px; padding: 7px 12px; box-shadow: var(--shadow-soft);
       font-family: 'Inter', system-ui, sans-serif;
     }
     #radar-timeline-bar.visible { display: block; }
-    .radar-tl-row { display: flex; align-items: center; gap: 8px; }
+    .radar-tl-row { display: flex; align-items: center; gap: 6px; }
     .radar-tl-play {
-      width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--primary);
+      width: 26px; height: 26px; border-radius: 50%; border: none; background: var(--primary);
       color: #fff; flex-shrink: 0; display: flex; align-items: center; justify-content: center; cursor: pointer;
+      font-size: 0.7rem;
     }
-    #radar-tl-slider { flex: 1; accent-color: var(--primary); }
-    .radar-tl-info { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
-    #radar-tl-stale { color: #fff; background: #dc2626; padding: 1px 6px; border-radius: 4px; font-size: 0.65rem; font-weight: 700; display: none; margin-left: 4px; }
+    #radar-tl-slider { flex: 1; min-width: 50px; accent-color: var(--primary); }
+    .radar-tl-info { font-size: 0.65rem; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
+    #radar-tl-stale { color: #fff; background: #dc2626; padding: 1px 5px; border-radius: 4px; font-size: 0.6rem; font-weight: 700; display: none; margin-left: 2px; }
     #radar-unavailable {
-      display: none; font-size: 0.72rem; font-weight: 700; color: #b91c1c; background: #fef2f2;
-      border: 1px solid #fecaca; border-radius: 8px; padding: 4px 8px; margin-top: 6px; text-align: center;
+      display: none; font-size: 0.65rem; font-weight: 700; color: #b91c1c; background: #fef2f2;
+      border: 1px solid #fecaca; border-radius: 8px; padding: 3px 7px; margin-top: 5px; text-align: center;
     }
-    .radar-scale-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
-    #radar-scale-gradient { flex: 1; height: 10px; border-radius: 4px; }
-    .radar-scale-labels { display: flex; justify-content: space-between; font-size: 0.62rem; color: var(--text-muted); margin-top: 1px; }
-    .radar-attribution { font-size: 0.6rem; color: var(--text-muted); text-align: right; margin-top: 3px; }
+    .radar-scale-row { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
+    #radar-scale-gradient { flex: 1; height: 8px; border-radius: 4px; }
+    .radar-scale-labels { display: flex; justify-content: space-between; font-size: 0.58rem; color: var(--text-muted); margin-top: 1px; }
+    .radar-attribution { font-size: 0.55rem; color: var(--text-muted); text-align: right; margin-top: 2px; }
     @media (max-width: 420px) {
       .radar-tl-info { display: none; }
     }
@@ -1008,13 +1012,10 @@
     }
     #radar-opacity-bar.visible { display: flex; }
     #radar-opacity-bar input[type="range"] {
-      writing-mode: vertical-lr; direction: rtl; width: 20px; height: 110px; accent-color: var(--primary);
+      writing-mode: vertical-lr; direction: rtl; width: 20px; accent-color: var(--primary);
+      flex: 1; min-height: 40px; margin: 10px 0; /* spazio prima delle estremità della barra */
     }
     #radar-opacity-bar .radar-opa-val { font-size: 0.6rem; font-weight: 700; color: var(--text-muted); }
-
-    /* offset controlli fissi quando la timeline radar occupa spazio in alto */
-    body.radar-bar-open .top-left-tools { top: 106px; }
-    body.radar-bar-open .leaflet-top { margin-top: 94px !important; }
 
     /* ── FABS (Pulsanti Fluttuanti) ── */
     .fab-container { position: fixed; bottom: 24px; left: 16px; z-index: 100; display: flex; flex-direction: column; gap: 12px; }
@@ -1364,8 +1365,12 @@
     .weather-icon-mini svg { width: 100%; height: 100%; display: block; }
 
     /* Animazioni icona meteo (condivise mini + card) */
-    .w-sun-core { transform-origin: center; animation: w-sun-pulse 3.2s cubic-bezier(.4,0,.2,1) infinite; }
-    .w-sun-rays { transform-origin: center; animation: w-sun-spin 20s linear infinite; }
+    /* transform-box: fill-box fa sì che "center" sia il centro del gruppo stesso
+       (sole/raggi), non quello del viewBox dell'SVG: senza, negli SVG dove il
+       sole non è centrato nel viewBox (es. icona "poco nuvoloso") i raggi
+       ruotavano attorno a un punto sbagliato e sembravano sballati. */
+    .w-sun-core { transform-box: fill-box; transform-origin: center; animation: w-sun-pulse 3.2s cubic-bezier(.4,0,.2,1) infinite; }
+    .w-sun-rays { transform-box: fill-box; transform-origin: center; animation: w-sun-spin 20s linear infinite; }
     @keyframes w-sun-pulse {
       0%,100% { transform: scale(1); filter: brightness(1); }
       50%     { transform: scale(1.1); filter: brightness(1.12); }
@@ -6160,6 +6165,21 @@ function radarPositionOpacityBar() {
   bar.style.bottom = bottom + 'px';
 }
 
+// Pillola timeline: stessa altezza del pulsante telefono (in alto a
+// sinistra) e del pulsante layer (in alto a destra), nello spazio libero
+// tra i due - mai sopra o sotto di loro.
+function radarPositionTimelineBar() {
+  const phoneBtn = document.getElementById('contacts-menu-toggle');
+  const layerCtrl = document.querySelector('.custom-layer-control-container');
+  const bar = document.getElementById('radar-timeline-bar');
+  if (!phoneBtn || !layerCtrl || !bar) return;
+  const phoneRect = phoneBtn.getBoundingClientRect();
+  const layerRect = layerCtrl.getBoundingClientRect();
+  bar.style.top = phoneRect.top + 'px';
+  bar.style.left = (phoneRect.right + 10) + 'px';
+  bar.style.right = (window.innerWidth - layerRect.left + 10) + 'px';
+}
+
 async function radarPoll(force) {
   try {
     const r = await fetch(`${RADAR_API}/findLastProductByType?type=VMI`);
@@ -6185,21 +6205,22 @@ function toggleRadarLayer() {
   if (radarActive) {
     document.getElementById('radar-timeline-bar').classList.add('visible');
     document.getElementById('radar-opacity-bar').classList.add('visible');
-    document.body.classList.add('radar-bar-open');
     radarPositionOpacityBar();
+    radarPositionTimelineBar();
     radarDrawLegend();
     radarPoll(true);
     radarPollTimer = setInterval(() => radarPoll(false), RADAR_POLL_MS);
     window.addEventListener('resize', radarPositionOpacityBar);
+    window.addEventListener('resize', radarPositionTimelineBar);
   } else {
     radarStop();
     clearInterval(radarPollTimer); radarPollTimer = null;
     window.removeEventListener('resize', radarPositionOpacityBar);
+    window.removeEventListener('resize', radarPositionTimelineBar);
     while (radarFrames.length) radarDropOldest();
     document.getElementById('radar-timeline-bar').classList.remove('visible');
     document.getElementById('radar-opacity-bar').classList.remove('visible');
     document.getElementById('radar-unavailable').style.display = 'none';
-    document.body.classList.remove('radar-bar-open');
   }
 }
 
