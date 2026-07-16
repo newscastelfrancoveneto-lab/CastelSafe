@@ -4078,6 +4078,15 @@ function parseWeatherXml(text) {
   // usiamo il più recente dei due come riferimento "quanto e' fresco il dato"
   const emissione = (aggiornamento && (!emissioneBase || aggiornamento >= emissioneBase)) ? aggiornamento : emissioneBase;
   const emissioneEAggiornamento = !!aggiornamento && emissioneBase && aggiornamento.getTime() !== emissioneBase.getTime();
+  if (!emissioneBase) console.warn('ARPAV: data_emissione non riconosciuta:', emissioneRaw);
+  if (aggiornamentoRaw && !aggiornamento) console.warn('ARPAV: data_aggiornamento non riconosciuta:', aggiornamentoRaw);
+
+  // Riferimento per calcolare l'anno delle scadenze (il bollettino riporta
+  // solo giorno/mese, es. "mercoledì 16 luglio"): usa la data di emissione
+  // se disponibile, altrimenti l'orario reale del dispositivo - così anche
+  // se emissione/aggiornamento non si riescono a leggere, le scadenze hanno
+  // comunque una data valida e il filtro "nascondi ieri" continua a funzionare.
+  const refDate = emissione || new Date();
 
   const zone = Array.from(doc.querySelectorAll('meteogramma'))
     .find(m => m.getAttribute('name') === WEATHER_ZONE_NAME);
@@ -4093,11 +4102,11 @@ function parseWeatherXml(text) {
     });
 
     let data = null;
-    if (m && emissione) {
+    if (m) {
       const giorno = +m[2];
       const mese = WEATHER_MESI[m[3].toLowerCase()];
-      let anno = emissione.getFullYear();
-      if (mese && mese < (emissione.getMonth() + 1)) anno += 1; // rollover capodanno
+      let anno = refDate.getFullYear();
+      if (mese && mese < (refDate.getMonth() + 1)) anno += 1; // rollover capodanno
       if (mese) data = new Date(anno, mese - 1, giorno);
     }
 
@@ -4130,6 +4139,10 @@ async function loadWeather(force = false) {
   weatherLoadingPromise = (async () => {
     const text = await fetchWeatherXml(force);
     const parsed = parseWeatherXml(text);
+    // Se il bollettino di questo fetch non riporta una data leggibile, tieni
+    // l'ultima emissione valida nota invece di azzerarla (meglio una data
+    // vecchia ma corretta di "sconosciuta").
+    if (!parsed.emissione && weatherState?.emissione) parsed.emissione = weatherState.emissione;
     weatherState = parsed;
     renderWeatherButton();
     if (document.getElementById('weather-modal')?.classList.contains('open')) {
