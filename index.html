@@ -4085,6 +4085,13 @@ function parseWeatherXml(text) {
     || extractDateAttrFromRawXml(text, 'data_emissione');
   const aggiornamentoRaw = doc.querySelector('data_aggiornamento')?.getAttribute('date')
     || extractDateAttrFromRawXml(text, 'data_aggiornamento');
+  if (!emissioneRaw) {
+    // Nessuna delle due strategie di lettura ha trovato nulla: o il testo
+    // scaricato non è il bollettino atteso (proxy/CORS ha restituito altro),
+    // o il tag non contiene "data_emissione" così come ce lo aspettiamo.
+    // Stampiamo un pezzo del testo grezzo per capire cosa è realmente arrivato.
+    console.warn('ARPAV: tag data_emissione non trovato nel testo scaricato. Estratto:', text.slice(0, 400));
+  }
   const emissioneBase = parseArpavDate(emissioneRaw, new Date().getFullYear());
   const aggiornamento = parseArpavDate(aggiornamentoRaw, emissioneBase ? emissioneBase.getFullYear() : new Date().getFullYear());
   // usiamo il più recente dei due come riferimento "quanto e' fresco il dato"
