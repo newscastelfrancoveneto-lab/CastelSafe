@@ -907,6 +907,38 @@
     .stn-marker:hover { transform: scale(1.1); }
     .stn-marker.active { border: 3px solid #fff; background: #0f172a; transform: scale(1.15); z-index: 1000 !important; }
 
+    /* ── MARKER "LA MIA POSIZIONE" ── */
+    .user-location-icon { position: relative; width: 22px; height: 22px; pointer-events: none; }
+    .user-location-dot {
+      position: absolute; top: 50%; left: 50%; width: 14px; height: 14px;
+      border-radius: 50%; background: #2563eb; border: 2.5px solid #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,.35);
+      transform: translate(-50%, -50%) scale(0);
+      animation: user-dot-pop .35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+    .user-location-pulse {
+      position: absolute; top: 50%; left: 50%; width: 14px; height: 14px;
+      border-radius: 50%; background: #3b82f6;
+      transform: translate(-50%, -50%) scale(0);
+      animation: user-pulse-ring 2.2s ease-out .3s infinite;
+    }
+    @keyframes user-dot-pop {
+      to { transform: translate(-50%, -50%) scale(1); }
+    }
+    @keyframes user-pulse-ring {
+      0%   { transform: translate(-50%, -50%) scale(1);   opacity: .55; }
+      100% { transform: translate(-50%, -50%) scale(2.8); opacity: 0; }
+    }
+    /* Il cerchio di precisione (Leaflet SVG path) appare con una dissolvenza
+       invece di comparire di scatto. */
+    .user-location-circle { opacity: 0; animation: user-circle-fade-in .4s ease forwards; }
+    @keyframes user-circle-fade-in { to { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) {
+      .user-location-pulse { animation: none; display: none; }
+      .user-location-dot { animation: none; transform: translate(-50%, -50%) scale(1); }
+      .user-location-circle { animation: none; opacity: 1; }
+    }
+
     /* ── MENU LAYER CUSTOM (COLLAPSIBLE) ── */
     .custom-layer-control-container { 
         position: relative; 
@@ -1887,14 +1919,40 @@
     <h3>A cosa serve</h3>
     <p>
       Questa app aiuta i cittadini a consultare rapidamente il territorio di Castelfranco Veneto:
-      allerte meteo regionali, sensori ARPAV, aree di protezione civile, avvisi temporanei e contatti utili.
+      allerte meteo regionali, previsioni e radar precipitazioni, sensori ARPAV, aree di protezione civile,
+      avvisi temporanei e contatti utili — con notifiche push per essere avvisati in tempo reale.
     </p>
 
     <h3>Come usare l'app</h3>
     <p>
       Dalla mappa puoi visualizzare le aree di protezione civile, i corsi d'acqua, gli avvisi di chiusura o pericolo,
-      la sede della Protezione Civile e i sensori ARPAV. Puoi anche usare i pulsanti rapidi per notifiche,
-      contatti di emergenza e strumenti di consultazione.
+      la sede della Protezione Civile e i sensori ARPAV (tocca un marker per aprire i dati). In alto a sinistra trovi
+      i contatti di emergenza; in basso a sinistra notifiche, condivisione dell'app e informazioni; in alto a destra
+      i livelli della mappa, l'aggiornamento dati, la tua posizione GPS e le previsioni meteo.
+    </p>
+
+    <h3>
+      <svg class="w-inline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3.2"/><path d="M8 2.5v1.4M8 12.1v1.4M2.5 8h1.4M12.1 8h1.4M4.5 4.5l1 1M10.5 10.5l1 1M11.5 4.5l-1 1M5.5 10.5l-1 1"/><path d="M9 20.5a4.5 4.5 0 0 1 .5-9 5.5 5.5 0 0 1 10.4 2A4 4 0 0 1 19 20.5H9z"/></svg>
+      Previsioni meteo
+    </h3>
+    <p>
+      Dal pulsante meteo in alto a destra apri il bollettino ARPAV per la zona di Castelfranco Veneto: condizioni
+      attuali, temperature, probabilità di precipitazione e previsioni per i giorni successivi divise per mattina/pomeriggio.
+      L'orario di aggiornamento del bollettino è sempre indicato; se il dato non viene rinnovato da troppo tempo
+      l'app lo segnala.
+    </p>
+
+    <h3>
+      <svg class="w-inline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.2"/><circle cx="12" cy="12" r="5"/><path d="M12 2.8 A9.2 9.2 0 0 1 21.2 12" stroke-opacity=".35" stroke-width="3.4"/><path d="M12 12 L18.4 5.6"/><circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="8.4" cy="15.6" r="1.3" fill="currentColor" stroke="none"/></svg>
+      Radar precipitazioni
+    </h3>
+    <p>
+      Sempre dal menu meteo puoi attivare il layer radar (dati Radar-DPC — Protezione Civile, licenza CC BY-SA):
+      mostra dove sta piovendo in questo momento, con un'animazione dell'ultima ora e slider di opacità.
+      Il dato ha circa 10-15 minuti di latenza rispetto al tempo reale (indicata sempre in etichetta) ed è a
+      risoluzione regionale, non puntuale: oltre un certo livello di zoom l'immagine viene solo ingrandita, non
+      mostra più dettaglio. Se il servizio non è raggiungibile l'app lo segnala chiaramente, invece di mostrare
+      una mappa vuota che potrebbe sembrare "non sta piovendo".
     </p>
 
     <h3>In caso di allerta</h3>
@@ -1939,6 +1997,31 @@
       Nella mappa puoi trovare avvisi relativi a strade o aree con limitazioni temporanee, chiusure,
       passaggi ridotti o situazioni di pericolo. Apri il dettaglio per consultare descrizione,
       periodo di validità e area interessata.
+    </p>
+
+    <h3>
+      <svg class="w-inline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+      Notifiche push
+    </h3>
+    <p>
+      Dal pulsante campanella puoi attivare le notifiche push per ricevere un avviso non appena viene emessa
+      una nuova allerta, anche ad app chiusa. Lo stesso pannello conserva la cronologia delle notifiche ricevute,
+      consultabile e svuotabile in qualsiasi momento.
+    </p>
+
+    <h3>Strumenti rapidi</h3>
+    <p>
+      In alto a sinistra trovi i <strong>contatti di emergenza</strong> (numeri nazionali e locali, con chiamata
+      diretta). In basso a sinistra puoi <strong>condividere</strong> l'app con altre persone e trovare questo
+      pannello di informazioni. In alto a destra, oltre ai livelli mappa, il pulsante di localizzazione centra
+      la vista sulla <strong>tua posizione</strong> GPS.
+    </p>
+
+    <h3>Aggiornamenti dell'app</h3>
+    <p>
+      L'app è installabile come applicazione (PWA) e si aggiorna da sola: quando è disponibile una nuova versione
+      compare un avviso con il pulsante <strong>Aggiorna</strong>. Se non lo tocchi, l'app resta comunque
+      utilizzabile con l'ultima versione scaricata finché non la riavvii.
     </p>
 
     <h3>Dati geografici</h3>
@@ -3726,12 +3809,19 @@ const LayerSwitcher = L.Control.extend({
       map.locate({ setView: true, maxZoom: 16 });
     });
 
+    const userLocationIcon = L.divIcon({
+      className: 'user-location-icon',
+      html: '<span class="user-location-pulse"></span><span class="user-location-dot"></span>',
+      iconSize: [22, 22],
+      iconAnchor: [11, 11]
+    });
+
     map.on('locationfound', (e) => {
       gpsBtn.disabled = false;
       gpsBtn.style.opacity = '1';
       if (userMarker) { map.removeLayer(userMarker); map.removeLayer(userCircle); }
-      userCircle = L.circle(e.latlng, { radius: e.accuracy / 2, color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 0.15, weight: 1.5 }).addTo(map);
-      userMarker = L.circleMarker(e.latlng, { radius: 8, color: '#ffffff', weight: 2.5, fillColor: '#2563eb', fillOpacity: 1 }).addTo(map).bindPopup('📍 Sei qui').openPopup();
+      userCircle = L.circle(e.latlng, { radius: e.accuracy / 2, color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 0.15, weight: 1.5, className: 'user-location-circle' }).addTo(map);
+      userMarker = L.marker(e.latlng, { icon: userLocationIcon, interactive: false, keyboard: false }).addTo(map);
     });
 
     map.on('locationerror', () => {
