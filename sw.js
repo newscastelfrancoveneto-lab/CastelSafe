@@ -2,7 +2,7 @@
 // modifica index.html (o altri asset), anche se sw.js non cambia altrimenti.
 // È l'unico modo per cui il browser rileva una nuova versione disponibile e
 // mostra il badge "Aggiornamento disponibile" nell'app.
-const APP_VERSION = '2026-07-21-21';
+const APP_VERSION = '2026-07-21-22';
 
 // Cache dedicata alle icone usate dalle notifiche: le pre-carichiamo così
 // sono sempre disponibili anche se la rete è debole/assente nel momento
@@ -19,9 +19,16 @@ self.addEventListener('install', event => {
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k.startsWith('castelsafe-icons-') && k !== ICON_CACHE).map(k => caches.delete(k)))
-    )
+    Promise.all([
+      caches.keys().then(keys =>
+        Promise.all(keys.filter(k => k.startsWith('castelsafe-icons-') && k !== ICON_CACHE).map(k => caches.delete(k)))
+      ),
+      // Senza questo, dopo skipWaiting() il nuovo SW si attiva ma non prende
+      // il controllo delle pagine già aperte: 'controllerchange' non scatta
+      // mai lì, quindi il reload dopo aver premuto "Aggiorna" non parte e il
+      // banner resta bloccato a schermo senza che succeda nulla.
+      self.clients.claim()
+    ])
   );
 });
 
