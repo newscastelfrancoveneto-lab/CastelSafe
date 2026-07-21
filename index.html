@@ -6012,13 +6012,19 @@ async function refreshPushSubscriptionSilently() {
     if (!('serviceWorker' in navigator)) return;
 
     const reg = await navigator.serviceWorker.ready;
+    // Non disiscrivere mai prima: se una subscription valida esiste già,
+    // pushManager.subscribe() la riusa (stesso endpoint) senza crearne una
+    // nuova. Forzare unsubscribe+subscribe ad ogni apertura genera invece un
+    // endpoint nuovo ogni volta: il server lo vede come "mai visto prima" e
+    // rimanda subito lo stato iniziale (chiusure attive incluse), causando
+    // la stessa notifica ripetuta a ogni riapertura dell'app.
     let sub = await reg.pushManager.getSubscription();
-    if (sub) await sub.unsubscribe();
-
-    sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC)
-    });
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC)
+      });
+    }
 
     await apiFetch('/api/subscribe', {
       method: 'POST',
