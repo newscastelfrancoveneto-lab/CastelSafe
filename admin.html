@@ -295,6 +295,7 @@
       <div class="card-head">
         <h1 style="font-size:1.08rem;margin:0;font-weight:800;letter-spacing:-.02em;">Invia notifica push manuale</h1>
         <p class="hint">Verrà inviata subito a tutte le sottoscrizioni attive. Usala per comunicazioni urgenti fuori dal normale ciclo dei bollettini.</p>
+        <p class="hint" id="subsCountHint" style="margin-top:10px;font-weight:700;color:var(--ink);">Iscritti alle notifiche: <span id="subsCountValue">…</span></p>
       </div>
       <div class="form-grid">
         <div>
@@ -398,7 +399,21 @@ function showClosures(){
   if (!window._adminMapInit) initAdminMap();
   else if (map) { setMode(false); requestAnimationFrame(() => map.invalidateSize(true)); }
 }
-function showNotifPanel(){ selection.style.display = 'none'; admin.style.display = 'none'; notifPanel.style.display = 'flex'; }
+async function refreshSubsCount(){
+  const el = document.getElementById('subsCountValue');
+  if (!el) return;
+  el.textContent = '…';
+  try {
+    const response = await fetch(`${SERVER_URL}/api/admin/subscriptions/count`, { headers: authHeaders() });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    el.textContent = data.count ?? '?';
+  } catch (err) {
+    console.error('Errore lettura conteggio iscritti:', err);
+    el.textContent = 'n/d';
+  }
+}
+function showNotifPanel(){ selection.style.display = 'none'; admin.style.display = 'none'; notifPanel.style.display = 'flex'; refreshSubsCount(); }
 function setLogged(value) {
   login.style.display = value ? 'none' : 'flex';
   if (value) {
@@ -511,6 +526,7 @@ document.getElementById('sendNotifBtn').onclick = async () => {
     document.getElementById('notifTitle').value = '';
     document.getElementById('notifBody').value = '';
     document.getElementById('notifTag').value = '';
+    refreshSubsCount();
   } catch (err) {
     console.error('Errore invio notifica manuale:', err);
     stateEl.className = 'err';
