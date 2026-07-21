@@ -1638,6 +1638,83 @@
 </head>
 <body>
 
+<div id="inapp-browser-banner" style="display:none;">
+  <div id="inapp-browser-banner-text">
+    Stai usando il browser interno di questa app: le notifiche push e l'installazione non funzionano qui.
+  </div>
+  <div id="inapp-browser-banner-actions">
+    <button id="inapp-browser-banner-btn" type="button">Apri nel browser</button>
+    <button id="inapp-browser-banner-close" type="button" aria-label="Chiudi">✕</button>
+  </div>
+</div>
+<style>
+  #inapp-browser-banner{
+    position:fixed; top:0; left:0; right:0; z-index:100000;
+    display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px;
+    background:#8d021f; color:#fff; padding:11px 14px;
+    font-family:'Inter','Segoe UI',sans-serif; font-size:.86rem; line-height:1.4;
+    box-shadow:0 4px 16px rgba(0,0,0,.2);
+  }
+  #inapp-browser-banner-text{flex:1 1 220px;}
+  #inapp-browser-banner-actions{display:flex; align-items:center; gap:8px; flex:none;}
+  #inapp-browser-banner-btn{
+    background:#fff; color:#8d021f; border:none; border-radius:8px;
+    padding:9px 14px; font-weight:700; font-size:.84rem; cursor:pointer; white-space:nowrap;
+  }
+  #inapp-browser-banner-close{
+    background:transparent; color:#fff; border:none; font-size:1rem; cursor:pointer;
+    padding:6px 8px; opacity:.85;
+  }
+  #inapp-browser-banner-close:hover{opacity:1;}
+  body.has-inapp-banner #boot-loader{top:48px;height:calc(100% - 48px);}
+  body.has-inapp-banner #app{padding-top:48px;}
+</style>
+<script>
+(function () {
+  // Rileva i browser "in-app" di Facebook/Instagram/Messenger/altri social:
+  // sono WebView che bloccano notifiche push e l'installazione PWA, quindi
+  // avvisiamo l'utente e proviamo a fargli aprire un browser vero.
+  var ua = navigator.userAgent || '';
+  var isFacebookIAB = /FBAN|FBAV|FB_IAB/i.test(ua);
+  var isInstagramIAB = /Instagram/i.test(ua);
+  var isMessengerIAB = /MessengerLiteForiOS|FBMD/i.test(ua) || /Messenger/i.test(ua);
+  var isInApp = isFacebookIAB || isInstagramIAB || isMessengerIAB;
+  if (!isInApp) return;
+
+  var isAndroid = /Android/i.test(ua);
+  var banner = document.getElementById('inapp-browser-banner');
+  var btn = document.getElementById('inapp-browser-banner-btn');
+  var closeBtn = document.getElementById('inapp-browser-banner-close');
+
+  if (sessionStorage.getItem('inappBannerDismissed') === '1') return;
+
+  banner.style.display = 'flex';
+  document.body.classList.add('has-inapp-banner');
+
+  btn.onclick = function () {
+    var url = window.location.href;
+    if (isAndroid) {
+      // Su Android l'intent scheme apre direttamente il selettore di browser di sistema.
+      var noScheme = url.replace(/^https?:\/\//, '');
+      window.location.href = 'intent://' + noScheme + '#Intent;scheme=https;end';
+    } else {
+      // Su iOS le WebView in-app non permettono un vero "escape" via JS:
+      // copiamo il link e spieghiamo il percorso manuale (menu ⋯ → Apri in Safari).
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).catch(function () {});
+      }
+      alert('Link copiato! Tocca i tre puntini (⋯) o l\'icona in alto, poi scegli "Apri nel browser" / "Apri in Safari" e incolla il link.');
+    }
+  };
+
+  closeBtn.onclick = function () {
+    banner.style.display = 'none';
+    document.body.classList.remove('has-inapp-banner');
+    sessionStorage.setItem('inappBannerDismissed', '1');
+  };
+})();
+</script>
+
 <div id="boot-loader">
   <img src="icon-192.png" alt="CastelSafe" />
   <div id="boot-loader-spinner"></div>
