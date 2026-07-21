@@ -9,12 +9,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
 
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script>
     // Mostra sempre un feedback visivo di caricamento: senza questo, se una
     // libreria da CDN è lenta/irraggiungibile (rete mobile debole), l'app
     // resta bloccata sullo splash screen nativo della PWA senza alcun testo,
     // dando l'impressione che sia "morta".
+    // IMPORTANTE: questo script deve stare PRIMA di qualsiasi <link
+    // rel="stylesheet">. Un browser blocca l'esecuzione degli script che
+    // seguono un <link rel="stylesheet"> finché quel CSS non ha finito di
+    // scaricarsi: se questo blocco stesse dopo il link a leaflet.css e la
+    // CDN fosse lenta/irraggiungibile, non solo la UI di caricamento non
+    // apparirebbe, ma nemmeno il timeout di sicurezza a 15s scatterebbe,
+    // lasciando l'utente bloccato a tempo indeterminato sullo splash
+    // screen nativo della PWA (il problema riportato alla riapertura
+    // dell'app dal background).
     window.__bootStatus = function (text) {
       var el = document.getElementById('boot-loader-text');
       if (el) el.textContent = text;
@@ -37,6 +45,7 @@
       window.__bootError('Il caricamento sta impiegando più del previsto. Controlla la connessione e riprova.');
     }, 15000);
   </script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <!-- Le librerie da CDN vengono caricate più avanti, subito prima dello
        script principale: così il browser non deve aspettare che finiscano
        di scaricarsi prima di iniziare a disegnare il <body> (schermata di
