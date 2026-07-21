@@ -3675,6 +3675,7 @@ function readLocalClosureAlerts() {
 async function loadClosureAlerts() {
   const CLOSURES_URL = withNgrokBypass(API_BASE + '/api/closures');
   const fetchAttempts = [
+    () => fetch(CLOSURES_URL, { headers: { Accept: 'application/json' } })
   ];
 
   let serverData = null;
