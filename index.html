@@ -3559,27 +3559,31 @@ function osmDiagIconHtml(state) {
   return '';
 }
 
-// Riga aggiuntiva "Cache": si accende solo quando TUTTI i tentativi di rete
-// per quel gruppo sono falliti e si è dovuto ripiegare sull'ultimo dato
-// buono salvato — non quando si serve normalmente dalla cache fresca.
-function osmDiagCacheHtml(used) {
-  if (used === true) return '<span class="osm-diag-cache-badge">in uso</span>';
-  if (used === false) return '<span class="osm-diag-cache-idle">—</span>';
-  return '';
+// Riga aggiuntiva "Cache": tre stati possibili.
+// - "in uso"  → TUTTI i tentativi di rete sono falliti ORA e si sta
+//               mostrando il dato di fallback salvato.
+// - "R"       → la cache ha un dato pronto/disponibile (perché un fetch
+//               è appena riuscito, o perché già presente da una sessione
+//               precedente), ma al momento non si sta usando come fallback.
+// - "—"       → nessun dato in cache per questo gruppo.
+function osmDiagCacheHtml(state) {
+  if (state?.used) return '<span class="osm-diag-cache-badge">in uso</span>';
+  if (state?.ready) return '<span class="osm-diag-cache-ready" title="Cache disponibile">R</span>';
+  return '<span class="osm-diag-cache-idle">—</span>';
 }
 
-const osmCacheUsedState = {}; // { waterway: true/false, cpa: true/false }
+const osmCacheState = {}; // { waterway: {used, ready}, cpa: {used, ready} }
 
-function reportOsmCacheUsed(groupKey, used) {
-  osmCacheUsedState[groupKey] = used;
+function reportOsmCache(groupKey, patch) {
+  osmCacheState[groupKey] = { ...osmCacheState[groupKey], ...patch };
   if (!osmDiagPanelEl) return;
   const cell = osmDiagPanelEl.querySelector(`.osm-diag-cache-cell[data-group="${groupKey}"]`);
-  if (cell) cell.innerHTML = osmDiagCacheHtml(used);
+  if (cell) cell.innerHTML = osmDiagCacheHtml(osmCacheState[groupKey]);
 }
 
 // ── Stato reale della barra allerte, mostrato sotto la tabella OSM ──────────
 let allertaDiagState = null; // 'loading' | 'success' | 'failed'
-let allertaCacheUsedState = false;
+let allertaCacheState = {};
 
 function reportAllertaDiagStatus(state) {
   allertaDiagState = state;
@@ -3587,10 +3591,37 @@ function reportAllertaDiagStatus(state) {
   if (cell) cell.innerHTML = osmDiagIconHtml(state);
 }
 
-function reportAllertaCacheUsed(used) {
-  allertaCacheUsedState = used;
+function reportAllertaCache(patch) {
+  allertaCacheState = { ...allertaCacheState, ...patch };
   const cell = osmDiagPanelEl?.querySelector('.osm-diag-allerta-cache');
-  if (cell) cell.innerHTML = osmDiagCacheHtml(used);
+  if (cell) cell.innerHTML = osmDiagCacheHtml(allertaCacheState);
+}
+
+// ── Stato reale delle chiusure, mostrato sotto la barra allerte ─────────────
+let closuresDiagState = null; // 'loading' | 'success' | 'failed'
+let closuresCacheState = {};
+
+function reportClosuresDiagStatus(state) {
+  closuresDiagState = state;
+  const cell = osmDiagPanelEl?.querySelector('.osm-diag-closures-status');
+  if (cell) cell.innerHTML = osmDiagIconHtml(state);
+}
+
+function reportClosuresCache(patch) {
+  closuresCacheState = { ...closuresCacheState, ...patch };
+  const cell = osmDiagPanelEl?.querySelector('.osm-diag-closures-cache');
+  if (cell) cell.innerHTML = osmDiagCacheHtml(closuresCacheState);
+}
+
+// Al momento di aprire il pannello, controlla se sul disco esiste già un
+// dato di cache "pronto" anche se in questa sessione non è ancora stato
+// toccato (es. cache salvata l'ultima volta che l'app era aperta).
+async function refreshCacheReadyState() {
+  const [w, c] = await Promise.all([osmCacheGetStale('waterways'), osmCacheGetStale('cpa')]);
+  if (w && !osmCacheState.waterway?.ready) osmCacheState.waterway = { ...osmCacheState.waterway, ready: true };
+  if (c && !osmCacheState.cpa?.ready) osmCacheState.cpa = { ...osmCacheState.cpa, ready: true };
+  if (readAllertaCache() && !allertaCacheState.ready) allertaCacheState = { ...allertaCacheState, ready: true };
+  if (localStorage.getItem(CLOSURE_ALERT_STORAGE_KEY) && !closuresCacheState.ready) closuresCacheState = { ...closuresCacheState, ready: true };
 }
 
 let osmDiagPanelEl = null;
@@ -3601,8 +3632,9 @@ function closeOsmDiagPanel() {
   if (osmDiagBackdropEl) { osmDiagBackdropEl.remove(); osmDiagBackdropEl = null; }
 }
 
-function openOsmDiagPanel() {
+async function openOsmDiagPanel() {
   closeOsmDiagPanel();
+  await refreshCacheReadyState();
   const labels = osmDiagServiceLabels();
 
   osmDiagBackdropEl = document.createElement('div');
@@ -3634,7 +3666,7 @@ function openOsmDiagPanel() {
           `).join('')}
           <tr class="osm-diag-cache-row">
             <td class="osm-diag-service">Cache (se tutto fallisce)</td>
-            ${OSM_DIAG_GROUPS.map(g => `<td class="osm-diag-cache-cell" data-group="${g.key}">${osmDiagCacheHtml(osmCacheUsedState[g.key])}</td>`).join('')}
+            ${OSM_DIAG_GROUPS.map(g => `<td class="osm-diag-cache-cell" data-group="${g.key}">${osmDiagCacheHtml(osmCacheState[g.key])}</td>`).join('')}
           </tr>
         </tbody>
       </table>
@@ -3642,7 +3674,12 @@ function openOsmDiagPanel() {
     <div class="osm-diag-allerta-row">
       <span class="osm-diag-allerta-label">Barra allerte</span>
       <span class="osm-diag-allerta-status">${osmDiagIconHtml(allertaDiagState)}</span>
-      <span class="osm-diag-allerta-cache">${osmDiagCacheHtml(allertaCacheUsedState)}</span>
+      <span class="osm-diag-allerta-cache">${osmDiagCacheHtml(allertaCacheState)}</span>
+    </div>
+    <div class="osm-diag-allerta-row">
+      <span class="osm-diag-allerta-label">Chiusure</span>
+      <span class="osm-diag-closures-status">${osmDiagIconHtml(closuresDiagState)}</span>
+      <span class="osm-diag-closures-cache">${osmDiagCacheHtml(closuresCacheState)}</span>
     </div>
     <button type="button" class="osm-diag-run-btn">Aggiorna ora</button>
   `;
@@ -3651,11 +3688,12 @@ function openOsmDiagPanel() {
 
   panel.querySelector('.osm-diag-close').addEventListener('click', closeOsmDiagPanel);
   // Aggiorna ora = lo stesso refresh reale usato altrove (dati OSM + barra
-  // allerte): la tabella e la riga allerte si popolano osservando i veri
-  // tentativi di rete, non una query di prova a parte.
+  // allerte + chiusure): la tabella e le righe sotto si popolano osservando
+  // i veri tentativi di rete, non una query di prova a parte.
   panel.querySelector('.osm-diag-run-btn').addEventListener('click', () => {
     triggerOSMRefresh({ forceRefresh: true, animate: true });
     checkAllertaUpdates();
+    loadClosureAlerts();
   });
 }
 
@@ -3679,11 +3717,11 @@ async function loadOSMData(forceRefresh = false) {
           const cpaFeatures = buildFeatureCollectionFromWays(cpaData.elements || [], 'cpa');
           await osmCacheSet('cpa', cpaFeatures);
           renderCPAGeoJSON(cpaFeatures);
-          reportOsmCacheUsed('cpa', false);
+          reportOsmCache('cpa', { used: false, ready: true });
         } catch (err) {
           console.error('Errore caricamento dati OSM (aree PC):', err);
           const stale = await osmCacheGetStale('cpa');
-          if (stale) { renderCPAGeoJSON(stale); reportOsmCacheUsed('cpa', true); }
+          if (stale) { renderCPAGeoJSON(stale); reportOsmCache('cpa', { used: true, ready: true }); }
         }
       })());
     }
@@ -3695,11 +3733,11 @@ async function loadOSMData(forceRefresh = false) {
           const waterwayFeatures = buildFeatureCollectionFromWays(waterwayData.elements || [], 'waterway');
           await osmCacheSet('waterways', waterwayFeatures);
           renderWaterwayGeoJSON(waterwayFeatures);
-          reportOsmCacheUsed('waterway', false);
+          reportOsmCache('waterway', { used: false, ready: true });
         } catch (err) {
           console.error('Errore caricamento dati OSM (fiumi):', err);
           const stale = await osmCacheGetStale('waterways');
-          if (stale) { renderWaterwayGeoJSON(stale); reportOsmCacheUsed('waterway', true); }
+          if (stale) { renderWaterwayGeoJSON(stale); reportOsmCache('waterway', { used: true, ready: true }); }
         }
       })());
     }
@@ -4048,6 +4086,7 @@ function readLocalClosureAlerts() {
 }
 
 async function loadClosureAlerts() {
+  reportClosuresDiagStatus('loading');
   const CLOSURES_URL = withNgrokBypass(API_BASE + '/api/closures');
   const fetchAttempts = [
     () => fetch(CLOSURES_URL, { headers: { Accept: 'application/json' } })
@@ -4077,17 +4116,21 @@ async function loadClosureAlerts() {
   if (serverData) {
     localStorage.setItem(CLOSURE_ALERT_STORAGE_KEY, JSON.stringify(serverData));
     renderClosureAlerts(serverData);
+    reportClosuresDiagStatus('success');
+    reportClosuresCache({ used: false, ready: true });
     return;
   }
 
   // Fallback: cache locale
   console.warn('API chiusure non raggiungibile, uso cache locale');
+  reportClosuresDiagStatus('failed');
   try {
     const cachedRaw = localStorage.getItem(CLOSURE_ALERT_STORAGE_KEY);
     if (cachedRaw) {
       const cachedData = JSON.parse(cachedRaw);
       if (cachedData && Array.isArray(cachedData.features)) {
         renderClosureAlerts(cachedData);
+        reportClosuresCache({ used: true, ready: true });
         return;
       }
     }
@@ -6883,13 +6926,13 @@ async function fetchAllertaWithCache() {
     const d = await res.json();
     saveAllertaCache(d);
     reportAllertaDiagStatus('success');
-    reportAllertaCacheUsed(false);
+    reportAllertaCache({ used: false, ready: true });
     return d;
   } catch (e) {
     reportAllertaDiagStatus('failed');
     const cached = readAllertaCache();
     if (cached) {
-      reportAllertaCacheUsed(true);
+      reportAllertaCache({ used: true, ready: true });
       return cached;
     }
     throw e;
