@@ -3354,13 +3354,20 @@ const OVERPASS_ENDPOINTS = [
 const OVERPASS_PROXY = API_BASE + '/api/overpass';
 // Se il tentativo diretto ai mirror fallisce una volta, fallirà quasi
 // certamente anche ai successivi nell'immediato (es. rete assente): si salta
-// dritti al proxy invece di riperdere ~12s ogni volta. Non deve però restare
-// bloccato per SEMPRE nella sessione: se la connessione torna (evento
-// 'online') o l'utente forza un refresh manuale, va ritentato il percorso
-// diretto — altrimenti un blackout momentaneo di rete condanna l'app al solo
-// proxy per il resto della sessione anche a connessione ripristinata.
-let osmDirectBlocked = false;
-window.addEventListener('online', () => { osmDirectBlocked = false; });
+// dritti al proxy invece di riperdere ~12s ogni volta.
+// NON un blocco permanente: è un timestamp di scadenza, non un booleano.
+// Un booleano richiede che qualcosa lo resetti esplicitamente (evento
+// 'online', refresh manuale) e in pratica quell'evento può non scattare in
+// modo affidabile (osservato: dopo un blackout di rete l'app restava sul
+// solo proxy anche a connessione ripristinata). Con la scadenza a tempo,
+// anche se NESSUN evento scatta, i mirror diretti vengono ritentati da soli
+// dopo al massimo OSM_DIRECT_RETRY_COOLDOWN_MS — nessuna dipendenza da
+// segnali esterni non garantiti.
+const OSM_DIRECT_RETRY_COOLDOWN_MS = 45 * 1000;
+let osmDirectBlockedUntil = 0;
+function isOsmDirectBlocked() { return Date.now() < osmDirectBlockedUntil; }
+function resetOsmDirectBlocked() { osmDirectBlockedUntil = 0; }
+window.addEventListener('online', resetOsmDirectBlocked);
 
 // groupKey (facoltativo) identifica il gruppo di dati (fiumi/aree PC) per cui
 // si sta interrogando Overpass: se presente, ogni tentativo (per-mirror e poi
@@ -3368,7 +3375,7 @@ window.addEventListener('online', () => { osmDirectBlocked = false; });
 // diagnostico (vedi più sotto), invece di una query sintetica separata.
 async function overpassFetch(query, groupKey) {
   const body = new URLSearchParams({ data: query });
-  if (osmDirectBlocked) return overpassFetchViaProxy(body, groupKey);
+  if (isOsmDirectBlocked()) return overpassFetchViaProxy(body, groupKey);
 
   // 1) Tentativo diretto lato client: corsa fra gli endpoint, timeout breve per fallire in fretta
   const controllers = [];
@@ -3397,7 +3404,7 @@ async function overpassFetch(query, groupKey) {
     });
     return await Promise.any(requests);
   } catch (directErr) {
-    osmDirectBlocked = true;
+    osmDirectBlockedUntil = Date.now() + OSM_DIRECT_RETRY_COOLDOWN_MS;
     console.warn('Overpass diretto fallito, provo il proxy del server:', directErr?.message || directErr);
   } finally {
     controllers.forEach(c => c.abort());
@@ -3712,7 +3719,7 @@ async function openOsmDiagPanel() {
 async function loadOSMData(forceRefresh = false) {
     // Refresh manuale = segnale esplicito "riprova tutto": non restare
     // bloccati sul solo proxy se i mirror diretti erano falliti in passato.
-    if (forceRefresh) osmDirectBlocked = false;
+    if (forceRefresh) resetOsmDirectBlocked();
 
     // Cache: se entrambi validi, renderizza e torna subito
     const cachedW = forceRefresh ? null : await osmCacheGet('waterways');
