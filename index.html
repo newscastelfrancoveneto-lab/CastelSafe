@@ -853,6 +853,10 @@
     #refresh-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: #6ee7b7; animation: pulse 2s infinite; }
     #refresh-badge.waiting .dot { background: #fbbf24; animation: pulse 1s infinite; }
     #refresh-badge.waiting { background: rgba(15,23,42,.25); }
+    /* In attesa il testo diventa una frase intera ("In attesa aggiornamento
+       ARPAV..."): il prefisso "Agg. tra:" andrebbe concatenato in modo
+       innaturale ("Agg. tra: In attesa...") se restasse visibile. */
+    #refresh-badge.waiting #refresh-badge-prefix { display: none; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
     #btn-close-panel {
@@ -1191,7 +1195,17 @@
     .allerta-open-label { display: none; }
   }
     .allerta-bollino-wrap { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; color: #fff; }
-    .allerta-bollino { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,.9); flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    /* Doppio bordo (chiaro + scuro): un bordo di un solo colore sparisce
+       quando il pallino ha lo stesso colore della barra (es. giallo su
+       giallo, appena percepibile anche con bordo bianco). Il bordo scuro
+       esterno garantisce contrasto sui colori chiari (giallo, arancione),
+       quello bianco interno lo garantisce su quelli scuri (rosso, verde):
+       insieme funzionano su qualunque combinazione. */
+    .allerta-bollino {
+      width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0;
+      border: 2px solid rgba(255,255,255,.95);
+      box-shadow: 0 0 0 1.5px rgba(15,23,42,.55), 0 1px 3px rgba(0,0,0,0.2);
+    }
     /* Il livello di allerta (verde/giallo/arancione/rosso) è oggi comunicato
        solo dal colore del pallino: invisibile per chi ha daltonismo o usa
        uno screen reader. Questo testo lo espone senza alterare l'aspetto
@@ -2423,7 +2437,7 @@
       </div>
       <div id="refresh-badge">
         <div class="dot"></div>
-        <span style="opacity:.9">Agg. tra:</span>
+        <span id="refresh-badge-prefix" style="opacity:.9">Agg. tra:</span>
         <span id="countdown-label">--:--</span>
       </div>
       <button id="btn-close-panel" onclick="closePanel()" title="Chiudi pannello" aria-label="Chiudi pannello">✕</button>
@@ -5985,7 +5999,7 @@ async function tickCountdown() {
   if (refreshState?.waiting) {
     waitingForFreshData = true;
     setBadgeWaitingState(true);
-    label.textContent = 'In corso...';
+    label.textContent = 'In attesa aggiornamento ARPAV...';
     setTimeout(tickCountdown, 1000);
     return;
   }
@@ -5999,7 +6013,7 @@ async function tickCountdown() {
     if (!waitingForFreshData) {
       waitingForFreshData = true;
       setBadgeWaitingState(true);
-      label.textContent = 'In corso...';
+      label.textContent = 'In attesa aggiornamento ARPAV...';
 
       const stn = currentStnRef;
       const baselineTimestamp = stationLastTimestamp[stn.id] || toArpavTimestamp(nextRefresh);
@@ -6010,7 +6024,7 @@ async function tickCountdown() {
       });
       triggerGlobalHalfHourRefresh(nextRefresh);
     } else {
-      label.textContent = 'In corso...';
+      label.textContent = 'In attesa aggiornamento ARPAV...';
     }
     setTimeout(tickCountdown, 1000);
     return;
@@ -6354,8 +6368,8 @@ function notifyUpdateAvailable(reg) {
   if (Notification.permission !== 'granted') return;
   updateNotificationShown = true;
 
-  reg.showNotification('Aggiornamento disponibile', {
-    body: 'È disponibile una nuova versione di CastelSafe. Tocca per aggiornare.',
+  reg.showNotification('Aggiornamento in attesa', {
+    body: 'Una nuova versione di CastelSafe è pronta e in attesa. Tocca per installarla.',
     tag: 'app-update',
     renotify: false,
     icon: 'icon-192.png',
@@ -6391,7 +6405,7 @@ function showUpdateBanner(reg) {
   `;
 
   banner.innerHTML = `
-    <span>Aggiornamento disponibile</span>
+    <span>Aggiornamento in attesa</span>
     <button id="btn-do-update" style="background:#8d021f;color:#fff;border:none;border-radius:999px;padding:6px 14px;font-weight:700;cursor:pointer;font-size:0.82rem;">Aggiorna</button>
     <button type="button" style="background:rgba(255,255,255,0.14);color:#fff;border:none;border-radius:999px;padding:6px 10px;cursor:pointer;font-size:0.82rem;" onclick="this.closest('#update-banner').remove()" aria-label="Chiudi">✕</button>
   `;
