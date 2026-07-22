@@ -770,17 +770,7 @@
     .osm-diag-spin { animation: spin-refresh 0.8s linear infinite; transform-origin: center; }
     .osm-diag-cache-row td { background: #f8fafc; }
     .osm-diag-cache-cell { width: 40px; height: 30px; }
-    .osm-diag-cache-badge {
-      font-size: 0.62rem; font-weight: 800; color: #b45309; background: #fef3c7;
-      border-radius: 999px; padding: 2px 6px; white-space: nowrap;
-    }
     .osm-diag-cache-idle { color: #cbd5e1; font-size: 0.8rem; }
-    .osm-diag-allerta-row {
-      display: flex; align-items: center; gap: 10px; margin-top: 12px;
-      padding: 8px 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: var(--radius-md);
-    }
-    .osm-diag-allerta-label { flex: 1; font-size: 0.78rem; font-weight: 700; color: var(--text-main); }
-    .osm-diag-allerta-status { display: flex; align-items: center; }
     .osm-diag-run-btn {
       margin-top: 14px; width: 100%; padding: 10px; border: none; border-radius: var(--radius-md);
       background: var(--primary); color: #fff; font-weight: 700; cursor: pointer; font-size: 0.85rem;
@@ -3563,15 +3553,13 @@ function osmDiagIconHtml(state) {
   return '';
 }
 
-// Riga aggiuntiva "Cache": tre stati possibili.
-// - "in uso"  → TUTTI i tentativi di rete sono falliti ORA e si sta
-//               mostrando il dato di fallback salvato.
-// - "R"       → la cache ha un dato pronto/disponibile (perché un fetch
-//               è appena riuscito, o perché già presente da una sessione
-//               precedente), ma al momento non si sta usando come fallback.
-// - "—"       → nessun dato in cache per questo gruppo.
+// Colonna/riga "Cache": mostra "R" se c'è un dato pronto/disponibile (che
+// sia stato appena scritto da un fetch riuscito, o che sia il fallback
+// attualmente in uso perché tutto il resto è fallito, o che fosse già
+// presente da una sessione precedente) — sempre "R", mai una spunta a
+// parte: la spunta è riservata alla colonna "Server" per indicare che
+// l'ULTIMO fetch reale è andato a buon fine.
 function osmDiagCacheHtml(state) {
-  if (state?.used) return '<span class="osm-diag-cache-badge">in uso</span>';
   if (state?.ready) return '<span class="osm-diag-cache-ready" title="Cache disponibile">R</span>';
   return '<span class="osm-diag-cache-idle">—</span>';
 }
@@ -3677,15 +3665,28 @@ async function openOsmDiagPanel() {
       </table>
     </div>
     <div class="osm-diag-subtitle">Dati Server</div>
-    <div class="osm-diag-allerta-row">
-      <span class="osm-diag-allerta-label">Barra allerte</span>
-      <span class="osm-diag-allerta-status">${osmDiagIconHtml(allertaDiagState)}</span>
-      <span class="osm-diag-allerta-cache">${osmDiagCacheHtml(allertaCacheState)}</span>
-    </div>
-    <div class="osm-diag-allerta-row">
-      <span class="osm-diag-allerta-label">Chiusure</span>
-      <span class="osm-diag-closures-status">${osmDiagIconHtml(closuresDiagState)}</span>
-      <span class="osm-diag-closures-cache">${osmDiagCacheHtml(closuresCacheState)}</span>
+    <div class="osm-diag-table-wrap">
+      <table class="osm-diag-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Server</th>
+            <th>Cache</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="osm-diag-service">Allerta</td>
+            <td class="osm-diag-cell osm-diag-allerta-status">${osmDiagIconHtml(allertaDiagState)}</td>
+            <td class="osm-diag-cache-cell osm-diag-allerta-cache">${osmDiagCacheHtml(allertaCacheState)}</td>
+          </tr>
+          <tr>
+            <td class="osm-diag-service">Chiusure</td>
+            <td class="osm-diag-cell osm-diag-closures-status">${osmDiagIconHtml(closuresDiagState)}</td>
+            <td class="osm-diag-cache-cell osm-diag-closures-cache">${osmDiagCacheHtml(closuresCacheState)}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
     <button type="button" class="osm-diag-run-btn">Aggiorna ora</button>
   `;
