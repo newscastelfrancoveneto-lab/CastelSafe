@@ -3325,9 +3325,13 @@ const OVERPASS_PROXY = API_BASE + '/api/overpass';
 // si salta dritti al proxy invece di riperdere ~12s ogni volta.
 let osmDirectBlocked = false;
 
-async function overpassFetch(query) {
+// groupKey (facoltativo) identifica il gruppo di dati (fiumi/aree PC) per cui
+// si sta interrogando Overpass: se presente, ogni tentativo (per-mirror e poi
+// proxy) aggiorna in tempo reale lo stato reale mostrato nel pannello
+// diagnostico (vedi più sotto), invece di una query sintetica separata.
+async function overpassFetch(query, groupKey) {
   const body = new URLSearchParams({ data: query });
-  if (osmDirectBlocked) return overpassFetchViaProxy(body);
+  if (osmDirectBlocked) return overpassFetchViaProxy(body, groupKey);
 
   // 1) Tentativo diretto lato client: corsa fra gli endpoint, timeout breve per fallire in fretta
   const controllers = [];
@@ -3335,6 +3339,8 @@ async function overpassFetch(query) {
     const requests = OVERPASS_ENDPOINTS.map(endpoint => {
       const controller = new AbortController();
       controllers.push(controller);
+      const label = shortOverpassLabel(endpoint);
+      reportOsmDiagStatus(label, groupKey, 'loading');
       return fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
@@ -3342,7 +3348,14 @@ async function overpassFetch(query) {
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12000)])
       }).then(async response => {
         if (!response.ok) throw new Error(`${endpoint} -> HTTP ${response.status}`);
-        return response.json();
+        const data = await response.json();
+        reportOsmDiagStatus(label, groupKey, 'success');
+        return data;
+      }).catch(err => {
+        // Un mirror "abortito" dal nostro stesso controller non ha fallito
+        // davvero: ha solo perso la gara perché un altro ha già risposto.
+        reportOsmDiagStatus(label, groupKey, controller.signal.aborted ? 'idle' : 'failed');
+        throw err;
       });
     });
     return await Promise.any(requests);
@@ -3354,17 +3367,25 @@ async function overpassFetch(query) {
   }
 
   // 2) Fallback: proxy sul Raspberry
-  return overpassFetchViaProxy(body);
+  return overpassFetchViaProxy(body, groupKey);
 }
 
-async function overpassFetchViaProxy(body) {
-  const proxyRes = await fetch(OVERPASS_PROXY, {
-    method: 'POST',
-    body,
-    signal: AbortSignal.timeout(50000)
-  });
-  if (!proxyRes.ok) throw new Error(`Proxy Overpass -> HTTP ${proxyRes.status}`);
-  return proxyRes.json();
+async function overpassFetchViaProxy(body, groupKey) {
+  reportOsmDiagStatus('Proxy Raspberry', groupKey, 'loading');
+  try {
+    const proxyRes = await fetch(OVERPASS_PROXY, {
+      method: 'POST',
+      body,
+      signal: AbortSignal.timeout(50000)
+    });
+    if (!proxyRes.ok) throw new Error(`Proxy Overpass -> HTTP ${proxyRes.status}`);
+    const data = await proxyRes.json();
+    reportOsmDiagStatus('Proxy Raspberry', groupKey, 'success');
+    return data;
+  } catch (err) {
+    reportOsmDiagStatus('Proxy Raspberry', groupKey, 'failed');
+    throw err;
+  }
 }
 
 
@@ -3446,47 +3467,45 @@ function buildFeatureCollectionFromWays(elements, featureType) {
   return { type: 'FeatureCollection', features };
 }
 
-async function fetchOverpassWithFallback(primaryQueryBuilder) {
+async function fetchOverpassWithFallback(primaryQueryBuilder, groupKey) {
   try {
-    return await overpassFetch(primaryQueryBuilder(false));
+    return await overpassFetch(primaryQueryBuilder(false), groupKey);
   } catch (bboxErr) {
     console.warn('Query OSM su bbox non riuscita, uso fallback area:', bboxErr);
-    return overpassFetch(primaryQueryBuilder(true));
+    return overpassFetch(primaryQueryBuilder(true), groupKey);
   }
 }
 
 // ── DIAGNOSTICA OSM (tenendo premuto il pulsante "Aggiorna Dati Mappa") ──────
-// Interroga ogni mirror Overpass singolarmente (non in gara come overpassFetch)
-// per capire esattamente quale servizio funziona e quale no, invece di vedere
-// solo "fallito" senza sapere se il problema è un mirror specifico o tutti.
+// Lo stato mostrato nel pannello rispecchia il caricamento REALE: overpassFetch
+// e overpassFetchViaProxy (usate dal normale loadOSMData) chiamano
+// reportOsmDiagStatus() ad ogni tentativo, quindi la tabella riflette esattamente
+// cosa succede quando l'app carica davvero i dati, non una query separata di test.
 const OSM_DIAG_GROUPS = [
-  { key: 'waterway', label: 'Fiumi', builder: buildOverpassWaterwayQuery },
-  { key: 'cpa', label: 'Aree PC', builder: buildOverpassCPAQuery }
+  { key: 'waterway', label: 'Fiumi' },
+  { key: 'cpa', label: 'Aree PC' }
 ];
 
 function shortOverpassLabel(url) {
   try { return new URL(url).hostname.replace(/^overpass\./, ''); } catch { return url; }
 }
 
-async function fetchOverpassSingle(url, query) {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-    body: new URLSearchParams({ data: query }),
-    signal: AbortSignal.timeout(12000)
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+function osmDiagServiceLabels() {
+  return [...OVERPASS_ENDPOINTS.map(shortOverpassLabel), 'Proxy Raspberry'];
 }
 
-function getOsmDiagServices() {
-  return [
-    ...OVERPASS_ENDPOINTS.map(url => ({
-      label: shortOverpassLabel(url),
-      test: (query) => fetchOverpassSingle(url, query)
-    })),
-    { label: 'Proxy Raspberry', test: (query) => overpassFetchViaProxy(new URLSearchParams({ data: query })) }
-  ];
+// Stato dell'ultimo tentativo reale per servizio+gruppo, persiste tra
+// un'apertura e l'altra del pannello (così mostra subito l'ultimo esito noto,
+// anche se il pannello viene aperto senza premere "Aggiorna ora").
+const osmDiagState = {};
+
+function reportOsmDiagStatus(serviceLabel, groupKey, state) {
+  if (!groupKey) return;
+  if (!osmDiagState[serviceLabel]) osmDiagState[serviceLabel] = {};
+  osmDiagState[serviceLabel][groupKey] = state;
+  if (!osmDiagPanelEl) return;
+  const cell = osmDiagPanelEl.querySelector(`.osm-diag-cell[data-service="${serviceLabel}"][data-group="${groupKey}"]`);
+  if (cell) cell.innerHTML = osmDiagIconHtml(state);
 }
 
 function osmDiagIconHtml(state) {
@@ -3505,29 +3524,6 @@ function osmDiagIconHtml(state) {
 let osmDiagPanelEl = null;
 let osmDiagBackdropEl = null;
 
-function setOsmDiagCell(serviceIdx, groupKey, state) {
-  if (!osmDiagPanelEl) return;
-  const cell = osmDiagPanelEl.querySelector(`.osm-diag-cell[data-service="${serviceIdx}"][data-group="${groupKey}"]`);
-  if (cell) cell.innerHTML = osmDiagIconHtml(state);
-}
-
-async function runOsmDiagnostics() {
-  const services = getOsmDiagServices();
-  const tasks = [];
-  services.forEach((service, si) => {
-    OSM_DIAG_GROUPS.forEach(group => {
-      setOsmDiagCell(si, group.key, 'loading');
-      const query = group.builder(false);
-      tasks.push(
-        service.test(query)
-          .then(() => setOsmDiagCell(si, group.key, 'success'))
-          .catch(() => setOsmDiagCell(si, group.key, 'failed'))
-      );
-    });
-  });
-  await Promise.allSettled(tasks);
-}
-
 function closeOsmDiagPanel() {
   if (osmDiagPanelEl) { osmDiagPanelEl.remove(); osmDiagPanelEl = null; }
   if (osmDiagBackdropEl) { osmDiagBackdropEl.remove(); osmDiagBackdropEl = null; }
@@ -3535,7 +3531,7 @@ function closeOsmDiagPanel() {
 
 function openOsmDiagPanel() {
   closeOsmDiagPanel();
-  const services = getOsmDiagServices();
+  const labels = osmDiagServiceLabels();
 
   osmDiagBackdropEl = document.createElement('div');
   osmDiagBackdropEl.id = 'osm-diag-backdrop';
@@ -3558,24 +3554,27 @@ function openOsmDiagPanel() {
           </tr>
         </thead>
         <tbody>
-          ${services.map((s, si) => `
+          ${labels.map(label => `
             <tr>
-              <td class="osm-diag-service">${s.label}</td>
-              ${OSM_DIAG_GROUPS.map(g => `<td class="osm-diag-cell" data-service="${si}" data-group="${g.key}"></td>`).join('')}
+              <td class="osm-diag-service">${label}</td>
+              ${OSM_DIAG_GROUPS.map(g => `<td class="osm-diag-cell" data-service="${label}" data-group="${g.key}">${osmDiagIconHtml(osmDiagState[label]?.[g.key])}</td>`).join('')}
             </tr>
           `).join('')}
         </tbody>
       </table>
     </div>
-    <button type="button" class="osm-diag-run-btn">Rifai il test</button>
+    <button type="button" class="osm-diag-run-btn">Aggiorna ora</button>
   `;
   document.body.appendChild(panel);
   osmDiagPanelEl = panel;
 
   panel.querySelector('.osm-diag-close').addEventListener('click', closeOsmDiagPanel);
-  panel.querySelector('.osm-diag-run-btn').addEventListener('click', () => runOsmDiagnostics());
-
-  runOsmDiagnostics();
+  // Aggiorna ora = lo stesso refresh reale del pulsante normale: la tabella si
+  // popola osservando i veri tentativi di overpassFetch/overpassFetchViaProxy,
+  // non una query di prova a parte.
+  panel.querySelector('.osm-diag-run-btn').addEventListener('click', () => {
+    triggerOSMRefresh({ forceRefresh: true, animate: true });
+  });
 }
 
 async function loadOSMData(forceRefresh = false) {
@@ -3591,7 +3590,7 @@ async function loadOSMData(forceRefresh = false) {
 
         if (!cachedC) {
           jobs.push((async () => {
-            const cpaData = await fetchOverpassWithFallback(buildOverpassCPAQuery);
+            const cpaData = await fetchOverpassWithFallback(buildOverpassCPAQuery, 'cpa');
             const cpaFeatures = buildFeatureCollectionFromWays(cpaData.elements || [], 'cpa');
             await osmCacheSet('cpa', cpaFeatures);
             renderCPAGeoJSON(cpaFeatures);
@@ -3600,7 +3599,7 @@ async function loadOSMData(forceRefresh = false) {
 
         if (!cachedW) {
           jobs.push((async () => {
-            const waterwayData = await fetchOverpassWithFallback(buildOverpassWaterwayQuery);
+            const waterwayData = await fetchOverpassWithFallback(buildOverpassWaterwayQuery, 'waterway');
             const waterwayFeatures = buildFeatureCollectionFromWays(waterwayData.elements || [], 'waterway');
             await osmCacheSet('waterways', waterwayFeatures);
             renderWaterwayGeoJSON(waterwayFeatures);
