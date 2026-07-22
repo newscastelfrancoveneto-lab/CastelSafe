@@ -1686,7 +1686,7 @@
 
 <div id="inapp-browser-banner" style="display:none;">
   <div id="inapp-browser-banner-inner">
-    <div id="inapp-browser-banner-icon">🔒</div>
+    <div id="inapp-browser-banner-icon"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path></svg></div>
     <div id="inapp-browser-banner-title">Apri in un browser vero</div>
     <div id="inapp-browser-banner-text">
       Stai usando il browser interno di questa app (Facebook/Instagram): qui le notifiche push e l'installazione non possono funzionare. Per usare CastelSafe devi aprirlo in Chrome, Safari o un altro browser.
@@ -1705,7 +1705,7 @@
     max-width:420px; width:100%; text-align:center;
     display:flex; flex-direction:column; align-items:center; gap:14px;
   }
-  #inapp-browser-banner-icon{ font-size:2.8rem; line-height:1; }
+  #inapp-browser-banner-icon{ line-height:1; }
   #inapp-browser-banner-title{ font-size:1.3rem; font-weight:800; }
   #inapp-browser-banner-text{ font-size:.95rem; line-height:1.5; opacity:.95; }
   #inapp-browser-banner-btn{
@@ -6037,6 +6037,9 @@ function showIOSInstallBanner() {
   if (document.getElementById('ios-install-banner')) return;
   if (document.body.classList.contains('has-inapp-banner')) return;
 
+  const SHARE_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px; margin:0 1px;"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>';
+  const ADD_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px; margin:0 1px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>';
+
   const banner = document.createElement('div');
   banner.id = 'ios-install-banner';
   banner.style.cssText = `
@@ -6046,20 +6049,26 @@ function showIOSInstallBanner() {
     transform: translateX(-50%);
     background: #1e293b;
     color: #fff;
-    padding: 12px 18px;
+    padding: 14px 16px;
     border-radius: 16px;
     display: flex;
-    align-items: center;
-    gap: 10px;
+    align-items: flex-start;
+    gap: 12px;
     z-index: 99999;
     box-shadow: 0 8px 24px rgba(0,0,0,0.25);
     font-size: 0.85rem;
-    font-weight: 600;
     max-width: calc(100vw - 24px);
+    width: 320px;
   `;
   banner.innerHTML = `
-    <span>📲 Per installare: tocca <strong>Condividi</strong> ⬆️ poi <strong>"Aggiungi alla Home"</strong></span>
-    <button type="button" style="background:rgba(255,255,255,0.14);color:#fff;border:none;border-radius:999px;padding:6px 10px;cursor:pointer;font-size:0.82rem;flex-shrink:0;" onclick="this.closest('#ios-install-banner').remove()">✕</button>
+    <div style="flex:1; min-width:0; line-height:1.6;">
+      <div style="font-weight:800; margin-bottom:5px;">Installa CastelSafe</div>
+      <div style="font-weight:500; opacity:.92;">
+        1. Tocca ${SHARE_ICON} <strong>Condividi</strong><br>
+        2. Scegli ${ADD_ICON} <strong>"Aggiungi alla schermata Home"</strong>
+      </div>
+    </div>
+    <button type="button" style="background:rgba(255,255,255,0.14);color:#fff;border:none;border-radius:999px;width:26px;height:26px;flex-shrink:0;cursor:pointer;font-size:0.8rem;line-height:1;padding:0;" onclick="this.closest('#ios-install-banner').remove()">✕</button>
   `;
   document.body.appendChild(banner);
 }
