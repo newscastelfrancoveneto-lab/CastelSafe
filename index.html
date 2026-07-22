@@ -10,6 +10,7 @@
        che a schermo intero, e usare un'icona/nome generati automaticamente
        invece di quelli dell'app. Il manifest.json (display:standalone) basta
        solo su iOS 16.4+; questi tag coprono anche le versioni precedenti. -->
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="CastelSafe" />
@@ -3369,15 +3370,20 @@ async function overpassFetchViaProxy(body) {
 
 const CVBBOX = { s: 45.6230, w: 11.8730, n: 45.7020, e: 12.0020 };
 
+// [bbox:...] è un "setting" globale come [out:json]/[timeout:...]: va nella
+// STESSA prima istruzione, non in una riga/istruzione separata dopo il primo
+// ';'. Alcuni mirror Overpass tollerano la forma spezzata, ma quelli con un
+// parser più rigido (es. openstreetmap.fr, maps.mail.ru) la rifiutano con
+// HTTP 400 "parse error: ';' expected - 'bbox' found" — qui era proprio il
+// caso e mascherava mirror perfettamente funzionanti come "falliti".
 function buildOverpassWaterwayQuery(useArea = true) {
-  const selector = useArea
-    ? 'area(3600045549)->.searchArea;'
-    : `[bbox:${CVBBOX.s},${CVBBOX.w},${CVBBOX.n},${CVBBOX.e}];`;
+  const settings = useArea
+    ? '[out:json][timeout:30];\narea(3600045549)->.searchArea;'
+    : `[out:json][timeout:30][bbox:${CVBBOX.s},${CVBBOX.w},${CVBBOX.n},${CVBBOX.e}];`;
 
   const areaFilter = useArea ? '(area.searchArea)' : '';
 
-  return `[out:json][timeout:30];
-${selector}
+  return `${settings}
 (
   way["waterway"~"^(river|stream|canal|drain|ditch)$"]${areaFilter};
 );
@@ -3385,14 +3391,13 @@ out geom qt;`;
 }
 
 function buildOverpassCPAQuery(useArea = true) {
-  const selector = useArea
-    ? 'area(3600045549)->.searchArea;'
-    : `[bbox:${CVBBOX.s},${CVBBOX.w},${CVBBOX.n},${CVBBOX.e}];`;
+  const settings = useArea
+    ? '[out:json][timeout:30];\narea(3600045549)->.searchArea;'
+    : `[out:json][timeout:30][bbox:${CVBBOX.s},${CVBBOX.w},${CVBBOX.n},${CVBBOX.e}];`;
 
   const areaFilter = useArea ? '(area.searchArea)' : '';
 
-  return `[out:json][timeout:30];
-${selector}
+  return `${settings}
 (
   way["emergency"~"^(waiting_area|camp_area|staging_area)$"]${areaFilter};
   way["emergency:waiting_area"="yes"]${areaFilter};
