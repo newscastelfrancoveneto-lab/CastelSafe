@@ -3565,13 +3565,16 @@ function osmDiagIconHtml(state) {
   return '';
 }
 
-// Colonna/riga "Cache": mostra "R" se c'è un dato pronto/disponibile (che
-// sia stato appena scritto da un fetch riuscito, o che sia il fallback
-// attualmente in uso perché tutto il resto è fallito, o che fosse già
-// presente da una sessione precedente) — sempre "R", mai una spunta a
-// parte: la spunta è riservata alla colonna "Server" per indicare che
-// l'ULTIMO fetch reale è andato a buon fine.
+// Colonna/riga "Cache": tre visualizzazioni.
+// - spunta verde → la cache è ATTIVA IN USO ora (tutti i fetch reali sono
+//   falliti e si sta mostrando il dato di fallback salvato).
+// - "R"          → la cache ha un dato pronto/disponibile ma NON è in uso
+//   in questo momento (o perché un fetch è appena riuscito e il dato
+//   mostrato è quello fresco di rete, o perché è rimasta pronta da una
+//   sessione precedente senza che sia mai servito usarla).
+// - "—"          → nessun dato in cache per questo tipo di dato.
 function osmDiagCacheHtml(state) {
+  if (state?.used) return osmDiagIconHtml('success');
   if (state?.ready) return '<span class="osm-diag-cache-ready" title="Cache disponibile">R</span>';
   return '<span class="osm-diag-cache-idle">—</span>';
 }
