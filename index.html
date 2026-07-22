@@ -6019,6 +6019,15 @@ const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 const IS_STANDALONE = window.navigator.standalone === true
   || window.matchMedia('(display-mode: standalone)').matches;
 
+// Brave disattiva di default l'uso dei servizi push di Google (FCM), che è
+// il trasporto su cui si appoggia la Push API standard: senza abilitarlo a
+// mano in brave://settings/privacy, reg.pushManager.subscribe() fallisce.
+// navigator.brave.isBrave() è l'API ufficiale di rilevamento esposta da Brave.
+let IS_BRAVE = false;
+(async () => {
+  try { IS_BRAVE = !!(navigator.brave && await navigator.brave.isBrave()); } catch (e) {}
+})();
+
 // Banner equivalente a showInstallBanner() ma per iOS: mostra le istruzioni
 // manuali (Condividi → Aggiungi a Home) al posto del tutorial esterno con
 // screenshot, così ogni visitatore iOS la vede subito, in app, senza dover
@@ -6112,6 +6121,9 @@ async function subscribeUser() {
     */
   } catch (err) {
     console.error('Subscribe fallito:', err);
+    if (IS_BRAVE) {
+      alert('Su Brave le notifiche push sono spesso disattivate di default per privacy.\n\nVai su brave://settings/privacy → "Usa i servizi Google per la messaggistica push", attivalo, poi riprova.');
+    }
 	updateSubscribeButton();
     /*btn.textContent = 'Errore - Riprova';
     btn.style.background = '#DC2626';  // Rosso errore*/

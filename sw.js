@@ -2,7 +2,7 @@
 // modifica index.html (o altri asset), anche se sw.js non cambia altrimenti.
 // È l'unico modo per cui il browser rileva una nuova versione disponibile e
 // mostra il badge "Aggiornamento disponibile" nell'app.
-const APP_VERSION = '2026-07-22-03';
+const APP_VERSION = '2026-07-22-05';
 
 // Cache dedicata alle icone usate dalle notifiche: le pre-carichiamo così
 // sono sempre disponibili anche se la rete è debole/assente nel momento
@@ -11,9 +11,23 @@ const APP_VERSION = '2026-07-22-03';
 const ICON_CACHE = 'castelsafe-icons-' + APP_VERSION;
 const ICON_URLS = ['icon-192.png', 'icon-512.png', 'badge-96.png'];
 
+// Cache dell'app shell (la pagina principale): senza questa, ad ogni apertura
+// da chiusa (cold start) il browser deve per forza andare in rete prima di
+// poter disegnare qualunque cosa, restando bloccato sulla schermata nativa
+// di splash della PWA se la rete è lenta a partire — il timeout di sicurezza
+// a 15s dentro index.html non può aiutare qui, perché scatta dentro la
+// pagina stessa, che a quel punto non è ancora arrivata. Da background
+// invece la pagina resta viva in memoria e il problema non si presenta mai
+// (comportamento osservato: si blocca solo da chiusa, mai da background).
+const SHELL_CACHE = 'castelsafe-shell-' + APP_VERSION;
+const SHELL_URL = self.registration.scope;
+
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(ICON_CACHE).then(cache => cache.addAll(ICON_URLS)).catch(() => {})
+    Promise.all([
+      caches.open(ICON_CACHE).then(cache => cache.addAll(ICON_URLS)).catch(() => {}),
+      caches.open(SHELL_CACHE).then(cache => cache.add(SHELL_URL)).catch(() => {})
+    ])
   );
 });
 
@@ -22,6 +36,9 @@ self.addEventListener('activate', event => {
     Promise.all([
       caches.keys().then(keys =>
         Promise.all(keys.filter(k => k.startsWith('castelsafe-icons-') && k !== ICON_CACHE).map(k => caches.delete(k)))
+      ),
+      caches.keys().then(keys =>
+        Promise.all(keys.filter(k => k.startsWith('castelsafe-shell-') && k !== SHELL_CACHE).map(k => caches.delete(k)))
       ),
       // Senza questo, dopo skipWaiting() il nuovo SW si attiva ma non prende
       // il controllo delle pagine già aperte: 'controllerchange' non scatta
@@ -39,6 +56,24 @@ self.addEventListener('fetch', event => {
   if (ICON_URLS.some(name => url.pathname.endsWith(name))) {
     event.respondWith(
       caches.match(event.request).then(cached => cached || fetch(event.request))
+    );
+    return;
+  }
+
+  // Navigazione verso l'app (apertura da icona Home): cache-first per un
+  // avvio sempre istantaneo, con aggiornamento della cache in background così
+  // la prossima apertura ha comunque l'ultima versione scaricata con successo.
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      caches.match(SHELL_URL).then(cached => {
+        const network = fetch(event.request).then(response => {
+          if (response && response.ok) {
+            caches.open(SHELL_CACHE).then(cache => cache.put(SHELL_URL, response.clone()));
+          }
+          return response;
+        }).catch(() => null);
+        return cached || network;
+      })
     );
   }
 });
