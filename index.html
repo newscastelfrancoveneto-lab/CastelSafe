@@ -771,6 +771,11 @@
     .osm-diag-cache-row td { background: #f8fafc; }
     .osm-diag-cache-cell { width: 40px; height: 30px; }
     .osm-diag-cache-idle { color: #cbd5e1; font-size: 0.8rem; }
+    .osm-diag-cache-debug {
+      font-size: 0.66rem; color: var(--text-muted); margin-top: 6px; line-height: 1.4;
+      word-break: break-word;
+    }
+    .osm-diag-cache-debug:empty { display: none; }
     .osm-diag-run-btn {
       margin-top: 14px; width: 100%; padding: 10px; border: none; border-radius: var(--radius-md);
       background: var(--primary); color: #fff; font-weight: 700; cursor: pointer; font-size: 0.85rem;
@@ -3191,6 +3196,24 @@ function osmCacheKey(key) {
   return `osmcache_${OSM_CACHE_VERSION}_${key}`;
 }
 
+// Diagnostica visibile nel pannello (pressione prolungata sul refresh): senza
+// accesso alla console del browser sul dispositivo dell'utente, altrimenti
+// non c'è modo di sapere PERCHÉ IndexedDB/localStorage falliscono lì.
+let osmCacheDebug = { lastError: null, lastWriteOk: null, lastWriteAt: null };
+function setOsmCacheDebug(patch) {
+  osmCacheDebug = { ...osmCacheDebug, ...patch };
+  const el = osmDiagPanelEl?.querySelector('.osm-diag-cache-debug');
+  if (el) el.textContent = osmCacheDebugText();
+}
+function osmCacheDebugText() {
+  const parts = [];
+  if (osmCacheDebug.lastWriteAt) {
+    parts.push(`Ultimo salvataggio: ${osmCacheDebug.lastWriteOk ? 'riuscito' : 'FALLITO'} (${new Date(osmCacheDebug.lastWriteAt).toLocaleTimeString('it-IT')})`);
+  }
+  if (osmCacheDebug.lastError) parts.push(`Errore: ${osmCacheDebug.lastError}`);
+  return parts.join(' — ');
+}
+
 function openOsmCacheDB() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open('OsmCacheDB', 1);
@@ -3244,6 +3267,7 @@ async function osmCacheGetStale(key) {
     });
     return entry?.data ?? null;
   } catch (e) {
+    setOsmCacheDebug({ lastError: `Lettura IndexedDB fallita (${key}): ${e?.message || e}` });
     try {
       const raw = localStorage.getItem(cacheKey);
       if (!raw) return null;
@@ -3269,14 +3293,30 @@ async function osmCacheSet(key, data) {
       req.onsuccess = () => res();
       req.onerror = () => rej(req.error);
     });
+    // Verifica di rilettura: su alcuni browser/dispositivi una put() può
+    // "riuscire" (nessun errore) ma il dato non essere davvero recuperabile
+    // subito dopo (storage in modalità privata/molto restrittiva che simula
+    // la scrittura senza persistere nulla). Senza questa verifica, il
+    // pannello avrebbe comunque mostrato "salvataggio riuscito".
+    const db2 = await openOsmCacheDB();
+    const readBack = await new Promise((res, rej) => {
+      const tx = db2.transaction('cache', 'readonly');
+      const req = tx.objectStore('cache').get(cacheKey);
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error);
+    });
+    if (!readBack) throw new Error('scrittura IndexedDB non verificabile in rilettura');
+    setOsmCacheDebug({ lastWriteOk: true, lastWriteAt: Date.now(), lastError: null });
     return true;
   } catch (e) {
     console.warn('osmCacheSet (IndexedDB) fallito, provo localStorage:', e);
     try {
       localStorage.setItem(cacheKey, JSON.stringify(entry));
+      setOsmCacheDebug({ lastWriteOk: true, lastWriteAt: Date.now(), lastError: `IndexedDB fallito (${e?.message || e}), salvato su localStorage` });
       return true;
     } catch(e2) {
       console.warn('osmCacheSet fallito anche su localStorage (storage pieno?):', e2);
+      setOsmCacheDebug({ lastWriteOk: false, lastWriteAt: Date.now(), lastError: `${e?.message || e} / localStorage: ${e2?.message || e2}` });
       return false;
     }
   }
@@ -3689,6 +3729,7 @@ async function openOsmDiagPanel() {
         </tbody>
       </table>
     </div>
+    <div class="osm-diag-cache-debug">${osmCacheDebugText()}</div>
     <div class="osm-diag-subtitle">Dati Server</div>
     <div class="osm-diag-table-wrap">
       <table class="osm-diag-table">
