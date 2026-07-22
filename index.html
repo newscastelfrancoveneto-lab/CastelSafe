@@ -3253,6 +3253,11 @@ async function osmCacheGetStale(key) {
   }
 }
 
+// Ritorna true/false in base al reale esito del salvataggio: chi chiama usa
+// questo per decidere se segnare la cache come "pronta" (R/spunta) nel
+// pannello diagnostico — prima non veniva mai controllato, quindi un
+// salvataggio silenziosamente fallito (sia su IndexedDB che sul fallback
+// localStorage) risultava comunque mostrato come "pronto".
 async function osmCacheSet(key, data) {
   const cacheKey = osmCacheKey(key);
   const entry = { ts: Date.now(), data };
@@ -3264,11 +3269,16 @@ async function osmCacheSet(key, data) {
       req.onsuccess = () => res();
       req.onerror = () => rej(req.error);
     });
+    return true;
   } catch (e) {
     console.warn('osmCacheSet (IndexedDB) fallito, provo localStorage:', e);
     try {
       localStorage.setItem(cacheKey, JSON.stringify(entry));
-    } catch(e2) { console.warn('osmCacheSet fallito anche su localStorage (storage pieno?):', e2); }
+      return true;
+    } catch(e2) {
+      console.warn('osmCacheSet fallito anche su localStorage (storage pieno?):', e2);
+      return false;
+    }
   }
 }
 
@@ -3741,9 +3751,9 @@ async function loadOSMData(forceRefresh = false) {
         try {
           const cpaData = await fetchOverpassWithFallback(buildOverpassCPAQuery, 'cpa');
           const cpaFeatures = buildFeatureCollectionFromWays(cpaData.elements || [], 'cpa');
-          await osmCacheSet('cpa', cpaFeatures);
+          const saved = await osmCacheSet('cpa', cpaFeatures);
           renderCPAGeoJSON(cpaFeatures);
-          reportOsmCache('cpa', { used: false, ready: true });
+          reportOsmCache('cpa', { used: false, ready: saved });
         } catch (err) {
           console.error('Errore caricamento dati OSM (aree PC):', err);
           const stale = await osmCacheGetStale('cpa');
@@ -3757,9 +3767,9 @@ async function loadOSMData(forceRefresh = false) {
         try {
           const waterwayData = await fetchOverpassWithFallback(buildOverpassWaterwayQuery, 'waterway');
           const waterwayFeatures = buildFeatureCollectionFromWays(waterwayData.elements || [], 'waterway');
-          await osmCacheSet('waterways', waterwayFeatures);
+          const saved = await osmCacheSet('waterways', waterwayFeatures);
           renderWaterwayGeoJSON(waterwayFeatures);
-          reportOsmCache('waterway', { used: false, ready: true });
+          reportOsmCache('waterway', { used: false, ready: saved });
         } catch (err) {
           console.error('Errore caricamento dati OSM (fiumi):', err);
           const stale = await osmCacheGetStale('waterways');
@@ -6638,6 +6648,16 @@ async function refreshPushSubscriptionSilently() {
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
+// Senza storage "persistente", il browser (soprattutto Android/Chrome sotto
+// pressione di spazio) può liberare la cache IndexedDB di un'origine poco
+// usata tra una chiusura e l'altra dell'app — anche se il salvataggio era
+// riuscito, i dati sparivano al riavvio. Richiesta best-effort: se il
+// browser la nega non succede nulla di grave, i dati restano comunque validi
+// finché la sessione/scheda rimane aperta.
+if (navigator.storage?.persist) {
+  navigator.storage.persist().catch(() => {});
+}
+
 window.__bootStatus && window.__bootStatus('Caricamento dati Protezione Civile…');
 refreshPushSubscriptionSilently();
 initMarkers();
