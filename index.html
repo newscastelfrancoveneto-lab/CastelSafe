@@ -749,6 +749,10 @@
       width: 28px; height: 28px; cursor: pointer; font-size: 0.85rem;
       color: var(--text-muted); flex-shrink: 0;
     }
+    .osm-diag-subtitle {
+      font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
+      color: var(--text-muted); margin: 10px 0 6px;
+    }
     .osm-diag-table-wrap { overflow-x: auto; }
     .osm-diag-table { border-collapse: collapse; }
     .osm-diag-table th, .osm-diag-table td {
@@ -3646,9 +3650,10 @@ async function openOsmDiagPanel() {
   panel.id = 'osm-diag-panel';
   panel.innerHTML = `
     <div class="osm-diag-header">
-      <span>Stato servizi dati OSM</span>
+      <span>Stato servizi</span>
       <button type="button" class="osm-diag-close" aria-label="Chiudi">✕</button>
     </div>
+    <div class="osm-diag-subtitle">Dati OSM</div>
     <div class="osm-diag-table-wrap">
       <table class="osm-diag-table">
         <thead>
@@ -3671,6 +3676,7 @@ async function openOsmDiagPanel() {
         </tbody>
       </table>
     </div>
+    <div class="osm-diag-subtitle">Dati Server</div>
     <div class="osm-diag-allerta-row">
       <span class="osm-diag-allerta-label">Barra allerte</span>
       <span class="osm-diag-allerta-status">${osmDiagIconHtml(allertaDiagState)}</span>
