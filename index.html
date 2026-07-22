@@ -725,6 +725,50 @@
     .refresh-spinning {
       animation: spin-refresh 1s linear infinite;
     }
+
+    /* ── PANNELLO DIAGNOSTICA OSM (pressione prolungata su refresh) ── */
+    #osm-diag-backdrop {
+      position: fixed; inset: 0; z-index: 100000;
+      background: rgba(15, 23, 42, 0.45);
+    }
+    #osm-diag-panel {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      z-index: 100001;
+      background: #fff; border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-float);
+      padding: 16px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px);
+      overflow: auto; font-family: 'Inter', system-ui, sans-serif;
+    }
+    .osm-diag-header {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      margin-bottom: 12px; font-weight: 800; font-size: 0.92rem; color: var(--text-main);
+    }
+    .osm-diag-close {
+      background: #f1f5f9; border: none; border-radius: 50%;
+      width: 28px; height: 28px; cursor: pointer; font-size: 0.85rem;
+      color: var(--text-muted); flex-shrink: 0;
+    }
+    .osm-diag-table-wrap { overflow-x: auto; }
+    .osm-diag-table { border-collapse: collapse; }
+    .osm-diag-table th, .osm-diag-table td {
+      border: 1px solid #e2e8f0; padding: 6px 8px; text-align: center;
+    }
+    .osm-diag-table td.osm-diag-service {
+      text-align: left; white-space: nowrap; font-size: 0.76rem;
+      font-weight: 600; color: var(--text-main);
+    }
+    .osm-diag-table th span {
+      writing-mode: vertical-rl; transform: rotate(180deg);
+      font-size: 0.7rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;
+    }
+    .osm-diag-cell { width: 40px; height: 34px; }
+    .osm-diag-spin { animation: spin-refresh 0.8s linear infinite; transform-origin: center; }
+    .osm-diag-run-btn {
+      margin-top: 14px; width: 100%; padding: 10px; border: none; border-radius: var(--radius-md);
+      background: var(--primary); color: #fff; font-weight: 700; cursor: pointer; font-size: 0.85rem;
+    }
+    .osm-diag-run-btn:active { transform: scale(0.98); }
+
     /* ── OFFSET SOTTO BARRA ALLERTE ── */
     .leaflet-top { margin-top: 46px !important; }
 
@@ -3404,6 +3448,129 @@ async function fetchOverpassWithFallback(primaryQueryBuilder) {
   }
 }
 
+// ── DIAGNOSTICA OSM (tenendo premuto il pulsante "Aggiorna Dati Mappa") ──────
+// Interroga ogni mirror Overpass singolarmente (non in gara come overpassFetch)
+// per capire esattamente quale servizio funziona e quale no, invece di vedere
+// solo "fallito" senza sapere se il problema è un mirror specifico o tutti.
+const OSM_DIAG_GROUPS = [
+  { key: 'waterway', label: 'Fiumi', builder: buildOverpassWaterwayQuery },
+  { key: 'cpa', label: 'Aree PC', builder: buildOverpassCPAQuery }
+];
+
+function shortOverpassLabel(url) {
+  try { return new URL(url).hostname.replace(/^overpass\./, ''); } catch { return url; }
+}
+
+async function fetchOverpassSingle(url, query) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+    body: new URLSearchParams({ data: query }),
+    signal: AbortSignal.timeout(12000)
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+function getOsmDiagServices() {
+  return [
+    ...OVERPASS_ENDPOINTS.map(url => ({
+      label: shortOverpassLabel(url),
+      test: (query) => fetchOverpassSingle(url, query)
+    })),
+    { label: 'Proxy Raspberry', test: (query) => overpassFetchViaProxy(new URLSearchParams({ data: query })) }
+  ];
+}
+
+function osmDiagIconHtml(state) {
+  if (state === 'success') {
+    return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" stroke="#16a34a" stroke-width="1.3" opacity="0.3"/><path d="M6 12.5l4 4 8-9"/></svg>';
+  }
+  if (state === 'failed') {
+    return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" stroke="#dc2626" stroke-width="1.3" opacity="0.3"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7"/></svg>';
+  }
+  if (state === 'loading') {
+    return '<svg class="osm-diag-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="9" stroke-dasharray="40 16"/></svg>';
+  }
+  return '';
+}
+
+let osmDiagPanelEl = null;
+let osmDiagBackdropEl = null;
+
+function setOsmDiagCell(serviceIdx, groupKey, state) {
+  if (!osmDiagPanelEl) return;
+  const cell = osmDiagPanelEl.querySelector(`.osm-diag-cell[data-service="${serviceIdx}"][data-group="${groupKey}"]`);
+  if (cell) cell.innerHTML = osmDiagIconHtml(state);
+}
+
+async function runOsmDiagnostics() {
+  const services = getOsmDiagServices();
+  const tasks = [];
+  services.forEach((service, si) => {
+    OSM_DIAG_GROUPS.forEach(group => {
+      setOsmDiagCell(si, group.key, 'loading');
+      const query = group.builder(false);
+      tasks.push(
+        service.test(query)
+          .then(() => setOsmDiagCell(si, group.key, 'success'))
+          .catch(() => setOsmDiagCell(si, group.key, 'failed'))
+      );
+    });
+  });
+  await Promise.allSettled(tasks);
+}
+
+function closeOsmDiagPanel() {
+  if (osmDiagPanelEl) { osmDiagPanelEl.remove(); osmDiagPanelEl = null; }
+  if (osmDiagBackdropEl) { osmDiagBackdropEl.remove(); osmDiagBackdropEl = null; }
+}
+
+function openOsmDiagPanel() {
+  closeOsmDiagPanel();
+  const services = getOsmDiagServices();
+
+  osmDiagBackdropEl = document.createElement('div');
+  osmDiagBackdropEl.id = 'osm-diag-backdrop';
+  osmDiagBackdropEl.addEventListener('click', closeOsmDiagPanel);
+  document.body.appendChild(osmDiagBackdropEl);
+
+  const panel = document.createElement('div');
+  panel.id = 'osm-diag-panel';
+  panel.innerHTML = `
+    <div class="osm-diag-header">
+      <span>Stato servizi dati OSM</span>
+      <button type="button" class="osm-diag-close" aria-label="Chiudi">✕</button>
+    </div>
+    <div class="osm-diag-table-wrap">
+      <table class="osm-diag-table">
+        <thead>
+          <tr>
+            <th></th>
+            ${OSM_DIAG_GROUPS.map(g => `<th><span>${g.label}</span></th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${services.map((s, si) => `
+            <tr>
+              <td class="osm-diag-service">${s.label}</td>
+              ${OSM_DIAG_GROUPS.map(g => `<td class="osm-diag-cell" data-service="${si}" data-group="${g.key}"></td>`).join('')}
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+    <button type="button" class="osm-diag-run-btn">Rifai il test</button>
+  `;
+  document.body.appendChild(panel);
+  osmDiagPanelEl = panel;
+
+  panel.querySelector('.osm-diag-close').addEventListener('click', closeOsmDiagPanel);
+  panel.querySelector('.osm-diag-run-btn').addEventListener('click', () => runOsmDiagnostics());
+
+  runOsmDiagnostics();
+}
+
 async function loadOSMData(forceRefresh = false) {
     // Cache: se entrambi validi, renderizza e torna subito
     const cachedW = forceRefresh ? null : await osmCacheGet('waterways');
@@ -4025,8 +4192,29 @@ const LayerSwitcher = L.Control.extend({
       document.body.classList.toggle('layer-menu-open', menu.classList.contains('open'));
     });
 
+    // Pressione prolungata (~700ms) sul pulsante refresh: apre il pannello
+    // diagnostico invece del refresh normale. Il click "normale" dopo un
+    // rilascio prolungato viene soppresso, altrimenti partirebbe anche il
+    // refresh vero e proprio insieme all'apertura del pannello.
+    let refreshPressTimer = null;
+    let refreshLongPressed = false;
+    const REFRESH_LONG_PRESS_MS = 700;
+    const cancelRefreshPress = () => clearTimeout(refreshPressTimer);
+    refreshBtn.addEventListener('pointerdown', () => {
+      refreshLongPressed = false;
+      clearTimeout(refreshPressTimer);
+      refreshPressTimer = setTimeout(() => {
+        refreshLongPressed = true;
+        openOsmDiagPanel();
+      }, REFRESH_LONG_PRESS_MS);
+    });
+    refreshBtn.addEventListener('pointerup', cancelRefreshPress);
+    refreshBtn.addEventListener('pointerleave', cancelRefreshPress);
+    refreshBtn.addEventListener('pointercancel', cancelRefreshPress);
+
     refreshBtn.addEventListener('click', async (e) => {
       e.preventDefault();
+      if (refreshLongPressed) { refreshLongPressed = false; return; }
       await triggerOSMRefresh({ forceRefresh: true, animate: true });
     });
 
