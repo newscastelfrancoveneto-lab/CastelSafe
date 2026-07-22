@@ -764,6 +764,19 @@
     }
     .osm-diag-cell { width: 40px; height: 34px; }
     .osm-diag-spin { animation: spin-refresh 0.8s linear infinite; transform-origin: center; }
+    .osm-diag-cache-row td { background: #f8fafc; }
+    .osm-diag-cache-cell { width: 40px; height: 30px; }
+    .osm-diag-cache-badge {
+      font-size: 0.62rem; font-weight: 800; color: #b45309; background: #fef3c7;
+      border-radius: 999px; padding: 2px 6px; white-space: nowrap;
+    }
+    .osm-diag-cache-idle { color: #cbd5e1; font-size: 0.8rem; }
+    .osm-diag-allerta-row {
+      display: flex; align-items: center; gap: 10px; margin-top: 12px;
+      padding: 8px 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: var(--radius-md);
+    }
+    .osm-diag-allerta-label { flex: 1; font-size: 0.78rem; font-weight: 700; color: var(--text-main); }
+    .osm-diag-allerta-status { display: flex; align-items: center; }
     .osm-diag-run-btn {
       margin-top: 14px; width: 100%; padding: 10px; border: none; border-radius: var(--radius-md);
       background: var(--primary); color: #fff; font-weight: 700; cursor: pointer; font-size: 0.85rem;
@@ -3222,6 +3235,30 @@ async function osmCacheGet(key) {
   }
 }
 
+// Lettura "stale" che ignora il TTL: usata come ultima spiaggia quando TUTTI
+// i fetch (mirror + proxy) falliscono, per mostrare comunque l'ultimo dato
+// buono conosciuto invece di lasciare la mappa vuota.
+async function osmCacheGetStale(key) {
+  const cacheKey = osmCacheKey(key);
+  try {
+    const db = await openOsmCacheDB();
+    const entry = await new Promise((res, rej) => {
+      const tx = db.transaction('cache', 'readonly');
+      const req = tx.objectStore('cache').get(cacheKey);
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error);
+    });
+    return entry?.data ?? null;
+  } catch (e) {
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      if (!raw) return null;
+      const { data } = JSON.parse(raw);
+      return data ?? null;
+    } catch (e2) { return null; }
+  }
+}
+
 async function osmCacheSet(key, data) {
   const cacheKey = osmCacheKey(key);
   const entry = { ts: Date.now(), data };
@@ -3522,6 +3559,40 @@ function osmDiagIconHtml(state) {
   return '';
 }
 
+// Riga aggiuntiva "Cache": si accende solo quando TUTTI i tentativi di rete
+// per quel gruppo sono falliti e si è dovuto ripiegare sull'ultimo dato
+// buono salvato — non quando si serve normalmente dalla cache fresca.
+function osmDiagCacheHtml(used) {
+  if (used === true) return '<span class="osm-diag-cache-badge">in uso</span>';
+  if (used === false) return '<span class="osm-diag-cache-idle">—</span>';
+  return '';
+}
+
+const osmCacheUsedState = {}; // { waterway: true/false, cpa: true/false }
+
+function reportOsmCacheUsed(groupKey, used) {
+  osmCacheUsedState[groupKey] = used;
+  if (!osmDiagPanelEl) return;
+  const cell = osmDiagPanelEl.querySelector(`.osm-diag-cache-cell[data-group="${groupKey}"]`);
+  if (cell) cell.innerHTML = osmDiagCacheHtml(used);
+}
+
+// ── Stato reale della barra allerte, mostrato sotto la tabella OSM ──────────
+let allertaDiagState = null; // 'loading' | 'success' | 'failed'
+let allertaCacheUsedState = false;
+
+function reportAllertaDiagStatus(state) {
+  allertaDiagState = state;
+  const cell = osmDiagPanelEl?.querySelector('.osm-diag-allerta-status');
+  if (cell) cell.innerHTML = osmDiagIconHtml(state);
+}
+
+function reportAllertaCacheUsed(used) {
+  allertaCacheUsedState = used;
+  const cell = osmDiagPanelEl?.querySelector('.osm-diag-allerta-cache');
+  if (cell) cell.innerHTML = osmDiagCacheHtml(used);
+}
+
 let osmDiagPanelEl = null;
 let osmDiagBackdropEl = null;
 
@@ -3561,8 +3632,17 @@ function openOsmDiagPanel() {
               ${OSM_DIAG_GROUPS.map(g => `<td class="osm-diag-cell" data-service="${label}" data-group="${g.key}">${osmDiagIconHtml(osmDiagState[label]?.[g.key])}</td>`).join('')}
             </tr>
           `).join('')}
+          <tr class="osm-diag-cache-row">
+            <td class="osm-diag-service">Cache (se tutto fallisce)</td>
+            ${OSM_DIAG_GROUPS.map(g => `<td class="osm-diag-cache-cell" data-group="${g.key}">${osmDiagCacheHtml(osmCacheUsedState[g.key])}</td>`).join('')}
+          </tr>
         </tbody>
       </table>
+    </div>
+    <div class="osm-diag-allerta-row">
+      <span class="osm-diag-allerta-label">Barra allerte</span>
+      <span class="osm-diag-allerta-status">${osmDiagIconHtml(allertaDiagState)}</span>
+      <span class="osm-diag-allerta-cache">${osmDiagCacheHtml(allertaCacheUsedState)}</span>
     </div>
     <button type="button" class="osm-diag-run-btn">Aggiorna ora</button>
   `;
@@ -3570,11 +3650,12 @@ function openOsmDiagPanel() {
   osmDiagPanelEl = panel;
 
   panel.querySelector('.osm-diag-close').addEventListener('click', closeOsmDiagPanel);
-  // Aggiorna ora = lo stesso refresh reale del pulsante normale: la tabella si
-  // popola osservando i veri tentativi di overpassFetch/overpassFetchViaProxy,
-  // non una query di prova a parte.
+  // Aggiorna ora = lo stesso refresh reale usato altrove (dati OSM + barra
+  // allerte): la tabella e la riga allerte si popolano osservando i veri
+  // tentativi di rete, non una query di prova a parte.
   panel.querySelector('.osm-diag-run-btn').addEventListener('click', () => {
     triggerOSMRefresh({ forceRefresh: true, animate: true });
+    checkAllertaUpdates();
   });
 }
 
@@ -3586,32 +3667,44 @@ async function loadOSMData(forceRefresh = false) {
     if (cachedC) renderCPAGeoJSON(cachedC);
     if (cachedW && cachedC) return;
 
-    try {
-        const jobs = [];
+    const jobs = [];
 
-        if (!cachedC) {
-          jobs.push((async () => {
-            const cpaData = await fetchOverpassWithFallback(buildOverpassCPAQuery, 'cpa');
-            const cpaFeatures = buildFeatureCollectionFromWays(cpaData.elements || [], 'cpa');
-            await osmCacheSet('cpa', cpaFeatures);
-            renderCPAGeoJSON(cpaFeatures);
-          })());
+    // Se TUTTI i tentativi (mirror diretti + proxy) falliscono, ripiega
+    // sull'ultimo dato buono in cache (anche scaduto) invece di lasciare il
+    // layer vuoto, segnalandolo nel pannello diagnostico.
+    if (!cachedC) {
+      jobs.push((async () => {
+        try {
+          const cpaData = await fetchOverpassWithFallback(buildOverpassCPAQuery, 'cpa');
+          const cpaFeatures = buildFeatureCollectionFromWays(cpaData.elements || [], 'cpa');
+          await osmCacheSet('cpa', cpaFeatures);
+          renderCPAGeoJSON(cpaFeatures);
+          reportOsmCacheUsed('cpa', false);
+        } catch (err) {
+          console.error('Errore caricamento dati OSM (aree PC):', err);
+          const stale = await osmCacheGetStale('cpa');
+          if (stale) { renderCPAGeoJSON(stale); reportOsmCacheUsed('cpa', true); }
         }
-
-        if (!cachedW) {
-          jobs.push((async () => {
-            const waterwayData = await fetchOverpassWithFallback(buildOverpassWaterwayQuery, 'waterway');
-            const waterwayFeatures = buildFeatureCollectionFromWays(waterwayData.elements || [], 'waterway');
-            await osmCacheSet('waterways', waterwayFeatures);
-            renderWaterwayGeoJSON(waterwayFeatures);
-          })());
-        }
-
-        await Promise.all(jobs);
-
-    } catch (e) {
-        console.error('Errore caricamento dati OSM:', e);
+      })());
     }
+
+    if (!cachedW) {
+      jobs.push((async () => {
+        try {
+          const waterwayData = await fetchOverpassWithFallback(buildOverpassWaterwayQuery, 'waterway');
+          const waterwayFeatures = buildFeatureCollectionFromWays(waterwayData.elements || [], 'waterway');
+          await osmCacheSet('waterways', waterwayFeatures);
+          renderWaterwayGeoJSON(waterwayFeatures);
+          reportOsmCacheUsed('waterway', false);
+        } catch (err) {
+          console.error('Errore caricamento dati OSM (fiumi):', err);
+          const stale = await osmCacheGetStale('waterways');
+          if (stale) { renderWaterwayGeoJSON(stale); reportOsmCacheUsed('waterway', true); }
+        }
+      })());
+    }
+
+    await Promise.all(jobs);
 }
 
 const pcIcon = L.divIcon({
@@ -6762,12 +6855,50 @@ function renderAllerta(d) {
   setTimeout(() => map.invalidateSize(), 300);
 }
 	
+// Cache locale del bollettino allerta: se il fetch fallisce (server giù,
+// rete assente), mostriamo comunque l'ultimo dato buono conosciuto invece
+// di lasciare la barra vuota. Nessun TTL: qui la "freschezza" conta meno
+// della disponibilità, e il polling normale la tiene comunque aggiornata
+// appena la rete torna.
+const ALLERTA_CACHE_KEY = 'allerta_cache_v1';
+function saveAllertaCache(data) {
+  try { localStorage.setItem(ALLERTA_CACHE_KEY, JSON.stringify({ ts: Date.now(), data })); } catch (e) {}
+}
+function readAllertaCache() {
+  try {
+    const raw = localStorage.getItem(ALLERTA_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw)?.data ?? null;
+  } catch (e) { return null; }
+}
+
+// Fetch reale del bollettino allerta, usata sia da loadAllerta che da
+// checkAllertaUpdates: riporta lo stato nel pannello diagnostico e, se il
+// fetch fallisce, ripiega sull'ultima cache salvata segnandolo nel pannello.
+async function fetchAllertaWithCache() {
+  reportAllertaDiagStatus('loading');
+  try {
+    const res = await apiFetch('/api/allerta', { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const d = await res.json();
+    saveAllertaCache(d);
+    reportAllertaDiagStatus('success');
+    reportAllertaCacheUsed(false);
+    return d;
+  } catch (e) {
+    reportAllertaDiagStatus('failed');
+    const cached = readAllertaCache();
+    if (cached) {
+      reportAllertaCacheUsed(true);
+      return cached;
+    }
+    throw e;
+  }
+}
+
 async function loadAllerta(data = null) {
   try {
-    if (data) { renderAllerta(data); return; }
-    const res = await apiFetch('/api/allerta', { cache: 'no-store' });
-    if (!res.ok) return;
-    const d = await res.json();
+    const d = data || await fetchAllertaWithCache();
     renderAllerta(d);
   } catch(e) { console.log('Allerta non disponibile', e.message); }
 }
@@ -6775,9 +6906,7 @@ async function loadAllerta(data = null) {
 
 async function checkAllertaUpdates() {
   try {
-    const res = await apiFetch('/api/allerta', { cache: 'no-store' });
-    if (!res.ok) return;
-    const d = await res.json();
+    const d = await fetchAllertaWithCache();
     if (!d || !d.idr) return;
     const signature = getAllertaSignature(d);
     if (signature === lastAllertaSignature) return;  // Nessun cambio
