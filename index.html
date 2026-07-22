@@ -16,7 +16,11 @@
   <link rel="apple-touch-icon" href="icon-192.png" />
 
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <!-- "user-scalable=no"/"maximum-scale=1.0" impedivano lo zoom manuale (pinch):
+       su iOS in particolare, l'impostazione di sistema "Testo grande" NON
+       ingrandisce da sola il testo dei siti web — chi ne ha bisogno deve poter
+       fare pinch-to-zoom, che qui era completamente bloccato. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
 
   <script>
@@ -3792,6 +3796,21 @@ async function updateSubscribeButton() {
   const btn = document.getElementById('btn-subscribe-main');
   if (!btn) return;
 
+  // Dispositivi/versioni troppo vecchi (iOS sotto il 16.4, che ha introdotto
+  // il Push per le web app da Home Screen, o Android con Chrome ormai
+  // abbandonato dagli aggiornamenti): qui reg.pushManager non esisterà MAI,
+  // installata o no. Va rilevato con un controllo di feature, non sulla
+  // versione — su iPad con user agent "da Mac" (vedi IS_IOS più sopra) la
+  // vera versione di iPadOS non è nemmeno leggibile dallo user agent.
+  if (!SUPPORTS_PUSH) {
+    btn.textContent = 'Notifiche non disponibili su questo dispositivo';
+    btn.style.background = '#64748b';
+    btn.style.opacity = '1';
+    btn.classList.remove('btn-attention');
+    updateBellAttention();
+    return;
+  }
+
   // Su iOS il Push non esiste finché l'app non è aggiunta alla Home e aperta
   // in standalone: mostrare "Attiva Notifiche" qui porterebbe solo a un fallimento
   // silenzioso in subscribeUser(). Spieghiamo il vero passo da fare.
@@ -3829,8 +3848,13 @@ async function updateSubscribeButton() {
 function updateBellAttention() {
   const bell = document.getElementById('btn-bell');
   if (!bell) return;
-  const needsAttention = (IS_IOS && !IS_STANDALONE)
-    || (('Notification' in window) && Notification.permission === 'default');
+  // Niente animazione se le notifiche sono comunque irraggiungibili su
+  // questo dispositivo: non ha senso richiamare l'attenzione su un'azione
+  // che non può avere successo.
+  const needsAttention = SUPPORTS_PUSH && (
+    (IS_IOS && !IS_STANDALONE)
+    || (('Notification' in window) && Notification.permission === 'default')
+  );
   bell.classList.toggle('bell-attention', needsAttention);
 }
 
@@ -6015,9 +6039,23 @@ function initGlobalRefreshScheduler() {
 // Senza questo controllo, subscribeUser() fallisce silenziosamente su ogni
 // iPhone non installato (reg.pushManager è undefined), lasciando l'utente
 // senza spiegazione del perché "Attiva Notifiche" non fa nulla.
-const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+// Da iOS 13 in poi Safari su iPad manda di default uno user agent "da Mac
+// desktop" (niente "iPad" nella stringa): senza il controllo su maxTouchPoints,
+// un iPad verrebbe trattato come un desktop qualsiasi, saltando sia il banner
+// "Aggiungi alla Home" sia il blocco del pulsante notifiche — che però su
+// iPad ha esattamente le stesse restrizioni Push/standalone di un iPhone.
+const IS_IOS = (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const IS_STANDALONE = window.navigator.standalone === true
   || window.matchMedia('(display-mode: standalone)').matches;
+
+// Rilevamento per feature, non per versione: su iOS il Push per le web app è
+// arrivato solo con iOS/iPadOS 16.4, ma la versione non è nemmeno leggibile
+// dallo user agent quando un iPad si maschera da Mac (vedi IS_IOS sopra).
+// Questo controllo copre da solo sia iPhone/iPad troppo vecchi sia qualunque
+// Android con Chrome ormai fuori dagli aggiornamenti: se l'API non esiste,
+// non esiste, a prescindere dal perché.
+const SUPPORTS_PUSH = ('serviceWorker' in navigator) && ('PushManager' in window);
 
 // Brave disattiva di default l'uso dei servizi push di Google (FCM), che è
 // il trasporto su cui si appoggia la Push API standard: senza abilitarlo a
@@ -6087,6 +6125,13 @@ function urlBase64ToUint8Array(base64String) {
 async function subscribeUser() {
   const btn = document.getElementById('btn-subscribe-main');
   if (!btn) return console.error('Bottone subscribe non trovato');
+
+  // Dispositivo/browser troppo vecchio: reg.pushManager non esiste e non
+  // esisterà, installata o no. Meglio dirlo chiaramente che tentare e fallire.
+  if (!SUPPORTS_PUSH) {
+    alert('Le notifiche push non sono disponibili su questo dispositivo o versione del sistema.\n\nSu iPhone/iPad serve iOS 16.4 o successivo.');
+    return;
+  }
 
   // Su iOS reg.pushManager non esiste fuori dalla modalità standalone: senza
   // questo controllo la subscribe fallirebbe silenziosamente (vedi commento

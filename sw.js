@@ -2,7 +2,7 @@
 // modifica index.html (o altri asset), anche se sw.js non cambia altrimenti.
 // È l'unico modo per cui il browser rileva una nuova versione disponibile e
 // mostra il badge "Aggiornamento disponibile" nell'app.
-const APP_VERSION = '2026-07-22-06';
+const APP_VERSION = '2026-07-22-09';
 
 // Cache dedicata alle icone usate dalle notifiche: le pre-carichiamo così
 // sono sempre disponibili anche se la rete è debole/assente nel momento
@@ -194,9 +194,15 @@ async function saveAndBroadcastNotification(data) {
     console.error('Salvataggio IndexedDB fallito', e);
   }
 
-  const channel = new BroadcastChannel('notifications-channel');
-  channel.postMessage({ ...notif, type: 'RELOAD_CLOSURES' });
-  channel.close();
+  // BroadcastChannel non esiste su iOS sotto il 15.4: senza questo controllo,
+  // su quei dispositivi la notifica verrebbe comunque mostrata da
+  // showNotification() ma la Promise.all() nel gestore 'push' finirebbe
+  // rigettata da un ReferenceError qui, invece che risolversi pulita.
+  if (typeof BroadcastChannel !== 'undefined') {
+    const channel = new BroadcastChannel('notifications-channel');
+    channel.postMessage({ ...notif, type: 'RELOAD_CLOSURES' });
+    channel.close();
+  }
 }
 
 self.addEventListener('message', event => {
