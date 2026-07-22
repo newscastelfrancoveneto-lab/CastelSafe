@@ -3734,11 +3734,16 @@ async function loadOSMData(forceRefresh = false) {
     // bloccati sul solo proxy se i mirror diretti erano falliti in passato.
     if (forceRefresh) resetOsmDirectBlocked();
 
-    // Cache: se entrambi validi, renderizza e torna subito
+    // Cache: se entrambi validi, renderizza e torna subito. Anche questo è a
+    // tutti gli effetti "sto mostrando dati di cache, non appena scaricati"
+    // (used:true) — senza questo, riaprendo l'app con una cache già valida
+    // (percorso più comune di tutti, visto il TTL di 7gg) il pannello
+    // mostrava sempre "R" a prescindere da quanto la rete fosse disponibile,
+    // perché la rete non veniva proprio interpellata.
     const cachedW = forceRefresh ? null : await osmCacheGet('waterways');
     const cachedC = forceRefresh ? null : await osmCacheGet('cpa');
-    if (cachedW) renderWaterwayGeoJSON(cachedW);
-    if (cachedC) renderCPAGeoJSON(cachedC);
+    if (cachedW) { renderWaterwayGeoJSON(cachedW); reportOsmCache('waterway', { used: true, ready: true }); }
+    if (cachedC) { renderCPAGeoJSON(cachedC); reportOsmCache('cpa', { used: true, ready: true }); }
     if (cachedW && cachedC) return;
 
     const jobs = [];
