@@ -5999,7 +5999,7 @@ async function tickCountdown() {
   if (refreshState?.waiting) {
     waitingForFreshData = true;
     setBadgeWaitingState(true);
-    label.textContent = 'In attesa aggiornamento ARPAV...';
+    label.textContent = 'In attesa di ARPAV';
     setTimeout(tickCountdown, 1000);
     return;
   }
@@ -6013,7 +6013,7 @@ async function tickCountdown() {
     if (!waitingForFreshData) {
       waitingForFreshData = true;
       setBadgeWaitingState(true);
-      label.textContent = 'In attesa aggiornamento ARPAV...';
+      label.textContent = 'In attesa di ARPAV';
 
       const stn = currentStnRef;
       const baselineTimestamp = stationLastTimestamp[stn.id] || toArpavTimestamp(nextRefresh);
@@ -6024,7 +6024,7 @@ async function tickCountdown() {
       });
       triggerGlobalHalfHourRefresh(nextRefresh);
     } else {
-      label.textContent = 'In attesa aggiornamento ARPAV...';
+      label.textContent = 'In attesa di ARPAV';
     }
     setTimeout(tickCountdown, 1000);
     return;
