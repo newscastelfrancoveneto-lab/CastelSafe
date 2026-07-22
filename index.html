@@ -623,14 +623,36 @@
 	}
 
 	.btn-rect-rounded.btn-attention {
-	  animation: btn-pulse-attention 1.8s ease-in-out infinite;
+	  animation: btn-pulse-attention 1.8s ease-in-out infinite, btn-bounce-attention 1.8s ease-in-out infinite;
 	}
 	@keyframes btn-pulse-attention {
 	  0%, 100% { box-shadow: 0 4px 12px rgba(141, 2, 31, 0.2), 0 0 0 0 rgba(141, 2, 31, 0.5); }
-	  50% { box-shadow: 0 4px 12px rgba(141, 2, 31, 0.2), 0 0 0 8px rgba(141, 2, 31, 0); }
+	  50% { box-shadow: 0 4px 12px rgba(141, 2, 31, 0.2), 0 0 0 10px rgba(141, 2, 31, 0); }
+	}
+	@keyframes btn-bounce-attention {
+	  0%, 100% { transform: scale(1); }
+	  50% { transform: scale(1.035); }
+	}
+
+	/* ── Richiamo attenzione pulsante "Installa" (banner PWA) ── */
+	#install-banner {
+	  animation: install-banner-pop .4s ease-out;
+	}
+	@keyframes install-banner-pop {
+	  0% { transform: translateX(-50%) scale(.85); opacity: 0; }
+	  100% { transform: translateX(-50%) scale(1); opacity: 1; }
+	}
+	#btn-do-install {
+	  animation: btn-install-glow 1.6s ease-in-out infinite;
+	}
+	@keyframes btn-install-glow {
+	  0%, 100% { box-shadow: 0 0 0 0 rgba(141,2,31,.6); transform: scale(1); }
+	  50% { box-shadow: 0 0 0 9px rgba(141,2,31,0); transform: scale(1.05); }
 	}
 	@media (prefers-reduced-motion: reduce) {
-	  .btn-rect-rounded.btn-attention { animation: none; }
+	  .btn-rect-rounded.btn-attention,
+	  #install-banner,
+	  #btn-do-install { animation: none; }
 	}
 
 	.btn-rect-rounded:active {
@@ -1082,17 +1104,21 @@
     /* ── Richiamo attenzione campanella notifiche non attive ── */
     .fab-btn.bell-attention {
       color: #dc2626;
-      animation: bell-shake 2.4s ease-in-out infinite;
+      animation: bell-shake 2.4s ease-in-out infinite, bell-glow 1.6s ease-in-out infinite;
     }
     @keyframes bell-shake {
-      0%, 100% { transform: rotate(0); }
-      4% { transform: rotate(15deg); }
-      8% { transform: rotate(-15deg); }
-      12% { transform: rotate(10deg); }
-      16% { transform: rotate(-10deg); }
-      20% { transform: rotate(5deg); }
-      24% { transform: rotate(-5deg); }
-      28% { transform: rotate(0); }
+      0%, 100% { transform: rotate(0) scale(1); }
+      4% { transform: rotate(18deg) scale(1.12); }
+      8% { transform: rotate(-18deg) scale(1.12); }
+      12% { transform: rotate(14deg) scale(1.08); }
+      16% { transform: rotate(-14deg) scale(1.08); }
+      20% { transform: rotate(8deg) scale(1.04); }
+      24% { transform: rotate(-8deg) scale(1.04); }
+      28% { transform: rotate(0) scale(1); }
+    }
+    @keyframes bell-glow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,.55); }
+      50% { box-shadow: 0 0 0 10px rgba(220,38,38,0); }
     }
     @media (prefers-reduced-motion: reduce) {
       .fab-btn.bell-attention { animation: none; }
@@ -1648,41 +1674,45 @@
 <body>
 
 <div id="inapp-browser-banner" style="display:none;">
-  <div id="inapp-browser-banner-text">
-    Stai usando il browser interno di questa app: le notifiche push e l'installazione non funzionano qui.
-  </div>
-  <div id="inapp-browser-banner-actions">
+  <div id="inapp-browser-banner-inner">
+    <div id="inapp-browser-banner-icon">🔒</div>
+    <div id="inapp-browser-banner-title">Apri in un browser vero</div>
+    <div id="inapp-browser-banner-text">
+      Stai usando il browser interno di questa app (Facebook/Instagram): qui le notifiche push e l'installazione non possono funzionare. Per usare CastelSafe devi aprirlo in Chrome, Safari o un altro browser.
+    </div>
     <button id="inapp-browser-banner-btn" type="button">Apri nel browser</button>
-    <button id="inapp-browser-banner-close" type="button" aria-label="Chiudi">✕</button>
   </div>
 </div>
 <style>
   #inapp-browser-banner{
-    position:fixed; top:0; left:0; right:0; z-index:100000;
-    display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px;
-    background:#8d021f; color:#fff; padding:11px 14px;
-    font-family:'Inter','Segoe UI',sans-serif; font-size:.86rem; line-height:1.4;
-    box-shadow:0 4px 16px rgba(0,0,0,.2);
+    position:fixed; inset:0; z-index:100000;
+    display:flex; align-items:center; justify-content:center;
+    background:#8d021f; color:#fff; padding:28px;
+    font-family:'Inter','Segoe UI',sans-serif;
   }
-  #inapp-browser-banner-text{flex:1 1 220px;}
-  #inapp-browser-banner-actions{display:flex; align-items:center; gap:8px; flex:none;}
+  #inapp-browser-banner-inner{
+    max-width:420px; width:100%; text-align:center;
+    display:flex; flex-direction:column; align-items:center; gap:14px;
+  }
+  #inapp-browser-banner-icon{ font-size:2.8rem; line-height:1; }
+  #inapp-browser-banner-title{ font-size:1.3rem; font-weight:800; }
+  #inapp-browser-banner-text{ font-size:.95rem; line-height:1.5; opacity:.95; }
   #inapp-browser-banner-btn{
-    background:#fff; color:#8d021f; border:none; border-radius:8px;
-    padding:9px 14px; font-weight:700; font-size:.84rem; cursor:pointer; white-space:nowrap;
+    background:#fff; color:#8d021f; border:none; border-radius:999px;
+    padding:15px 30px; font-weight:800; font-size:1rem; cursor:pointer;
+    margin-top:8px; white-space:nowrap;
   }
-  #inapp-browser-banner-close{
-    background:transparent; color:#fff; border:none; font-size:1rem; cursor:pointer;
-    padding:6px 8px; opacity:.85;
-  }
-  #inapp-browser-banner-close:hover{opacity:1;}
-  body.has-inapp-banner #boot-loader{top:48px;height:calc(100% - 48px);}
-  body.has-inapp-banner #app{padding-top:48px;}
+  /* Blocca del tutto l'app sottostante: niente scroll, niente contenuto
+     interagibile finché non si esce dal browser in-app. Nessun modo di
+     chiudere il banner: l'uscita verso un browser vero è obbligatoria. */
+  body.has-inapp-banner{ overflow:hidden; }
+  body.has-inapp-banner #app, body.has-inapp-banner #boot-loader{ display:none; }
 </style>
 <script>
 (function () {
   // Rileva i browser "in-app" di Facebook/Instagram/Messenger/altri social:
   // sono WebView che bloccano notifiche push e l'installazione PWA, quindi
-  // avvisiamo l'utente e proviamo a fargli aprire un browser vero.
+  // blocchiamo l'accesso all'app finché non aprono un browser vero.
   var ua = navigator.userAgent || '';
   var isFacebookIAB = /FBAN|FBAV|FB_IAB/i.test(ua);
   var isInstagramIAB = /Instagram/i.test(ua);
@@ -1693,9 +1723,6 @@
   var isAndroid = /Android/i.test(ua);
   var banner = document.getElementById('inapp-browser-banner');
   var btn = document.getElementById('inapp-browser-banner-btn');
-  var closeBtn = document.getElementById('inapp-browser-banner-close');
-
-  if (sessionStorage.getItem('inappBannerDismissed') === '1') return;
 
   banner.style.display = 'flex';
   document.body.classList.add('has-inapp-banner');
@@ -1714,12 +1741,6 @@
       }
       alert('Link copiato! Tocca i tre puntini (⋯) o l\'icona in alto, poi scegli "Apri nel browser" / "Apri in Safari" e incolla il link.');
     }
-  };
-
-  closeBtn.onclick = function () {
-    banner.style.display = 'none';
-    document.body.classList.remove('has-inapp-banner');
-    sessionStorage.setItem('inappBannerDismissed', '1');
   };
 })();
 </script>
