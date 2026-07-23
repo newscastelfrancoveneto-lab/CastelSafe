@@ -6778,15 +6778,30 @@ initGlobalRefreshScheduler();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
-    const reg = await navigator.serviceWorker.register('sw.js');
-    console.log('Service Worker registrato');
+    let reg;
+    try {
+      reg = await navigator.serviceWorker.register('sw.js');
+      console.log('Service Worker registrato');
+    } catch (err) {
+      console.warn('Registrazione Service Worker fallita:', err);
+      return;
+    }
 
     const checkWaiting = () => {
       if (reg.waiting) showUpdateBanner(reg);
     };
 
-    await reg.update();
-    checkWaiting();
+    // reg.update() richiede rete (deve ricontrollare sw.js sul server): se
+    // offline fallisce. Senza il try/catch, quel rifiuto restava "non
+    // gestito" e — cosa peggiore — bloccava anche tutto il codice sotto
+    // (listener di aggiornamento, polling periodico), che quindi non
+    // partiva mai finché non si tornava online e si ricaricava la pagina.
+    try {
+      await reg.update();
+      checkWaiting();
+    } catch (err) {
+      console.warn('Controllo aggiornamenti Service Worker fallito (offline?):', err);
+    }
 
     reg.addEventListener('updatefound', () => {
       const newSW = reg.installing;
@@ -6804,7 +6819,7 @@ if ('serviceWorker' in navigator) {
     });
 
     setInterval(() => {
-      reg.update().then(checkWaiting).catch(console.warn);
+      reg.update().then(checkWaiting).catch(err => console.warn('Controllo aggiornamenti periodico fallito:', err));
     }, 30000);
   });
 }
