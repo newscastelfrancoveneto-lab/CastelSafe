@@ -3238,6 +3238,13 @@ function jsErrorsDebugText() {
   return 'Errori JS recenti: ' + errors.map(e => `[${new Date(e.ts).toLocaleTimeString('it-IT')}] ${e.msg}`).join(' | ');
 }
 
+function storagePersistedText() {
+  if (window.__storagePersisted === null) return 'Storage persistente: richiesta in corso…';
+  return window.__storagePersisted
+    ? 'Storage persistente: concesso dal browser'
+    : 'Storage persistente: NEGATO dal browser — i dati possono essere cancellati tra una chiusura e l\'altra';
+}
+
 function openOsmCacheDB() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open('OsmCacheDB', 1);
@@ -3754,6 +3761,7 @@ async function openOsmDiagPanel() {
       </table>
     </div>
     <div class="osm-diag-cache-debug">${osmCacheDebugText()}</div>
+    <div class="osm-diag-cache-debug">${storagePersistedText()}</div>
     <div class="osm-diag-cache-debug osm-diag-js-errors">${jsErrorsDebugText()}</div>
     <div class="osm-diag-subtitle">Dati Server</div>
     <div class="osm-diag-table-wrap">
@@ -6725,8 +6733,13 @@ async function refreshPushSubscriptionSilently() {
 // riuscito, i dati sparivano al riavvio. Richiesta best-effort: se il
 // browser la nega non succede nulla di grave, i dati restano comunque validi
 // finché la sessione/scheda rimane aperta.
+window.__storagePersisted = null; // null = non ancora noto, altrimenti true/false
 if (navigator.storage?.persist) {
-  navigator.storage.persist().catch(() => {});
+  navigator.storage.persist()
+    .then(granted => { window.__storagePersisted = granted; })
+    .catch(() => { window.__storagePersisted = false; });
+} else {
+  window.__storagePersisted = false; // API non disponibile su questo browser
 }
 
 window.__bootStatus && window.__bootStatus('Caricamento dati Protezione Civile…');
