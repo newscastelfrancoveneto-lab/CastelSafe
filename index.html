@@ -5781,10 +5781,21 @@ function renderWindCombined(stn, sensor) {
 function renderTabs(stn, sensors) {
   sensors = mergeWindSensors(sensors);
 
+  // Alla stazione di Asolo (554) la prima scheda deve essere il livello
+  // idrometrico invece delle precipitazioni, al contrario delle altre
+  // stazioni fluviali.
+  const lividroFirst = stn?.id === 554;
+
   sensors.sort((a, b) => {
-    const pri = s =>
-      s.paramnm?.toLowerCase().includes('precipit') ? 0 :
-      s.isWindCombined ? 1 : 2;
+    const pri = s => {
+      const isPrec = s.paramnm?.toLowerCase().includes('precipit');
+      if (lividroFirst) {
+        if (s.type === 'LIVIDRO') return 0;
+        if (isPrec) return 1;
+        return s.isWindCombined ? 2 : 3;
+      }
+      return isPrec ? 0 : s.isWindCombined ? 1 : 2;
+    };
     return pri(a) - pri(b);
   });
 
