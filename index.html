@@ -2762,6 +2762,12 @@ const CV_BBOX = { s: 45.6230, w: 11.8730, n: 45.7020, e: 12.0020 };
 let activeChart = null, currentId = null, currentSensors = [];
 let currentStnRef = null, nextRefresh = null;
 let currentTabIndex = 0;
+// Incrementato ad ogni renderSensor(): invalida i render asincroni ancora in
+// corso (es. grafico precipitazioni con accumulo) quando l'utente cambia
+// scheda/stazione prima che finiscano, evitando che scrivano nel pannello
+// sbagliato (bug: grafico/tabella della prima scheda che compare su un'altra
+// dopo un cambio rapido di scheda).
+let currentRenderToken = 0;
 let timerRunning = false;
 let waitingForFreshData = false;
 let globalRefreshInProgress = false;
@@ -5963,7 +5969,7 @@ async function buildRolling24hAccumulation(rows, bars, renderToken) {
   let rollingStart = 0;
   let rollingSum = 0;
   for (let i = 0; i < bars.length; i++) {
-    if (renderToken !== activePrecipitationRenderToken) return null;
+    if (renderToken !== currentRenderToken) return null;
     rollingSum += bars[i];
     const currentDate = parsedDates[i];
     while (rollingStart <= i) {
@@ -6007,7 +6013,7 @@ async function buildDryingAdjusted24hAccumulation(rows, bars, supportSeries, ren
   const remainingRainQueue = [];
   let rollingSum = 0;
   for (let i = 0; i < bars.length; i++) {
-    if (renderToken !== activePrecipitationRenderToken) return null;
+    if (renderToken !== currentRenderToken) return null;
 
     const currentDate = parsedDates[i];
     const prevDate = i > 0 ? parsedDates[i - 1] : null;
@@ -6063,10 +6069,7 @@ function yieldToMainThread() {
   return new Promise(resolve => setTimeout(resolve, 0));
 }
 
-let activePrecipitationRenderToken = 0;
-
-async function renderSpecialPrecipitation(stn, sensor) {
-  const renderToken = ++activePrecipitationRenderToken;
+async function renderSpecialPrecipitation(stn, sensor, renderToken) {
   const rows = [...sensor.rows].reverse();
   const unit = sensor.unitnm || 'mm';
   const supportSeries = buildPrecipitationSupportSeries(rows, currentSensors, sensor);
@@ -6082,11 +6085,11 @@ const supportSummary = [
     `<div class="loading"><div class="spinner"></div>Preparazione grafico precipitazioni...</div>`;
 
   await yieldToMainThread();
-  if (renderToken !== activePrecipitationRenderToken) return;
+  if (renderToken !== currentRenderToken) return;
 
   const labels = rows.map(r => r.label);
   const bars = buildPrecipitationBars(rows);
-  if (renderToken !== activePrecipitationRenderToken) return;
+  if (renderToken !== currentRenderToken) return;
 
   const lastStep = bars.at(-1) ?? 0;
   const total48h = bars.reduce((sum, v) => sum + v, 0);
@@ -6171,11 +6174,11 @@ rows.slice().reverse().forEach((r, i, src) => {
 
   setTimeout(async () => {
     const accumulation = await buildRolling24hAccumulation(rows, bars, renderToken);
-    if (!accumulation || renderToken !== activePrecipitationRenderToken) return;
+    if (!accumulation || renderToken !== currentRenderToken) return;
     const dryingAdjustedAccumulation = hasDryingSupport
       ? await buildDryingAdjusted24hAccumulation(rows, bars, supportSeries, renderToken)
       : null;
-    if (renderToken !== activePrecipitationRenderToken) return;
+    if (renderToken !== currentRenderToken) return;
 
     const last24h = accumulation.at(-1) ?? 0;
     const max24h = accumulation.length ? Math.max(...accumulation) : 0;
@@ -6247,8 +6250,9 @@ rows.slice().reverse().forEach((r, i, src) => {
 }
 
 function renderSensor(stn, sensor) {
+  const renderToken = ++currentRenderToken;
   if (sensor.isWindCombined) { renderWindCombined(stn, sensor); return; }
-  if (isSpecialPrecipitationChart(stn, sensor)) { void renderSpecialPrecipitation(stn, sensor); return; }
+  if (isSpecialPrecipitationChart(stn, sensor)) { void renderSpecialPrecipitation(stn, sensor, renderToken); return; }
   const isLivello = sensor.type === 'LIVIDRO';
   const soglie    = isLivello ? (sensor.soglie || stn.soglie) : null;
   const rows = sensor.rows, unit = sensor.unitnm;
