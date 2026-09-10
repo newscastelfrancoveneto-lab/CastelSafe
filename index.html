@@ -5839,7 +5839,7 @@ function switchTab(idx) {
 }
 
 function isSpecialPrecipitationChart(stn, sensor) {
-  const specialStations = new Set([292, 102]); // Muson e Castelfranco
+  const specialStations = new Set([292, 554, 102]); // Muson, Muson ad Asolo, Castelfranco
   if (!stn?.id || !specialStations.has(stn.id)) return false;
   const normalized = `${sensor?.type || ''} ${sensor?.paramnm || ''}`.toLowerCase();
   return normalized.includes('precip');
@@ -6083,8 +6083,8 @@ const supportSummary = [
 document.getElementById('panel-body').innerHTML =
   `<div class="stat-row">
     <div class="stat-card"><div class="val">${lastStep.toFixed(2)}</div><div class="lbl">Ultimo step (${unit})</div></div>
-    ${stn.id !== 102 ? `<div class="stat-card"><div class="val" id="precip-acc-last">—</div><div class="lbl">Accumulo 24h (${unit})</div></div>` : ''}
-    ${stn.id !== 292 ? `<div class="stat-card"><div class="val" id="precip-acc-drying">—</div><div class="lbl">Accumulo 24h corretto (${unit})</div></div>` : ''}
+    ${!hasDryingSupport ? `<div class="stat-card"><div class="val" id="precip-acc-last">—</div><div class="lbl">Accumulo 24h (${unit})</div></div>` : ''}
+    ${hasDryingSupport ? `<div class="stat-card"><div class="val" id="precip-acc-drying">—</div><div class="lbl">Accumulo 24h corretto (${unit})</div></div>` : ''}
     <div class="stat-card"><div class="val" id="precip-acc-peak">—</div><div class="lbl">Picco 24h (${unit})</div></div>
     <div class="stat-card"><div class="val">${total48h.toFixed(2)}</div><div class="lbl">Totale 48h (${unit})</div></div>
   </div>
@@ -6094,8 +6094,8 @@ document.getElementById('panel-body').innerHTML =
     <thead><tr>
       <th>Data / Ora</th>
       <th>Precipitazione (${unit})</th>
-      ${stn.id !== 102 ? `<th>Accumulo 24h (${unit})</th>` : ''}
-      ${stn.id !== 292 ? `<th>Accumulo 24h corretto (${unit})</th>` : ''}
+      ${!hasDryingSupport ? `<th>Accumulo 24h (${unit})</th>` : ''}
+      ${hasDryingSupport ? `<th>Accumulo 24h corretto (${unit})</th>` : ''}
     </tr></thead>
     <tbody id="tbl-body"></tbody>
   </table>`;
@@ -6105,7 +6105,7 @@ rows.slice().reverse().forEach((r, i, src) => {
   const reverseIdx = src.length - 1 - i;
   const tr = document.createElement('tr');
   if (i === 0) tr.classList.add('latest');
-  tr.innerHTML = `<td>${r.label}</td><td><strong>${bars[reverseIdx].toFixed(2)}</strong></td>${stn.id !== 102 ? `<td data-acc-idx="${reverseIdx}">—</td>` : ''}${stn.id !== 292 ? `<td data-drying-idx="${reverseIdx}">—</td>` : ''}`;
+  tr.innerHTML = `<td>${r.label}</td><td><strong>${bars[reverseIdx].toFixed(2)}</strong></td>${!hasDryingSupport ? `<td data-acc-idx="${reverseIdx}">—</td>` : ''}${hasDryingSupport ? `<td data-drying-idx="${reverseIdx}">—</td>` : ''}`;
   tbody.appendChild(tr);
 });
 
@@ -6189,10 +6189,11 @@ rows.slice().reverse().forEach((r, i, src) => {
     const statusEl = document.getElementById('precip-acc-status');
     if (statusEl) statusEl.textContent = 'Accumulo 24h pronto';
 
-	// Stazione 292 (Muson): solo accumulata classica, niente sensori ambientali
-	// Stazione 102 (Castelfranco): solo accumulata corretta con temp/rad/umidità
-	const showClassic = stn.id === 292;
-	const showCorrected = stn.id === 102;
+	// Accumulata classica per le stazioni senza sensori ambientali (es. Muson,
+	// Muson ad Asolo); accumulata corretta (con temp/rad/umidità) per quelle
+	// che li hanno (es. Castelfranco).
+	const showClassic = !hasDryingSupport;
+	const showCorrected = hasDryingSupport;
 	
 	if (showClassic) {
 	  activeChart.data.datasets.push({
