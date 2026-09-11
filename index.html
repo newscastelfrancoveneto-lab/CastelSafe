@@ -2962,17 +2962,18 @@ function loadSedePCFromOSM() {
 
   const marker = L.marker([lat, lon], { icon: pcIcon });
   marker.bindPopup(`
-    <div style="font-family:Inter,sans-serif;font-size:0.9rem">
+    <div style="font-family:Inter,sans-serif;font-size:0.9rem;text-align:center">
       <strong style="color:#ff6600;font-size:1rem">${name}</strong>
       <span style="font-size:0.8rem;color:#64748b;margin-top:4px;display:block">
         Castelfranco Veneto
       </span>
-      <div style="margin-top:12px">
+      <div style="margin-top:12px;text-align:center">
         <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}"
            target="_blank"
-           style="display:inline-flex;align-items:center;gap:6px;background:#8d021f;color:#fff;
-                  padding:8px 14px;border-radius:8px;text-decoration:none;font-size:0.8rem;
+           style="display:inline-flex;align-items:center;gap:7px;background:#8d021f;color:#fff;
+                  padding:8px 15px;border-radius:8px;text-decoration:none;font-size:0.8rem;
                   font-weight:600">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 2.5 19.5 21 12 17.2 4.5 21 12 2.5Z"/></svg>
           Naviga con Maps
         </a>
       </div>
@@ -4030,14 +4031,15 @@ function renderCPAGeoJSON(geojson) {
       const style = CPA_STYLES[type] || CPA_STYLES.waiting;
       const name  = tags.name || tags.ref || null;
 
-      layer.bindPopup(`<div style="font-family:'Inter',sans-serif;font-size:0.9rem;">
+      layer.bindPopup(`<div style="font-family:'Inter',sans-serif;font-size:0.9rem;text-align:center;">
         <strong style="color:${style.color};font-size:1rem;">${style.label}</strong>
         ${name ? `<br><span style="font-size:0.8rem;color:#64748b;margin-top:4px;display:block;">${name}</span>` : ''}
-        <div style="margin-top:12px;">
+        <div style="margin-top:12px;text-align:center;">
           <a href="https://www.google.com/maps/dir/?api=1&destination=${centroid(feature)}"
              target="_blank"
-             style="display:inline-flex;align-items:center;gap:6px;background:var(--primary);color:#fff;padding:8px 14px;
+             style="display:inline-flex;align-items:center;gap:7px;background:var(--primary);color:#fff;padding:8px 15px;
                     border-radius:8px;text-decoration:none;font-size:0.8rem;font-weight:600;transition:background 0.2s;">
+             <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 2.5 19.5 21 12 17.2 4.5 21 12 2.5Z"/></svg>
              Naviga con Maps
           </a>
         </div>
