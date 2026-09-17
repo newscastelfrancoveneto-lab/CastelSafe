@@ -1364,6 +1364,13 @@
     
     .info-area-badge { display: inline-block; border-radius: 6px; padding: 3px 8px; font-size: 0.75rem; font-weight: 700; color: #fff; margin-right: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 
+    .update-check-box { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border-color, rgba(0,0,0,0.08)); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .update-check-box #btn-check-update { width: 100%; }
+    .update-check-box #btn-check-update:disabled { opacity: 0.65; cursor: default; transform: none; }
+    #update-check-status { font-size: 0.8rem; color: var(--text-muted); text-align: center; min-height: 1.1em; }
+    #update-check-status.ok { color: #166534; font-weight: 600; }
+    #update-check-status.err { color: var(--primary); font-weight: 600; }
+
     .allerta-row .bollino-lg { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
     .allerta-row .label { font-size: 0.85rem; font-weight: 600; color: var(--text-main); }
     .allerta-row .livello { font-size: 0.85rem; font-weight: 800; margin-left: auto; text-transform: uppercase; }
@@ -2297,6 +2304,14 @@
       La pagina di gestione avvisi è riservata agli operatori autorizzati.
       <a href="./admin.html" target="_blank" rel="noopener noreferrer">Apri pagina admin</a>
     </p>
+
+    <div class="update-check-box">
+      <button id="btn-check-update" onclick="checkForAppUpdate()" class="btn-rect-rounded" style="margin-bottom:0; display:flex; align-items:center; justify-content:center; gap:8px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"></path><path d="M21 3v6h-6"></path></svg>
+        Controlla aggiornamenti
+      </button>
+      <span id="update-check-status"></span>
+    </div>
   </div>
 </div>
 
@@ -6945,6 +6960,57 @@ function showUpdateBanner(reg) {
       reg.waiting.postMessage({ type: 'SKIP_WAITING' });
     }
   });
+}
+
+// Controllo manuale aggiornamenti (pulsante nella pagina Info): usa la
+// stessa API standard (ServiceWorkerRegistration.update()) del controllo
+// automatico, valida su Chrome/Edge/Firefox (Windows, macOS, Android) e su
+// Safari (macOS e iOS, incluso da Home Screen). Utile perché il polling
+// automatico ogni 30s può non essere ancora scattato, o perché su iOS le
+// app da Home Screen possono restare sospese a lungo e non ricontrollare
+// finché non vengono riaperte.
+async function checkForAppUpdate() {
+  const btn = document.getElementById('btn-check-update');
+  const statusEl = document.getElementById('update-check-status');
+  if (!statusEl) return;
+  statusEl.className = '';
+  statusEl.textContent = '';
+
+  if (!('serviceWorker' in navigator)) {
+    statusEl.className = 'err';
+    statusEl.textContent = 'Il tuo browser non supporta gli aggiornamenti automatici dell\'app.';
+    return;
+  }
+
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.textContent = 'Controllo in corso...';
+
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) {
+      statusEl.textContent = 'Nessuna versione dell\'app installata da controllare.';
+      return;
+    }
+
+    await reg.update();
+
+    if (reg.waiting) {
+      showUpdateBanner(reg);
+      statusEl.className = 'ok';
+      statusEl.textContent = 'Trovato un aggiornamento: tocca "Aggiorna" nel banner per installarlo.';
+    } else {
+      statusEl.className = 'ok';
+      statusEl.textContent = 'Hai già l\'ultima versione dell\'app.';
+    }
+  } catch (err) {
+    console.warn('Controllo aggiornamenti manuale fallito:', err);
+    statusEl.className = 'err';
+    statusEl.textContent = 'Controllo non riuscito: verifica la connessione e riprova.';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+  }
 }
 	
 // ── BARRA ALLERTA ─────────────────────────────────────────────────────────────
