@@ -472,12 +472,13 @@
           <div id="shareTimeBanner" class="share-caption share-caption-bottom"></div>
           <div class="share-sign-panel" id="shareSignPanel">
             <div class="share-sign-panel-head">
-              <input type="text" id="shareSignSearch" placeholder="Cerca segnale italiano (es. strada chiusa, divieto transito)...">
+              <input type="text" id="shareSignSearch" placeholder="Filtra per nome (facoltativo, es. strada chiusa)...">
               <button type="button" class="btn-primary btn-small" id="shareSignSearchBtn">Cerca</button>
               <button type="button" class="btn-ghost btn-small" id="shareSignPanelCloseBtn">✕</button>
             </div>
-            <p class="share-sign-hint" id="shareSignHint">Cerca tra i segnali stradali italiani su Wikimedia Commons e tocca la miniatura per aggiungerlo.</p>
+            <p class="share-sign-hint" id="shareSignHint">Caricamento segnali...</p>
             <div class="share-sign-results" id="shareSignResults"></div>
+            <button type="button" class="btn-ghost btn-small" id="shareSignLoadMoreBtn" style="display:none;align-self:center;">Carica altri segnali</button>
           </div>
         </div>
       </div>
@@ -1548,41 +1549,57 @@ document.addEventListener('keydown', (e) => {
   removeShareElement(shareSelectedElId);
 });
 
-// ── Ricerca segnali stradali su Wikimedia Commons ───────────────────────────
-function openSignPanel() { document.getElementById('shareSignPanel').classList.add('open'); document.getElementById('shareSignSearch').focus(); }
+// ── Segnali stradali (sfoglia + ricerca) su Wikimedia Commons ───────────────
+// Filtro base sempre applicato: solo l'albero della categoria Commons
+// indicata dall'utente (Category:Diagrams of road signs of Italy), incluse
+// le sue sotto-categorie (deepcategory:), ma ESCLUDENDO le sotto-categorie
+// di segnali storici/obsoleti — solo la segnaletica CdS attuale.
+const SHARE_SIGN_BASE_FILTER = 'deepcategory:"Diagrams of road signs of Italy" -deepcategory:"Diagrams of historic road signs of Italy" -incategory:"Diagrams of road signs of Italy obsoleted by SVG replacement"';
+let shareSignContinue = null; // parametri di paginazione ("continue") dell'ultima risposta, per "Carica altri"
+
+function openSignPanel() {
+  document.getElementById('shareSignPanel').classList.add('open');
+  document.getElementById('shareSignSearch').value = '';
+  document.getElementById('shareSignSearch').focus();
+  runSignSearch({ reset: true });
+}
 function closeSignPanel() { document.getElementById('shareSignPanel').classList.remove('open'); }
 document.getElementById('shareSignPanelCloseBtn').onclick = closeSignPanel;
-document.getElementById('shareSignSearchBtn').onclick = runSignSearch;
-document.getElementById('shareSignSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); runSignSearch(); } });
+document.getElementById('shareSignSearchBtn').onclick = () => runSignSearch({ reset: true });
+document.getElementById('shareSignSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); runSignSearch({ reset: true }); } });
+document.getElementById('shareSignLoadMoreBtn').onclick = () => runSignSearch({ reset: false });
 
-async function runSignSearch() {
+async function runSignSearch({ reset = true } = {}) {
   const query = document.getElementById('shareSignSearch').value.trim();
   const resultsEl = document.getElementById('shareSignResults');
   const hintEl = document.getElementById('shareSignHint');
-  if (!query) return;
+  const loadMoreBtn = document.getElementById('shareSignLoadMoreBtn');
+  if (reset) { resultsEl.innerHTML = ''; shareSignContinue = null; }
   if (shareSignSearchController) shareSignSearchController.abort();
   shareSignSearchController = new AbortController();
-  hintEl.textContent = 'Ricerca in corso...';
-  resultsEl.innerHTML = '';
+  hintEl.textContent = reset ? 'Caricamento segnali...' : 'Caricamento altri segnali...';
+  loadMoreBtn.style.display = 'none';
   try {
-    // Limita i risultati esclusivamente all'albero della categoria Commons
-    // indicata dall'utente (Category:Diagrams of road signs of Italy),
-    // incluse le sue sotto-categorie grazie a deepcategory:, invece di
-    // restituire segnali di qualunque paese o foto generiche che contengono
-    // per caso le stesse parole.
-    const scopedQuery = `deepcategory:"Diagrams of road signs of Italy" ${query}`;
-    const url = 'https://commons.wikimedia.org/w/api.php?' + new URLSearchParams({
+    const scopedQuery = query ? `${SHARE_SIGN_BASE_FILTER} ${query}` : SHARE_SIGN_BASE_FILTER;
+    const params = {
       action: 'query', format: 'json', origin: '*',
-      generator: 'search', gsrsearch: scopedQuery, gsrnamespace: '6', gsrlimit: '24',
+      generator: 'search', gsrsearch: scopedQuery, gsrnamespace: '6', gsrlimit: '30',
       prop: 'imageinfo', iiprop: 'url', iiurlwidth: '150'
-    });
+    };
+    if (!reset && shareSignContinue) Object.assign(params, shareSignContinue);
+    const url = 'https://commons.wikimedia.org/w/api.php?' + new URLSearchParams(params);
     const res = await fetch(url, { signal: shareSignSearchController.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    const pages = Object.values(data.query?.pages || {});
+    // L'oggetto "pages" è chiavato per pageid, non nell'ordine di rilevanza:
+    // si riordina con il campo "index" che l'API restituisce per ogni pagina.
+    const pages = Object.values(data.query?.pages || {}).sort((a, b) => (a.index || 0) - (b.index || 0));
     const withImages = pages.filter((p) => p.imageinfo?.[0]?.thumburl);
-    if (!withImages.length) { hintEl.textContent = 'Nessun segnale italiano trovato per questo termine. Prova un altro termine (es. "divieto di transito", "strada chiusa").'; return; }
-    hintEl.textContent = `${withImages.length} risultati da Wikimedia Commons — tocca per aggiungere.`;
+    shareSignContinue = data.continue || null;
+    if (!withImages.length && reset) {
+      hintEl.textContent = query ? `Nessun segnale trovato per "${query}".` : 'Nessun segnale disponibile al momento.';
+      return;
+    }
     withImages.forEach((p) => {
       const thumbUrl = p.imageinfo[0].thumburl;
       const btn = document.createElement('button');
@@ -1595,6 +1612,9 @@ async function runSignSearch() {
       btn.addEventListener('click', () => { createSignElement(thumbUrl); closeSignPanel(); });
       resultsEl.appendChild(btn);
     });
+    const totalShown = resultsEl.querySelectorAll('button').length;
+    hintEl.textContent = query ? `${totalShown} risultati per "${query}" — tocca per aggiungere.` : `${totalShown} segnali CdS attuali — tocca per aggiungere.`;
+    loadMoreBtn.style.display = shareSignContinue ? 'inline-flex' : 'none';
   } catch (err) {
     if (err.name === 'AbortError') return;
     console.error('Ricerca Wikimedia fallita:', err);
