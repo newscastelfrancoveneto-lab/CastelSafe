@@ -117,6 +117,9 @@
     /* ---------- modalità "Condividi chiusura" ---------- */
     #share-live-map{position:absolute;inset:0;z-index:1;background:#dfe3e8;}
     #share-live-map .leaflet-control-attribution{display:none;}
+    .share-caption{position:absolute;left:0;right:0;z-index:15;text-align:center;color:#fff;font-weight:800;font-family:'Public Sans',sans-serif;padding:10px 12px;text-shadow:0 1px 4px rgba(0,0,0,.7);pointer-events:none;font-size:4.4cqw;line-height:1.3;display:none;}
+    .share-caption-top{top:0;background:linear-gradient(180deg,rgba(0,0,0,.62) 0%,rgba(0,0,0,.62) 55%,transparent 100%);}
+    .share-caption-bottom{bottom:0;background:linear-gradient(0deg,rgba(0,0,0,.62) 0%,rgba(0,0,0,.62) 55%,transparent 100%);}
     #share-editor-modal{position:fixed;inset:0;background:rgba(15,17,23,.8);z-index:5000;display:none;align-items:center;justify-content:center;padding:14px;}
     #share-editor-modal.open{display:flex;}
     .share-editor-box{background:#fff;border-radius:var(--r-lg);box-shadow:var(--shadow-lg);width:100%;max-width:900px;max-height:96vh;display:flex;flex-direction:column;overflow:hidden;}
@@ -465,6 +468,8 @@
           <div id="share-live-map"></div>
           <img id="share-bg-img" alt="Screenshot area chiusura" crossorigin="anonymous">
           <div id="share-overlay"></div>
+          <div id="shareDateBanner" class="share-caption share-caption-top"></div>
+          <div id="shareTimeBanner" class="share-caption share-caption-bottom"></div>
           <div class="share-sign-panel" id="shareSignPanel">
             <div class="share-sign-panel-head">
               <input type="text" id="shareSignSearch" placeholder="Cerca segnale italiano (es. strada chiusa, divieto transito)...">
@@ -491,9 +496,13 @@
         Carica foto
         <input type="file" accept="image/*" id="shareUploadInput" style="display:none;">
       </label>
-      <button type="button" class="btn-primary" id="shareExportBtn">
+      <button type="button" class="btn-ghost" id="shareDownloadBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></svg>
+        Scarica
+      </button>
+      <button type="button" class="btn-primary" id="shareShareBtn" style="display:none;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51 15.42 17.49"/><path d="M15.41 6.51 8.59 10.49"/></svg>
-        Condividi / Scarica
+        Condividi
       </button>
     </div>
   </div>
@@ -981,6 +990,10 @@ let shareSignSearchController = null;
 let shareLiveMap = null;
 let shareLiveTileLayer = null;
 let shareLiveHighlightLayer = null;
+// Alcuni browser/dispositivi (es. desktop) non supportano affatto la
+// condivisione nativa di file: il pulsante "Condividi" va mostrato solo
+// quando è davvero utilizzabile, altrimenti resta solo "Scarica".
+const shareNativeShareSupported = Boolean(navigator.canShare && navigator.canShare({ files: [new File([], 'test.png', { type: 'image/png' })] }));
 
 function stageRect() { return document.getElementById('share-stage').getBoundingClientRect(); }
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
@@ -992,6 +1005,37 @@ function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 // pan/zoom dell'inquadratura. La rimuoviamo temporaneamente e la
 // ripristiniamo alla chiusura, solo se era effettivamente visibile prima.
 let shareOsmLayerWasVisible = false;
+
+// Formatta una data da input type=date (YYYY-MM-DD) in formato italiano
+// leggibile (GG/MM/AAAA).
+function formatItDate(iso) {
+  const parts = (iso || '').split('-');
+  if (parts.length !== 3) return '';
+  const [y, m, d] = parts;
+  if (!y || !m || !d) return '';
+  return `${d}/${m}/${y}`;
+}
+// Costruisce le due didascalie auto-generate (giorni in alto, orari in
+// basso) a partire dai campi data/ora dell'avviso: restano vuote (e quindi
+// nascoste) se i campi non sono ancora compilati, com'è il caso quando si
+// prova l'editor sulla bozza prima di finire di compilare il form.
+function buildShareCaptions(props = {}) {
+  const startDate = formatItDate(props.startDate);
+  const endDate = formatItDate(props.endDate);
+  let daysText = '';
+  if (startDate && endDate && startDate !== endDate) daysText = `Dal ${startDate} al ${endDate}`;
+  else if (startDate) daysText = startDate;
+  else if (endDate) daysText = endDate;
+
+  const startTime = props.startTime || '';
+  const endTime = props.endTime || '';
+  let timeText = '';
+  if (startTime && endTime) timeText = `Dalle ${startTime} alle ${endTime}`;
+  else if (startTime) timeText = `Dalle ${startTime}`;
+  else if (endTime) timeText = `Fino alle ${endTime}`;
+
+  return { daysText, timeText };
+}
 
 function openShareEditor(feature) {
   shareEditorFeature = feature;
@@ -1005,6 +1049,14 @@ function openShareEditor(feature) {
   statusEl.className = ''; statusEl.textContent = '';
   closeSignPanel();
   highlightColorSwatch(shareCurrentColor);
+
+  const { daysText, timeText } = buildShareCaptions(feature.properties || {});
+  const dateBanner = document.getElementById('shareDateBanner');
+  const timeBanner = document.getElementById('shareTimeBanner');
+  dateBanner.textContent = daysText;
+  dateBanner.style.display = daysText ? 'block' : 'none';
+  timeBanner.textContent = timeText;
+  timeBanner.style.display = timeText ? 'block' : 'none';
 
   shareOsmLayerWasVisible = Boolean(map && osmSourceLayer && map.hasLayer(osmSourceLayer));
   if (shareOsmLayerWasVisible) map.removeLayer(osmSourceLayer);
@@ -1029,7 +1081,11 @@ document.getElementById('sharePreviewBtn').onclick = () => {
   if (!geometry) { alert('Seleziona prima una via, un\'area o un punto sulla mappa.'); return; }
   const title = document.getElementById('title').value.trim();
   const description = document.getElementById('description').value.trim();
-  openShareEditor({ type:'Feature', geometry, properties: { id:'draft-preview', title, description } });
+  const startDate = document.getElementById('startDate').value;
+  const endDate = document.getElementById('endDate').value;
+  const startTime = document.getElementById('startTime').value;
+  const endTime = document.getElementById('endTime').value;
+  openShareEditor({ type:'Feature', geometry, properties: { id:'draft-preview', title, description, startDate, endDate, startTime, endTime } });
 };
 
 // ── Fase 1: inquadratura, con una mini-mappa live dentro il pannello ────────
@@ -1043,7 +1099,8 @@ function setSharePhase(phase) {
   document.getElementById('shareEditToolbar').style.display = positioning ? 'none' : 'flex';
   document.getElementById('shareCaptureNowBtn').style.display = positioning ? 'inline-flex' : 'none';
   document.getElementById('shareRetryBtn').style.display = positioning ? 'none' : 'inline-flex';
-  document.getElementById('shareExportBtn').style.display = positioning ? 'none' : 'inline-flex';
+  document.getElementById('shareDownloadBtn').style.display = positioning ? 'none' : 'inline-flex';
+  document.getElementById('shareShareBtn').style.display = (!positioning && shareNativeShareSupported) ? 'inline-flex' : 'none';
 }
 
 function featureBoundsForShare(feature) {
@@ -1546,38 +1603,64 @@ async function runSignSearch() {
 }
 
 // ── Esportazione / condivisione dell'immagine finale ────────────────────────
-document.getElementById('shareExportBtn').onclick = async () => {
-  const btn = document.getElementById('shareExportBtn');
-  const statusEl = document.getElementById('share-status-msg');
+// Genera l'immagine finale (screenshot + testi/frecce/segnali/didascalie)
+// appiattendo il DOM dello stage con html2canvas. Condivisa da entrambi i
+// pulsanti "Scarica" e "Condividi": prima si lasciava scegliere solo l'uno
+// o l'altro in base al supporto del dispositivo, ora "Scarica" è sempre
+// disponibile indipendentemente dal supporto della condivisione nativa.
+async function generateShareImageBlob() {
   const stage = document.getElementById('share-stage');
   deselectAll();
-  const original = btn.innerHTML;
-  btn.disabled = true;
-  btn.textContent = 'Generazione immagine...';
-  statusEl.className = ''; statusEl.textContent = '';
   stage.classList.add('share-editor-exporting');
   try {
     const canvas = await html2canvas(stage, { backgroundColor: '#dfe3e8', useCORS: true, scale: 2 });
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
     if (!blob) throw new Error('Generazione immagine fallita');
-    const fileName = `chiusura-${shareEditorFeature?.properties?.id || Date.now()}.png`;
-    const file = new File([blob], fileName, { type: 'image/png' });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: shareEditorFeature?.properties?.title || 'Chiusura', text: shareEditorFeature?.properties?.title || '' });
-      statusEl.textContent = 'Condiviso.';
-    } else {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = fileName;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-      statusEl.textContent = 'Immagine scaricata.';
-    }
-  } catch (err) {
-    if (err?.name === 'AbortError') { /* condivisione annullata dall'utente, nessun errore da mostrare */ }
-    else { console.error('Export immagine chiusura fallito:', err); statusEl.className = 'err'; statusEl.textContent = 'Impossibile generare l\'immagine.'; }
+    return blob;
   } finally {
     stage.classList.remove('share-editor-exporting');
+  }
+}
+
+document.getElementById('shareDownloadBtn').onclick = async () => {
+  const btn = document.getElementById('shareDownloadBtn');
+  const statusEl = document.getElementById('share-status-msg');
+  const original = btn.innerHTML;
+  btn.disabled = true; btn.textContent = 'Generazione immagine...';
+  statusEl.className = ''; statusEl.textContent = '';
+  try {
+    const blob = await generateShareImageBlob();
+    const fileName = `chiusura-${shareEditorFeature?.properties?.id || Date.now()}.png`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fileName;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    statusEl.textContent = 'Immagine scaricata.';
+  } catch (err) {
+    console.error('Download immagine chiusura fallito:', err);
+    statusEl.className = 'err'; statusEl.textContent = 'Impossibile generare l\'immagine.';
+  } finally {
+    btn.disabled = false; btn.innerHTML = original;
+  }
+};
+
+document.getElementById('shareShareBtn').onclick = async () => {
+  const btn = document.getElementById('shareShareBtn');
+  const statusEl = document.getElementById('share-status-msg');
+  const original = btn.innerHTML;
+  btn.disabled = true; btn.textContent = 'Generazione immagine...';
+  statusEl.className = ''; statusEl.textContent = '';
+  try {
+    const blob = await generateShareImageBlob();
+    const fileName = `chiusura-${shareEditorFeature?.properties?.id || Date.now()}.png`;
+    const file = new File([blob], fileName, { type: 'image/png' });
+    await navigator.share({ files: [file], title: shareEditorFeature?.properties?.title || 'Chiusura', text: shareEditorFeature?.properties?.title || '' });
+    statusEl.textContent = 'Condiviso.';
+  } catch (err) {
+    if (err?.name === 'AbortError') { /* condivisione annullata dall'utente, nessun errore da mostrare */ }
+    else { console.error('Condivisione immagine chiusura fallita:', err); statusEl.className = 'err'; statusEl.textContent = 'Impossibile condividere l\'immagine.'; }
+  } finally {
     btn.disabled = false; btn.innerHTML = original;
   }
 };
