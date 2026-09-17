@@ -3432,7 +3432,7 @@ function renderWaterwayGeoJSON(geojson) {
         });
 
         hitLayer.bindPopup(popupText);
-        hitLayer.on('click', () => hitLayer.openPopup());
+        hitLayer.on('click', (e) => hitLayer.openPopup(e.latlng));
 
         layer.setStyle({
           ...visualStyle,
