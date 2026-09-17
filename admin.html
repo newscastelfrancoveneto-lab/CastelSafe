@@ -115,9 +115,8 @@
     .trim-handle:hover{background:#dcfce7;}
 
     /* ---------- modalità "Condividi chiusura" ---------- */
-    #share-position-bar{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(140%);opacity:0;pointer-events:none;transition:transform .2s ease,opacity .2s ease;z-index:4000;background:#fff;border-radius:999px;box-shadow:var(--shadow-lg);padding:10px 10px 10px 18px;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 24px);flex-wrap:wrap;}
-    #share-position-bar.open{transform:translateX(-50%) translateY(0);opacity:1;pointer-events:auto;}
-    #share-position-bar span{font-size:.82rem;font-weight:600;color:var(--ink);}
+    #share-live-map{position:absolute;inset:0;z-index:1;background:#dfe3e8;}
+    #share-live-map .leaflet-control-attribution{display:none;}
     #share-editor-modal{position:fixed;inset:0;background:rgba(15,17,23,.8);z-index:5000;display:none;align-items:center;justify-content:center;padding:14px;}
     #share-editor-modal.open{display:flex;}
     .share-editor-box{background:#fff;border-radius:var(--r-lg);box-shadow:var(--shadow-lg);width:100%;max-width:900px;max-height:96vh;display:flex;flex-direction:column;overflow:hidden;}
@@ -144,6 +143,7 @@
     .share-el-resize{bottom:-12px;right:-12px;background:#2563eb;cursor:nwse-resize;}
     .share-el-handle{position:absolute;width:20px;height:20px;margin:-10px;border-radius:50%;background:#fff;border:3px solid #2563eb;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:pointer;z-index:25;display:none;}
     .share-editor-exporting .share-el-chrome,.share-editor-exporting .share-el-handle,.share-editor-exporting .share-el.selected{display:none!important;outline:none!important;}
+    .share-editor-exporting #share-live-map{display:none!important;}
     .share-sign-panel{position:absolute;left:8px;right:8px;bottom:8px;top:8px;background:rgba(255,255,255,.98);border-radius:var(--r-md);box-shadow:var(--shadow-lg);padding:10px;display:none;flex-direction:column;gap:8px;z-index:30;}
     .share-sign-panel.open{display:flex;}
     .share-sign-panel-head{display:flex;gap:8px;}
@@ -427,12 +427,6 @@
   </div>
 </div>
 
-<div id="share-position-bar">
-  <span>Sposta e zooma la mappa per inquadrare l'area, poi cattura.</span>
-  <button type="button" class="btn-ghost btn-small" id="sharePositionCancelBtn">Annulla</button>
-  <button type="button" class="btn-primary btn-small" id="sharePositionCaptureBtn">Cattura screenshot</button>
-</div>
-
 <div id="share-editor-modal">
   <div class="share-editor-box">
     <div class="share-editor-head">
@@ -440,7 +434,8 @@
       <button type="button" class="btn-ghost btn-small" id="shareEditorCloseBtn" aria-label="Chiudi">✕</button>
     </div>
     <div class="share-editor-body">
-      <div class="share-toolbar">
+      <p id="sharePositionHint" class="share-sign-hint" style="margin:0;">Sposta e zooma la mappa qui sotto per inquadrare l'area, poi tocca "Cattura screenshot".</p>
+      <div class="share-toolbar" id="shareEditToolbar">
         <button type="button" class="btn-ghost btn-small" id="shareAddTextBtn">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h16"/></svg>
           Testo
@@ -466,6 +461,7 @@
 
       <div class="share-stage-wrap">
         <div id="share-stage">
+          <div id="share-live-map"></div>
           <img id="share-bg-img" alt="Screenshot area chiusura" crossorigin="anonymous">
           <div id="share-overlay"></div>
           <div class="share-sign-panel" id="shareSignPanel">
@@ -482,6 +478,10 @@
       <p id="share-status-msg"></p>
     </div>
     <div class="share-editor-foot">
+      <button type="button" class="btn-primary" id="shareCaptureNowBtn" style="display:none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7 9.5 4h5L16 7"/><circle cx="12" cy="13.5" r="3.2"/></svg>
+        Cattura screenshot
+      </button>
       <button type="button" class="btn-ghost" id="shareRetryBtn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
         Ricattura mappa
@@ -805,7 +805,7 @@ function normalizeGeometryForDraft(geometry) { if (!geometry) return null; if (g
 function osmFeatureStyle(feature) { const hasGeometry = Boolean(normalizeGeometryForDraft(feature.geometry)); const isSelected = selectedOSMIds.has(feature.properties?._osmId); return { color: isSelected ? '#16a34a' : hasGeometry ? '#3b82f6' : '#94a3b8', fillColor: isSelected ? '#22c55e' : hasGeometry ? '#60a5fa' : '#cbd5e1', fillOpacity: isSelected ? 0.35 : hasGeometry ? 0.15 : 0.05, weight: isSelected ? 6 : 5 }; }
 function distanceToSegmentSquared(px, py, x1, y1, x2, y2) { const dx = x2 - x1; const dy = y2 - y1; if (dx === 0 && dy === 0) { const ddx = px - x1; const ddy = py - y1; return ddx * ddx + ddy * ddy; } const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy))); const cx = x1 + t * dx; const cy = y1 + t * dy; const ddx = px - cx; const ddy = py - cy; return ddx * ddx + ddy * ddy; }
 function featureDistancePx(feature, clickPoint) { const geom = feature?.geometry; if (!geom || !map) return Number.POSITIVE_INFINITY; const [px, py] = [clickPoint.x, clickPoint.y]; if (geom.type === 'Point') { const p = map.latLngToContainerPoint([geom.coordinates[1], geom.coordinates[0]]); return Math.hypot(px - p.x, py - p.y); } const lines = geom.type === 'Polygon' ? [geom.coordinates?.[0] || []] : geom.type === 'LineString' ? [geom.coordinates || []] : []; let minDistanceSquared = Number.POSITIVE_INFINITY; lines.forEach((line) => { for (let i = 0; i < line.length - 1; i++) { const a = map.latLngToContainerPoint([line[i][1], line[i][0]]); const b = map.latLngToContainerPoint([line[i + 1][1], line[i + 1][0]]); minDistanceSquared = Math.min(minDistanceSquared, distanceToSegmentSquared(px, py, a.x, a.y, b.x, b.y)); } }); return Math.sqrt(minDistanceSquared); }
-function selectNearestFeatureByClick(latlng) { if (!isEditingMode || !osmFeaturesCache.length || sharePositioningActive) return; const clickPoint = map.latLngToContainerPoint(latlng); let nearestFeature = null; let nearestDistance = Number.POSITIVE_INFINITY; osmFeaturesCache.forEach((feature) => { const distance = featureDistancePx(feature, clickPoint); if (distance < nearestDistance) { nearestDistance = distance; nearestFeature = feature; } }); if (nearestFeature && nearestDistance <= PICK_TOLERANCE_PX) selectOSMFeature(nearestFeature); }
+function selectNearestFeatureByClick(latlng) { if (!isEditingMode || !osmFeaturesCache.length) return; const clickPoint = map.latLngToContainerPoint(latlng); let nearestFeature = null; let nearestDistance = Number.POSITIVE_INFINITY; osmFeaturesCache.forEach((feature) => { const distance = featureDistancePx(feature, clickPoint); if (distance < nearestDistance) { nearestDistance = distance; nearestFeature = feature; } }); if (nearestFeature && nearestDistance <= PICK_TOLERANCE_PX) selectOSMFeature(nearestFeature); }
 function renderOsmFeatures() { osmSourceLayer.clearLayers(); osmSourceLayer.addData({ type:'FeatureCollection', features: osmFeaturesCache }); }
 function overpassQueryForBounds(bounds) { const south = bounds.getSouth().toFixed(6); const west = bounds.getWest().toFixed(6); const north = bounds.getNorth().toFixed(6); const east = bounds.getEast().toFixed(6); const bb = `${south},${west},${north},${east}`; const zoom = map ? map.getZoom() : 13; let parts = `way["highway"](${bb});way["waterway"](${bb});node["highway"="bus_stop"](${bb});`; if (zoom >= 15) parts += `node["amenity"](${bb});node["shop"](${bb});way["amenity"](${bb});way["leisure"](${bb});way["landuse"](${bb});`; if (zoom >= 17) parts += `way["building"](${bb});`; return `[out:json][timeout:45];(${parts});out geom;`; }
 function getViewportCacheKey(bounds, zoom) { return [bounds.getSouth().toFixed(3), bounds.getWest().toFixed(3), bounds.getNorth().toFixed(3), bounds.getEast().toFixed(3), Number(zoom || 0).toFixed(1)].join('|'); }
@@ -972,11 +972,14 @@ let shareEditorFeature = null;
 let shareEditorElements = []; // { id, type, el, extraEls?, getColor?, setColor?, setSelected? }
 let shareSelectedElId = null;
 let shareCurrentColor = '#dc2626';
-let shareOriginalMapView = null; // { center, zoom } da ripristinare alla chiusura
 let shareIdCounter = 0;
 let shareSignSearchController = null;
-let sharePositioningActive = false;
-let sharePositionHighlightLayer = null;
+// Mappa Leaflet dedicata all'inquadratura, dentro il pannello "Condividi":
+// istanziata una sola volta e riusata, separata dalla mappa admin principale
+// così pan/zoom durante l'inquadratura non toccano mai la bozza OSM in corso.
+let shareLiveMap = null;
+let shareLiveTileLayer = null;
+let shareLiveHighlightLayer = null;
 
 function stageRect() { return document.getElementById('share-stage').getBoundingClientRect(); }
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
@@ -993,56 +996,15 @@ function openShareEditor(feature) {
   statusEl.className = ''; statusEl.textContent = '';
   closeSignPanel();
   highlightColorSwatch(shareCurrentColor);
-  startSharePositioning(feature, { autoFit: true });
+  document.getElementById('share-editor-modal').classList.add('open');
+  enterLivePositioning(feature, { autoFit: true });
 }
 
 function closeShareEditor() {
   document.getElementById('share-editor-modal').classList.remove('open');
-  stopSharePositioning();
-  if (shareOriginalMapView && map) map.setView(shareOriginalMapView.center, shareOriginalMapView.zoom, { animate:false });
-  shareOriginalMapView = null;
   shareEditorFeature = null;
 }
 document.getElementById('shareEditorCloseBtn').onclick = closeShareEditor;
-
-// ── Fase di posizionamento: la mappa reale resta interattiva (pan/zoom) così
-// l'operatore può scegliere esattamente cosa inquadrare, invece di uno
-// screenshot forzato sul solo bounding box della geometria.
-function startSharePositioning(feature, { autoFit = false } = {}) {
-  if (!map) return;
-  if (!shareOriginalMapView) shareOriginalMapView = { center: map.getCenter(), zoom: map.getZoom() };
-  document.getElementById('share-editor-modal').classList.remove('open');
-  sharePositioningActive = true;
-  if (autoFit) {
-    const bounds = featureBoundsForShare(feature);
-    if (feature.geometry?.type === 'Point' && bounds) map.setView(bounds.getCenter(), 17, { animate:false });
-    else if (bounds) map.fitBounds(bounds.pad(0.4), { animate:false });
-  }
-  if (sharePositionHighlightLayer) { map.removeLayer(sharePositionHighlightLayer); sharePositionHighlightLayer = null; }
-  if (feature.geometry) {
-    sharePositionHighlightLayer = L.geoJSON(feature.geometry, {
-      style: { color:'#dc2626', weight:6, opacity:1, fillColor:'#f87171', fillOpacity:0.35 },
-      pointToLayer: (f, latlng) => L.circleMarker(latlng, { radius:10, color:'#dc2626', weight:4, fillColor:'#f87171', fillOpacity:0.9 })
-    }).addTo(map);
-  }
-  document.getElementById('share-position-bar').classList.add('open');
-}
-function stopSharePositioning() {
-  sharePositioningActive = false;
-  document.getElementById('share-position-bar').classList.remove('open');
-  if (sharePositionHighlightLayer && map) { map.removeLayer(sharePositionHighlightLayer); sharePositionHighlightLayer = null; }
-}
-document.getElementById('sharePositionCancelBtn').onclick = () => {
-  stopSharePositioning();
-  if (shareOriginalMapView && map) map.setView(shareOriginalMapView.center, shareOriginalMapView.zoom, { animate:false });
-  shareOriginalMapView = null;
-  shareEditorFeature = null;
-};
-document.getElementById('sharePositionCaptureBtn').onclick = async () => {
-  stopSharePositioning();
-  document.getElementById('share-editor-modal').classList.add('open');
-  await captureAlertScreenshot(shareEditorFeature);
-};
 
 // Permette di provare l'editor di condivisione sulla bozza corrente (via/e
 // selezionate sulla mappa, non ancora salvate come avviso): niente viene
@@ -1055,7 +1017,20 @@ document.getElementById('sharePreviewBtn').onclick = () => {
   openShareEditor({ type:'Feature', geometry, properties: { id:'draft-preview', title, description } });
 };
 
-// ── Cattura screenshot della mappa ──────────────────────────────────────────
+// ── Fase 1: inquadratura, con una mini-mappa live dentro il pannello ────────
+function setSharePhase(phase) {
+  const positioning = phase === 'positioning';
+  document.getElementById('share-live-map').style.visibility = positioning ? 'visible' : 'hidden';
+  document.getElementById('share-live-map').style.pointerEvents = positioning ? 'auto' : 'none';
+  document.getElementById('share-bg-img').style.visibility = positioning ? 'hidden' : 'visible';
+  document.getElementById('share-overlay').style.visibility = positioning ? 'hidden' : 'visible';
+  document.getElementById('sharePositionHint').style.display = positioning ? 'block' : 'none';
+  document.getElementById('shareEditToolbar').style.display = positioning ? 'none' : 'flex';
+  document.getElementById('shareCaptureNowBtn').style.display = positioning ? 'inline-flex' : 'none';
+  document.getElementById('shareRetryBtn').style.display = positioning ? 'none' : 'inline-flex';
+  document.getElementById('shareExportBtn').style.display = positioning ? 'none' : 'inline-flex';
+}
+
 function featureBoundsForShare(feature) {
   try {
     const bounds = L.geoJSON(feature.geometry).getBounds();
@@ -1063,23 +1038,54 @@ function featureBoundsForShare(feature) {
   } catch (e) { return null; }
 }
 
-function waitForTilesLoaded(timeoutMs) {
+function enterLivePositioning(feature, { autoFit = false } = {}) {
+  setSharePhase('positioning');
+  const statusEl = document.getElementById('share-status-msg');
+  statusEl.className = ''; statusEl.textContent = '';
+
+  if (!shareLiveMap) {
+    shareLiveMap = L.map('share-live-map', { attributionControl:false, zoomControl:true, maxZoom:22 });
+    shareLiveTileLayer = L.tileLayer(`https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png?v=${TILE_CACHE_BUSTER}`, { maxZoom:22, crossOrigin:true }).addTo(shareLiveMap);
+  }
+  if (shareLiveHighlightLayer) { shareLiveMap.removeLayer(shareLiveHighlightLayer); shareLiveHighlightLayer = null; }
+
+  requestAnimationFrame(() => {
+    shareLiveMap.invalidateSize();
+    if (autoFit) {
+      const bounds = featureBoundsForShare(feature);
+      if (feature.geometry?.type === 'Point' && bounds) shareLiveMap.setView(bounds.getCenter(), 17, { animate:false });
+      else if (bounds) shareLiveMap.fitBounds(bounds.pad(0.4), { animate:false });
+      else shareLiveMap.setView([45.664, 11.958], 14, { animate:false });
+    }
+    if (feature.geometry) {
+      shareLiveHighlightLayer = L.geoJSON(feature.geometry, {
+        style: { color:'#dc2626', weight:6, opacity:1, fillColor:'#f87171', fillOpacity:0.35 },
+        pointToLayer: (f, latlng) => L.circleMarker(latlng, { radius:10, color:'#dc2626', weight:4, fillColor:'#f87171', fillOpacity:0.9 })
+      }).addTo(shareLiveMap);
+    }
+  });
+}
+document.getElementById('shareRetryBtn').onclick = () => { if (shareEditorFeature) enterLivePositioning(shareEditorFeature, { autoFit: false }); };
+document.getElementById('shareCaptureNowBtn').onclick = () => captureFromLiveMap();
+
+// ── Fase 2: cattura della mini-mappa live nello screenshot statico ──────────
+function waitForLiveTilesLoaded(timeoutMs) {
   return new Promise((resolve) => {
-    if (!baseTileLayer) return resolve();
+    if (!shareLiveTileLayer) return resolve();
     let done = false;
-    const finish = () => { if (done) return; done = true; clearTimeout(timer); baseTileLayer.off('load', finish); resolve(); };
+    const finish = () => { if (done) return; done = true; clearTimeout(timer); shareLiveTileLayer.off('load', finish); resolve(); };
     const timer = setTimeout(finish, timeoutMs);
-    baseTileLayer.once('load', finish);
+    shareLiveTileLayer.once('load', finish);
   });
 }
 
-function projectLatLngPct(lat, lon) { const pt = map.latLngToContainerPoint([lat, lon]); return [pt.x, pt.y]; }
+function projectLatLngPct(lat, lon, mapInstance) { const pt = mapInstance.latLngToContainerPoint([lat, lon]); return [pt.x, pt.y]; }
 
-function drawGeometryHighlight(ctx, geom) {
+function drawGeometryHighlight(ctx, geom, mapInstance) {
   const strokeLine = (coords) => {
     if (!coords || coords.length < 2) return;
     ctx.beginPath();
-    coords.forEach(([lon, lat], i) => { const [x, y] = projectLatLngPct(lat, lon); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+    coords.forEach(([lon, lat], i) => { const [x, y] = projectLatLngPct(lat, lon, mapInstance); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 10; ctx.stroke();
     ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 6; ctx.stroke();
@@ -1087,12 +1093,12 @@ function drawGeometryHighlight(ctx, geom) {
   const fillPolygon = (rings) => {
     if (!rings?.length) return;
     ctx.beginPath();
-    rings.forEach((ring) => { ring.forEach(([lon, lat], i) => { const [x, y] = projectLatLngPct(lat, lon); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }); ctx.closePath(); });
+    rings.forEach((ring) => { ring.forEach(([lon, lat], i) => { const [x, y] = projectLatLngPct(lat, lon, mapInstance); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }); ctx.closePath(); });
     ctx.fillStyle = 'rgba(248,113,113,0.35)'; ctx.fill();
     ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 4; ctx.stroke();
   };
   const drawPoint = (lon, lat) => {
-    const [x, y] = projectLatLngPct(lat, lon);
+    const [x, y] = projectLatLngPct(lat, lon, mapInstance);
     ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI * 2);
     ctx.fillStyle = '#f87171'; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = '#dc2626'; ctx.stroke();
   };
@@ -1102,11 +1108,11 @@ function drawGeometryHighlight(ctx, geom) {
   else if (type === 'MultiLineString') geom.coordinates.forEach(strokeLine);
   else if (type === 'Polygon') fillPolygon(geom.coordinates);
   else if (type === 'MultiPolygon') geom.coordinates.forEach(fillPolygon);
-  else if (type === 'GeometryCollection') (geom.geometries || []).forEach((g) => drawGeometryHighlight(ctx, g));
+  else if (type === 'GeometryCollection') (geom.geometries || []).forEach((g) => drawGeometryHighlight(ctx, g, mapInstance));
 }
 
-function renderMapToCanvas() {
-  const mapEl = document.getElementById('map');
+function renderLiveMapToCanvas() {
+  const mapEl = document.getElementById('share-live-map');
   const rect = mapEl.getBoundingClientRect();
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const canvas = document.createElement('canvas');
@@ -1119,36 +1125,32 @@ function renderMapToCanvas() {
   // tile correnti, quindi ci appoggiamo a questa finché la versione resta
   // fissa. Le tile OSM inviano Access-Control-Allow-Origin:* (verificato),
   // quindi con crossOrigin:true sul layer drawImage non "sporca" il canvas.
-  if (baseTileLayer && baseTileLayer._tiles) {
-    Object.values(baseTileLayer._tiles).forEach((tile) => {
+  if (shareLiveTileLayer && shareLiveTileLayer._tiles) {
+    Object.values(shareLiveTileLayer._tiles).forEach((tile) => {
       if (!tile.current || !tile.el || !tile.el.complete) return;
       const tr = tile.el.getBoundingClientRect();
       try { ctx.drawImage(tile.el, tr.left - rect.left, tr.top - rect.top, tr.width, tr.height); } catch (e) { /* tile non disegnabile, si ignora */ }
     });
   }
-  if (shareEditorFeature?.geometry) drawGeometryHighlight(ctx, shareEditorFeature.geometry);
+  if (shareEditorFeature?.geometry) drawGeometryHighlight(ctx, shareEditorFeature.geometry, shareLiveMap);
   document.getElementById('share-stage').style.aspectRatio = `${rect.width} / ${rect.height}`;
   return canvas.toDataURL('image/png');
 }
 
-async function captureAlertScreenshot(feature) {
+async function captureFromLiveMap() {
   const stage = document.getElementById('share-stage');
   const statusEl = document.getElementById('share-status-msg');
   stage.classList.add('loading');
   statusEl.className = ''; statusEl.textContent = '';
-  if (!map) { stage.classList.remove('loading'); return; }
-
-  // L'inquadratura (pan/zoom) è già stata scelta dall'operatore nella fase
-  // di posizionamento precedente (startSharePositioning): qui catturiamo la
-  // mappa così com'è, senza ri-centrarla.
   try {
-    await waitForTilesLoaded(2500);
-    // Lascia respirare il layout dopo fitBounds prima di leggere le
-    // posizioni reali dei tile nel DOM.
+    await waitForLiveTilesLoaded(2500);
+    // Lascia respirare il layout prima di leggere le posizioni reali dei
+    // tile nel DOM.
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-    const dataUrl = renderMapToCanvas();
+    const dataUrl = renderLiveMapToCanvas();
     document.getElementById('share-bg-img').src = dataUrl;
+    setSharePhase('editing');
   } catch (err) {
     console.error('Cattura screenshot mappa fallita:', err);
     statusEl.className = 'err';
@@ -1157,7 +1159,6 @@ async function captureAlertScreenshot(feature) {
     stage.classList.remove('loading');
   }
 }
-document.getElementById('shareRetryBtn').onclick = () => { if (shareEditorFeature) startSharePositioning(shareEditorFeature, { autoFit: false }); };
 
 document.getElementById('shareUploadInput').addEventListener('change', (e) => {
   const file = e.target.files?.[0];
@@ -1168,6 +1169,7 @@ document.getElementById('shareUploadInput').addEventListener('change', (e) => {
     img.onload = () => {
       document.getElementById('share-stage').style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
       document.getElementById('share-bg-img').src = reader.result;
+      setSharePhase('editing');
       const statusEl = document.getElementById('share-status-msg');
       statusEl.className = ''; statusEl.textContent = 'Foto caricata.';
     };
