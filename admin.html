@@ -141,6 +141,7 @@
     .share-el.selected>.share-el-chrome{display:flex;}
     .share-el-delete{top:-12px;right:-12px;background:var(--danger);}
     .share-el-resize{bottom:-12px;right:-12px;background:#2563eb;cursor:nwse-resize;}
+    .share-el-rotate{top:-32px;left:50%;margin-left:-11.5px;background:#2563eb;cursor:grab;}
     .share-el-handle{position:absolute;width:20px;height:20px;margin:-10px;border-radius:50%;background:#fff;border:3px solid #2563eb;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:pointer;z-index:25;display:none;}
     .share-editor-exporting .share-el-chrome,.share-editor-exporting .share-el-handle,.share-editor-exporting .share-el.selected{display:none!important;outline:none!important;}
     .share-editor-exporting #share-live-map{display:none!important;}
@@ -984,6 +985,14 @@ let shareLiveHighlightLayer = null;
 function stageRect() { return document.getElementById('share-stage').getBoundingClientRect(); }
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
+// Mentre l'editor di condivisione è aperto, la mappa admin (sotto al
+// modale, non visibile ma comunque attiva) può avere migliaia di elementi
+// OSM caricati in osmSourceLayer: tenerli mentre gira anche la mini-mappa
+// live dell'editor appesantisce inutilmente la pagina e causa lag durante
+// pan/zoom dell'inquadratura. La rimuoviamo temporaneamente e la
+// ripristiniamo alla chiusura, solo se era effettivamente visibile prima.
+let shareOsmLayerWasVisible = false;
+
 function openShareEditor(feature) {
   shareEditorFeature = feature;
   shareEditorElements = [];
@@ -996,12 +1005,18 @@ function openShareEditor(feature) {
   statusEl.className = ''; statusEl.textContent = '';
   closeSignPanel();
   highlightColorSwatch(shareCurrentColor);
+
+  shareOsmLayerWasVisible = Boolean(map && osmSourceLayer && map.hasLayer(osmSourceLayer));
+  if (shareOsmLayerWasVisible) map.removeLayer(osmSourceLayer);
+
   document.getElementById('share-editor-modal').classList.add('open');
   enterLivePositioning(feature, { autoFit: true });
 }
 
 function closeShareEditor() {
   document.getElementById('share-editor-modal').classList.remove('open');
+  if (shareOsmLayerWasVisible && map && osmSourceLayer && isEditingMode) map.addLayer(osmSourceLayer);
+  shareOsmLayerWasVisible = false;
   shareEditorFeature = null;
 }
 document.getElementById('shareEditorCloseBtn').onclick = closeShareEditor;
@@ -1258,6 +1273,31 @@ function attachResizeHandle(el, opts) {
   el.appendChild(handle);
 }
 
+function attachRotateHandle(el, opts) {
+  const handle = document.createElement('div');
+  handle.className = 'share-el-chrome share-el-rotate';
+  handle.textContent = '⟳';
+  handle.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    selectShareElement(el.dataset.elId);
+    handle.setPointerCapture(e.pointerId);
+    const onMove = (ev) => {
+      const rect = el.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      // 0° = maniglia in alto (ore 12): l'angolo grezzo di atan2 parte da
+      // destra (ore 3), quindi si aggiungono 90° per allinearlo alla
+      // posizione della maniglia.
+      const deg = Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI + 90;
+      opts.set(deg);
+    };
+    const onUp = () => { handle.removeEventListener('pointermove', onMove); handle.removeEventListener('pointerup', onUp); };
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', onUp);
+  });
+  el.appendChild(handle);
+}
+
 function createTextElement() {
   const id = 'el' + (++shareIdCounter);
   const el = document.createElement('div');
@@ -1296,6 +1336,7 @@ function createSignElement(imgUrl) {
   wrapper.dataset.elId = id;
   wrapper.style.left = '40%';
   wrapper.style.top = '40%';
+  let rotation = 0;
   const img = document.createElement('img');
   img.crossOrigin = 'anonymous';
   img.alt = 'Segnale stradale';
@@ -1303,6 +1344,7 @@ function createSignElement(imgUrl) {
   document.getElementById('share-overlay').appendChild(wrapper);
   makeDraggable(wrapper);
   attachDeleteHandle(wrapper);
+  attachRotateHandle(wrapper, { set: (deg) => { rotation = deg; wrapper.style.transform = `rotate(${deg}deg)`; } });
   img.onload = () => {
     const natAspect = img.naturalHeight / img.naturalWidth || 1;
     const stage = stageRect();
@@ -1313,7 +1355,7 @@ function createSignElement(imgUrl) {
     attachResizeHandle(wrapper, {
       get: () => parseFloat(wrapper.style.width),
       set: (v) => { wrapper.style.width = v + '%'; const s = stageRect(); wrapper.style.height = (v * (s.width / s.height) * natAspect) + '%'; },
-      min: 4, max: 80
+      min: 2, max: 80
     });
   };
   img.src = imgUrl;
@@ -1466,11 +1508,12 @@ async function runSignSearch() {
   hintEl.textContent = 'Ricerca in corso...';
   resultsEl.innerHTML = '';
   try {
-    // Limita i risultati all'albero delle categorie "Road signs in Italy" su
-    // Commons (segnaletica stradale italiana, incluse le sotto-categorie
-    // grazie a deepcategory:), invece di restituire segnali di qualunque
-    // paese o foto generiche che contengono per caso le stesse parole.
-    const scopedQuery = `deepcategory:"Road signs in Italy" ${query}`;
+    // Limita i risultati esclusivamente all'albero della categoria Commons
+    // indicata dall'utente (Category:Diagrams of road signs of Italy),
+    // incluse le sue sotto-categorie grazie a deepcategory:, invece di
+    // restituire segnali di qualunque paese o foto generiche che contengono
+    // per caso le stesse parole.
+    const scopedQuery = `deepcategory:"Diagrams of road signs of Italy" ${query}`;
     const url = 'https://commons.wikimedia.org/w/api.php?' + new URLSearchParams({
       action: 'query', format: 'json', origin: '*',
       generator: 'search', gsrsearch: scopedQuery, gsrnamespace: '6', gsrlimit: '24',
