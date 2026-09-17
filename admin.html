@@ -32,6 +32,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Usata solo dalla modalità "Condividi chiusura" per appiattire lo
+       screenshot mappa + testi/frecce/segnali in un'unica immagine PNG. -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <style>
     :root{
       --primary:#8d021f; --primary-700:#73021a; --primary-50:#fbeff1; --primary-100:#f7dde1;
@@ -110,6 +113,46 @@
     /* maniglie di ritaglio via (per selezionare solo un tratto della via OSM) */
     .trim-handle{width:16px;height:16px;border-radius:50%;background:#fff;border:3px solid #16a34a;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:ew-resize;}
     .trim-handle:hover{background:#dcfce7;}
+
+    /* ---------- modalità "Condividi chiusura" ---------- */
+    #share-editor-modal{position:fixed;inset:0;background:rgba(15,17,23,.8);z-index:5000;display:none;align-items:center;justify-content:center;padding:14px;}
+    #share-editor-modal.open{display:flex;}
+    .share-editor-box{background:#fff;border-radius:var(--r-lg);box-shadow:var(--shadow-lg);width:100%;max-width:900px;max-height:96vh;display:flex;flex-direction:column;overflow:hidden;}
+    .share-editor-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 18px;border-bottom:1px solid var(--line);flex:none;}
+    .share-editor-head h2{margin:0;font-size:1.02rem;font-weight:800;letter-spacing:-.01em;}
+    .share-editor-body{overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:12px;}
+    .share-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
+    .share-toolbar .sep{width:1px;align-self:stretch;background:var(--line-strong);margin:0 2px;}
+    .share-color-row{display:flex;align-items:center;gap:6px;}
+    .share-color-dot{width:24px;height:24px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line-strong);cursor:pointer;padding:0;}
+    .share-color-dot.active{box-shadow:0 0 0 2px var(--ink);}
+    .share-stage-wrap{position:relative;width:100%;background:#dfe3e8;border-radius:var(--r-md);border:1px solid var(--line-strong);overflow:hidden;}
+    #share-stage{position:relative;width:100%;aspect-ratio:4/3;overflow:hidden;touch-action:none;background:#dfe3e8;container-type:inline-size;}
+    #share-stage.loading::after{content:'Cattura della mappa in corso…';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;color:var(--muted);}
+    #share-bg-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;user-select:none;pointer-events:none;-webkit-user-drag:none;display:block;}
+    #share-overlay{position:absolute;inset:0;}
+    .share-el{position:absolute;touch-action:none;cursor:move;}
+    .share-el.selected{outline:2px dashed #2563eb;outline-offset:3px;}
+    .share-el-text{min-width:34px;min-height:1.3em;padding:2px 5px;font-weight:800;font-family:'Public Sans',sans-serif;white-space:pre-wrap;outline:none;text-shadow:0 1px 3px rgba(0,0,0,.55),0 0 7px rgba(255,255,255,.45);}
+    .share-el-sign img{width:100%;height:100%;display:block;pointer-events:none;user-select:none;-webkit-user-drag:none;}
+    .share-el-chrome{position:absolute;width:23px;height:23px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;color:#fff;cursor:pointer;z-index:25;font-size:12px;line-height:1;}
+    .share-el.selected>.share-el-chrome{display:flex;}
+    .share-el-delete{top:-12px;right:-12px;background:var(--danger);}
+    .share-el-resize{bottom:-12px;right:-12px;background:#2563eb;cursor:nwse-resize;}
+    .share-el-handle{position:absolute;width:20px;height:20px;margin:-10px;border-radius:50%;background:#fff;border:3px solid #2563eb;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:pointer;z-index:25;display:none;}
+    .share-editor-exporting .share-el-chrome,.share-editor-exporting .share-el-handle,.share-editor-exporting .share-el.selected{display:none!important;outline:none!important;}
+    .share-sign-panel{position:absolute;left:8px;right:8px;bottom:8px;top:8px;background:rgba(255,255,255,.98);border-radius:var(--r-md);box-shadow:var(--shadow-lg);padding:10px;display:none;flex-direction:column;gap:8px;z-index:30;}
+    .share-sign-panel.open{display:flex;}
+    .share-sign-panel-head{display:flex;gap:8px;}
+    .share-sign-panel-head input{flex:1;}
+    .share-sign-results{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px;overflow-y:auto;}
+    .share-sign-results button{padding:4px;background:#fff;border:1px solid var(--line-strong);display:flex;flex-direction:column;align-items:center;}
+    .share-sign-results img{width:100%;height:52px;object-fit:contain;}
+    .share-sign-hint{font-size:.78rem;color:var(--muted);margin:0;}
+    .share-editor-foot{display:flex;gap:10px;padding:13px 18px;border-top:1px solid var(--line);flex:none;}
+    .share-editor-foot button{flex:1;}
+    #share-status-msg{font-size:.8rem;color:var(--muted);text-align:center;min-height:1.1em;}
+    #share-status-msg.err{color:var(--danger);font-weight:600;}
 
     /* osm loader */
     .osm-loader{display:inline-flex;align-items:center;gap:8px;padding:9px 13px;border-radius:var(--r-sm);border:1px solid var(--line-strong);background:#fff;color:var(--muted);font-size:.82rem;font-weight:600;box-shadow:var(--shadow-sm);}
@@ -376,6 +419,72 @@
     <div id="map"></div>
   </div>
 </div>
+
+<div id="share-editor-modal">
+  <div class="share-editor-box">
+    <div class="share-editor-head">
+      <h2 id="shareEditorTitle">Condividi chiusura</h2>
+      <button type="button" class="btn-ghost btn-small" id="shareEditorCloseBtn" aria-label="Chiudi">✕</button>
+    </div>
+    <div class="share-editor-body">
+      <div class="share-toolbar">
+        <button type="button" class="btn-ghost btn-small" id="shareAddTextBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h16"/></svg>
+          Testo
+        </button>
+        <button type="button" class="btn-ghost btn-small" id="shareAddArrowBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19 19 5"/><path d="M9 5h10v10"/></svg>
+          Freccia
+        </button>
+        <button type="button" class="btn-ghost btn-small" id="shareAddSignBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7v3c0 6.5 4.3 10.5 10 12 5.7-1.5 10-5.5 10-12V7L12 2Z"/><path d="M12 8v5"/><circle cx="12" cy="16" r=".6" fill="currentColor"/></svg>
+          Segnale
+        </button>
+        <div class="sep"></div>
+        <div class="share-color-row" id="shareColorRow">
+          <button type="button" class="share-color-dot active" data-color="#dc2626" style="background:#dc2626;" title="Rosso" aria-label="Colore rosso"></button>
+          <button type="button" class="share-color-dot" data-color="#eab308" style="background:#eab308;" title="Giallo" aria-label="Colore giallo"></button>
+          <button type="button" class="share-color-dot" data-color="#111827" style="background:#111827;" title="Nero" aria-label="Colore nero"></button>
+          <button type="button" class="share-color-dot" data-color="#ffffff" style="background:#ffffff;" title="Bianco" aria-label="Colore bianco"></button>
+        </div>
+        <div class="sep"></div>
+        <button type="button" class="btn-danger btn-small" id="shareDeleteSelBtn">Elimina selezionato</button>
+      </div>
+
+      <div class="share-stage-wrap">
+        <div id="share-stage">
+          <img id="share-bg-img" alt="Screenshot area chiusura" crossorigin="anonymous">
+          <div id="share-overlay"></div>
+          <div class="share-sign-panel" id="shareSignPanel">
+            <div class="share-sign-panel-head">
+              <input type="text" id="shareSignSearch" placeholder="Cerca segnale (es. strada chiusa, divieto transito)...">
+              <button type="button" class="btn-primary btn-small" id="shareSignSearchBtn">Cerca</button>
+              <button type="button" class="btn-ghost btn-small" id="shareSignPanelCloseBtn">✕</button>
+            </div>
+            <p class="share-sign-hint" id="shareSignHint">Cerca un segnale su Wikimedia Commons e tocca la miniatura per aggiungerlo.</p>
+            <div class="share-sign-results" id="shareSignResults"></div>
+          </div>
+        </div>
+      </div>
+      <p id="share-status-msg"></p>
+    </div>
+    <div class="share-editor-foot">
+      <button type="button" class="btn-ghost" id="shareRetryBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+        Ricattura mappa
+      </button>
+      <label class="btn-ghost" style="text-align:center;">
+        Carica foto
+        <input type="file" accept="image/*" id="shareUploadInput" style="display:none;">
+      </label>
+      <button type="button" class="btn-primary" id="shareExportBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51 15.42 17.49"/><path d="M15.41 6.51 8.59 10.49"/></svg>
+        Condividi / Scarica
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SERVER_URL = 'https://andrea.tail04be23.ts.net';
 const CLOSURES_API_URL = 'https://andrea.tail04be23.ts.net/api/closures';
@@ -554,7 +663,7 @@ document.getElementById('sendNotifBtn').onclick = async () => {
 window.addEventListener('beforeunload', forceLogoutOnExit);
 window.addEventListener('pagehide', forceLogoutOnExit);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') forceLogoutOnExit(); });
-let map, draftLayer, alertsLayer, osmSourceLayer, trimHandlesLayer;
+let map, draftLayer, alertsLayer, osmSourceLayer, trimHandlesLayer, baseTileLayer;
 let draftGeometry = null;
 let selectedOSMFeatures = [];
 let selectedOSMIds = new Set();
@@ -675,7 +784,7 @@ function style() { return styleByStatus('active'); }
 function resetDraft() { draftGeometry = null; selectedOSMFeatures = []; selectedOSMIds = new Set(); selectedLineRanges.clear(); if (trimHandlesLayer) trimHandlesLayer.clearLayers(); draftLayer.clearLayers(); renderOsmFeatures(); document.getElementById('state').textContent = 'Bozza cancellata. Seleziona nuovi elementi.'; }
 function setMode(editingEnabled) { isEditingMode = Boolean(editingEnabled); const modeButton = document.getElementById('modeToggleBtn'); const panelTitle = document.getElementById('panelTitle'); const panelHint = document.getElementById('panelHint'); const saveBtn = document.getElementById('saveBtn'); const clearDraftBtn = document.getElementById('clearDraftBtn'); modeButton.textContent = isEditingMode ? 'Modalità editing (OSM)' : 'Modalità avvisi attivi'; panelTitle.textContent = isEditingMode ? 'Nuovo avviso chiusura' : 'Avvisi attivi (Sola lettura)'; panelHint.textContent = isEditingMode ? "La geometria viene presa da OpenStreetMap: i dati dell'area visibile si aggiornano automaticamente mentre scorri la mappa. Clicca sulla mappa per selezionare o deselezionare più elementi OSM insieme. Su una via selezionata trascina i pallini verdi alle estremità per limitare la chiusura a un tratto parziale." : 'Visualizzazione di sola lettura degli avvisi già attivi sulla mappa.'; saveBtn.style.display = isEditingMode ? 'inline-flex' : 'none'; clearDraftBtn.style.display = isEditingMode ? 'inline-flex' : 'none'; if (!map) return; if (isEditingMode) { map.addLayer(osmSourceLayer); map.addLayer(draftLayer); map.addLayer(trimHandlesLayer); map.on('moveend', scheduleOsmLoad); scheduleOsmLoad(); } else { map.off('moveend', scheduleOsmLoad); clearTimeout(osmLoadTimer); if (osmFetchController) osmFetchController.abort(); map.removeLayer(osmSourceLayer); map.removeLayer(draftLayer); map.removeLayer(trimHandlesLayer); document.getElementById('state').textContent = 'Sei in visualizzazione avvisi attivi.'; setOsmLoaderState(false, 'Caricamento OSM disattivato'); } }
 async function refreshAlerts() { await loadData(); const fc = getData(); const allFeatures = fc.features || []; const now = new Date(); const features = allFeatures; if (features.length !== allFeatures.length) await saveData({ ...fc, features }); alertsLayer.clearLayers(); L.geoJSON({ type:'FeatureCollection', features }, { style: (feature) => styleByStatus(getAlertStatus(feature.properties || {}, now)), pointToLayer: (feature,latlng) => L.circleMarker(latlng, { ...styleByStatus(getAlertStatus(feature.properties || {}, now)), radius:8 }), onEachFeature: (f,l) => { const p = f.properties || {}; const osmNames = Array.isArray(p.osmNames) ? p.osmNames.filter(Boolean) : []; const namesHtml = osmNames.length ? `<br><small><strong>Aree:</strong> ${osmNames.join(', ')}</small>` : ''; l.bindPopup(`<strong>${p.title || 'Avviso'}</strong><br>${p.description || ''}${namesHtml}<br><small>${p.startDate || '-'} ${p.startTime || '--:--'} → ${p.endDate || '-'} ${p.endTime || '--:--'}</small>`); } }).addTo(alertsLayer); renderAlertsList(features, now); }
-function renderAlertsList(features, now = new Date()) { const list = document.getElementById('alertsList'); if (!list) return; if (!features.length) { list.innerHTML = '<div class="empty">Nessun avviso attualmente presente.</div>'; return; } list.innerHTML = features.map((feature, index) => { const p = feature.properties || {}; const id = p.id || ''; const status = getAlertStatus(p, now); const itemClass = status === 'upcoming' ? 'alert-upcoming' : 'alert-active'; const osmNames = Array.isArray(p.osmNames) ? p.osmNames.filter(Boolean) : []; const namesText = osmNames.length ? `<p class="alert-desc"><strong>Aree:</strong> ${osmNames.join(', ')}</p>` : ''; return `<div class="alert-item ${itemClass}"><div class="alert-head"><p class="alert-title">${p.title || `Avviso #${index + 1}`}</p><button class="btn-danger btn-small" data-alert-id="${id}" data-alert-index="${index}">Elimina</button></div><p class="alert-meta"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>${p.startDate || '-'} ${p.startTime || '--:--'} &rarr; ${p.endDate || '-'} ${p.endTime || '--:--'}</p><p class="alert-desc">${p.description || 'Nessuna descrizione.'}</p>${namesText}</div>`; }).join(''); }
+function renderAlertsList(features, now = new Date()) { const list = document.getElementById('alertsList'); if (!list) return; if (!features.length) { list.innerHTML = '<div class="empty">Nessun avviso attualmente presente.</div>'; return; } list.innerHTML = features.map((feature, index) => { const p = feature.properties || {}; const id = p.id || ''; const status = getAlertStatus(p, now); const itemClass = status === 'upcoming' ? 'alert-upcoming' : 'alert-active'; const osmNames = Array.isArray(p.osmNames) ? p.osmNames.filter(Boolean) : []; const namesText = osmNames.length ? `<p class="alert-desc"><strong>Aree:</strong> ${osmNames.join(', ')}</p>` : ''; return `<div class="alert-item ${itemClass}"><div class="alert-head"><p class="alert-title">${p.title || `Avviso #${index + 1}`}</p><div style="display:flex;gap:6px;flex:none;"><button class="btn-ghost btn-small btn-share-alert" data-share-index="${index}" title="Condividi chiusura" aria-label="Condividi chiusura"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51 15.42 17.49"/><path d="M15.41 6.51 8.59 10.49"/></svg></button><button class="btn-danger btn-small" data-alert-id="${id}" data-alert-index="${index}">Elimina</button></div></div><p class="alert-meta"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>${p.startDate || '-'} ${p.startTime || '--:--'} &rarr; ${p.endDate || '-'} ${p.endTime || '--:--'}</p><p class="alert-desc">${p.description || 'Nessuna descrizione.'}</p>${namesText}</div>`; }).join(''); }
 function geometryFromDraft() { return draftGeometry; }
 function drawDraft() { draftLayer.clearLayers(); const geom = geometryFromDraft(); if (!geom) return; L.geoJSON({ type:'Feature', properties:{}, geometry:geom }, { style, pointToLayer: (_,latlng) => L.circleMarker(latlng, { ...style(), radius:8 }) }).addTo(draftLayer); }
 function toRing(coords = []) { if (!coords.length) return null; const first = coords[0]; const last = coords[coords.length - 1]; const closed = first[0] === last[0] && first[1] === last[1]; return closed ? coords : [...coords, first]; }
@@ -761,7 +870,7 @@ async function overpassFetch(query) {
 async function loadOsmData() { const bounds = map.getBounds().pad(0.3); const cacheKey = getViewportCacheKey(bounds, map.getZoom()); if (readViewportCache(cacheKey)) { setOsmLoaderState(false, `Dati in cache (${globalOsmCache.size} totali)`); return; } if (osmFetchController) osmFetchController.abort(); osmFetchController = new AbortController(); setOsmLoaderState(true, 'Caricamento nuovi dati OSM...'); try { const query = overpassQueryForBounds(bounds); const data = await Promise.race([overpassFetch(query), new Promise((_, reject) => { osmFetchController.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true }); })]); const newFeatures = (data.elements || []).map(overpassToFeature).filter(Boolean); let addedCount = 0; newFeatures.forEach(feature => { const id = feature.properties._osmId; if (!globalOsmCache.has(id)) { globalOsmCache.set(id, feature); addedCount++; } }); osmFeaturesCache = Array.from(globalOsmCache.values()); writeViewportCache(cacheKey); if (addedCount > 0) { renderOsmFeatures(); saveAdminOsmCache(); } setOsmLoaderState(false, `OSM: +${addedCount} nuovi (${globalOsmCache.size} totali)`); } catch (err) { if (err?.name === 'AbortError') return; console.error(err); setOsmLoaderState(false, 'Errore caricamento OSM'); } }
 function scheduleOsmLoad() { if (!isEditingMode || !map) return; clearTimeout(osmLoadTimer); osmLoadTimer = setTimeout(async () => { try { await loadOsmData(); } catch (err) { if (err?.name === 'AbortError') return; console.error(err); setOsmLoaderState(false, 'Errore caricamento OSM'); } }, 350); }
 function selectOSMFeature(feature) { if (!isEditingMode) return; const normalized = normalizeGeometryForDraft(feature.geometry); if (!normalized) return; const osmId = feature.properties?._osmId; if (!osmId) return; if (selectedOSMIds.has(osmId)) { selectedOSMIds.delete(osmId); selectedOSMFeatures = selectedOSMFeatures.filter((f) => f.properties?._osmId !== osmId); removeTrimHandles(osmId); selectedLineRanges.delete(osmId); } else { selectedOSMIds.add(osmId); selectedOSMFeatures.push(feature); if (normalized.type === 'LineString') initLineRange(feature, normalized); } updateDraftGeometryFromSelection(); drawDraft(); renderOsmFeatures(); setOsmLoaderState(false, `Selezionati: ${selectedOSMFeatures.length}`); }
-function initAdminMap() { window._adminMapInit = true; map = L.map('map', { center:[45.664,11.958], zoom:13, maxZoom:22, zoomControl:false }); L.control.zoom({ position:'bottomright' }).addTo(map); L.tileLayer(`https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png?v=${TILE_CACHE_BUSTER}`, { attribution:'© OpenStreetMap', maxZoom:22 }).addTo(map); draftLayer = L.layerGroup().addTo(map); alertsLayer = L.layerGroup().addTo(map); trimHandlesLayer = L.layerGroup().addTo(map); osmSourceLayer = L.geoJSON([], { style: osmFeatureStyle, pointToLayer: (feature, latlng) => L.circleMarker(latlng, { ...osmFeatureStyle(feature), radius: 10 }), onEachFeature: (feature, layer) => { const p = feature.properties || {}; const name = p.name || p.highway || p.amenity || p.shop || p._osmId; layer.bindTooltip(`OSM: ${name}`); } }).addTo(map);
+function initAdminMap() { window._adminMapInit = true; map = L.map('map', { center:[45.664,11.958], zoom:13, maxZoom:22, zoomControl:false }); L.control.zoom({ position:'bottomright' }).addTo(map); baseTileLayer = L.tileLayer(`https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png?v=${TILE_CACHE_BUSTER}`, { attribution:'© OpenStreetMap', maxZoom:22, crossOrigin:true }).addTo(map); draftLayer = L.layerGroup().addTo(map); alertsLayer = L.layerGroup().addTo(map); trimHandlesLayer = L.layerGroup().addTo(map); osmSourceLayer = L.geoJSON([], { style: osmFeatureStyle, pointToLayer: (feature, latlng) => L.circleMarker(latlng, { ...osmFeatureStyle(feature), radius: 10 }), onEachFeature: (feature, layer) => { const p = feature.properties || {}; const name = p.name || p.highway || p.amenity || p.shop || p._osmId; layer.bindTooltip(`OSM: ${name}`); } }).addTo(map);
 // Selezione unica tramite il click sulla mappa (nearest-feature): i layer
 // vettoriali di Leaflet fanno "bubblare" il click fino alla mappa per
 // default (bubblingMouseEvents:true). Avere ANCHE un click diretto sul
@@ -839,7 +948,516 @@ document.getElementById('saveBtn').onclick = async () => {
   }
 };
                          
-document.getElementById('deleteAllBtn').onclick = async () => { if (!confirm('Sei sicuro di voler eliminare TUTTI gli avvisi?')) return; await saveData({ type:'FeatureCollection', features:[] }); await refreshAlerts(); }; document.getElementById('alertsList').onclick = async (event) => { const button = event.target.closest('button[data-alert-id]'); if (!button) return; const alertId = button.getAttribute('data-alert-id'); const alertIndex = Number(button.getAttribute('data-alert-index')); if (!confirm('Eliminare questo avviso?')) return; const fc = getData(); fc.features = (fc.features || []).filter((feature, index) => alertId ? feature?.properties?.id !== alertId : index !== alertIndex); await saveData(fc); await refreshAlerts(); }; }
+document.getElementById('deleteAllBtn').onclick = async () => { if (!confirm('Sei sicuro di voler eliminare TUTTI gli avvisi?')) return; await saveData({ type:'FeatureCollection', features:[] }); await refreshAlerts(); }; document.getElementById('alertsList').onclick = async (event) => { const button = event.target.closest('button[data-alert-id]'); if (!button) return; const alertId = button.getAttribute('data-alert-id'); const alertIndex = Number(button.getAttribute('data-alert-index')); if (!confirm('Eliminare questo avviso?')) return; const fc = getData(); fc.features = (fc.features || []).filter((feature, index) => alertId ? feature?.properties?.id !== alertId : index !== alertIndex); await saveData(fc); await refreshAlerts(); }; document.getElementById('alertsList').addEventListener('click', (event) => { const shareBtn = event.target.closest('.btn-share-alert'); if (!shareBtn) return; const idx = Number(shareBtn.getAttribute('data-share-index')); const fc = getData(); const feature = (fc.features || [])[idx]; if (feature) openShareEditor(feature); }); }
+
+// ── MODALITÀ "CONDIVIDI CHIUSURA" ───────────────────────────────────────────
+// Cattura uno screenshot dell'area della mappa interessata dalla chiusura e
+// apre un piccolo editor per aggiungere testo, frecce e segnali stradali
+// (cercati in diretta su Wikimedia Commons, non scaricati in blocco) prima
+// di condividere o scaricare l'immagine finale composta.
+let shareEditorFeature = null;
+let shareEditorElements = []; // { id, type, el, extraEls?, getColor?, setColor?, setSelected? }
+let shareSelectedElId = null;
+let shareCurrentColor = '#dc2626';
+let shareOriginalMapView = null; // { center, zoom } da ripristinare alla chiusura
+let shareIdCounter = 0;
+let shareSignSearchController = null;
+
+function stageRect() { return document.getElementById('share-stage').getBoundingClientRect(); }
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+function openShareEditor(feature) {
+  shareEditorFeature = feature;
+  shareEditorElements = [];
+  shareSelectedElId = null;
+  document.getElementById('share-overlay').innerHTML = '';
+  document.getElementById('share-bg-img').src = '';
+  document.getElementById('share-stage').style.aspectRatio = '4 / 3';
+  document.getElementById('shareEditorTitle').textContent = feature.properties?.title ? `Condividi: ${feature.properties.title}` : 'Condividi chiusura';
+  const statusEl = document.getElementById('share-status-msg');
+  statusEl.className = ''; statusEl.textContent = '';
+  closeSignPanel();
+  highlightColorSwatch(shareCurrentColor);
+  document.getElementById('share-editor-modal').classList.add('open');
+  captureAlertScreenshot(feature);
+}
+
+function closeShareEditor() {
+  document.getElementById('share-editor-modal').classList.remove('open');
+  if (shareOriginalMapView && map) map.setView(shareOriginalMapView.center, shareOriginalMapView.zoom, { animate:false });
+  shareOriginalMapView = null;
+  shareEditorFeature = null;
+}
+document.getElementById('shareEditorCloseBtn').onclick = closeShareEditor;
+
+// ── Cattura screenshot della mappa ──────────────────────────────────────────
+function featureBoundsForShare(feature) {
+  try {
+    const bounds = L.geoJSON(feature.geometry).getBounds();
+    return bounds.isValid() ? bounds : null;
+  } catch (e) { return null; }
+}
+
+function waitForTilesLoaded(timeoutMs) {
+  return new Promise((resolve) => {
+    if (!baseTileLayer) return resolve();
+    let done = false;
+    const finish = () => { if (done) return; done = true; clearTimeout(timer); baseTileLayer.off('load', finish); resolve(); };
+    const timer = setTimeout(finish, timeoutMs);
+    baseTileLayer.once('load', finish);
+  });
+}
+
+function projectLatLngPct(lat, lon) { const pt = map.latLngToContainerPoint([lat, lon]); return [pt.x, pt.y]; }
+
+function drawGeometryHighlight(ctx, geom) {
+  const strokeLine = (coords) => {
+    if (!coords || coords.length < 2) return;
+    ctx.beginPath();
+    coords.forEach(([lon, lat], i) => { const [x, y] = projectLatLngPct(lat, lon); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 10; ctx.stroke();
+    ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 6; ctx.stroke();
+  };
+  const fillPolygon = (rings) => {
+    if (!rings?.length) return;
+    ctx.beginPath();
+    rings.forEach((ring) => { ring.forEach(([lon, lat], i) => { const [x, y] = projectLatLngPct(lat, lon); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }); ctx.closePath(); });
+    ctx.fillStyle = 'rgba(248,113,113,0.35)'; ctx.fill();
+    ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 4; ctx.stroke();
+  };
+  const drawPoint = (lon, lat) => {
+    const [x, y] = projectLatLngPct(lat, lon);
+    ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI * 2);
+    ctx.fillStyle = '#f87171'; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = '#dc2626'; ctx.stroke();
+  };
+  const type = geom?.type;
+  if (type === 'Point') drawPoint(geom.coordinates[0], geom.coordinates[1]);
+  else if (type === 'LineString') strokeLine(geom.coordinates);
+  else if (type === 'MultiLineString') geom.coordinates.forEach(strokeLine);
+  else if (type === 'Polygon') fillPolygon(geom.coordinates);
+  else if (type === 'MultiPolygon') geom.coordinates.forEach(fillPolygon);
+  else if (type === 'GeometryCollection') (geom.geometries || []).forEach((g) => drawGeometryHighlight(ctx, g));
+}
+
+function renderMapToCanvas() {
+  const mapEl = document.getElementById('map');
+  const rect = mapEl.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(rect.width * dpr);
+  canvas.height = Math.round(rect.height * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  // _tiles è una proprietà interna non documentata di L.TileLayer (Leaflet
+  // 1.9.4, versione fissata via CDN): non c'è API pubblica per elencare le
+  // tile correnti, quindi ci appoggiamo a questa finché la versione resta
+  // fissa. Le tile OSM inviano Access-Control-Allow-Origin:* (verificato),
+  // quindi con crossOrigin:true sul layer drawImage non "sporca" il canvas.
+  if (baseTileLayer && baseTileLayer._tiles) {
+    Object.values(baseTileLayer._tiles).forEach((tile) => {
+      if (!tile.current || !tile.el || !tile.el.complete) return;
+      const tr = tile.el.getBoundingClientRect();
+      try { ctx.drawImage(tile.el, tr.left - rect.left, tr.top - rect.top, tr.width, tr.height); } catch (e) { /* tile non disegnabile, si ignora */ }
+    });
+  }
+  if (shareEditorFeature?.geometry) drawGeometryHighlight(ctx, shareEditorFeature.geometry);
+  document.getElementById('share-stage').style.aspectRatio = `${rect.width} / ${rect.height}`;
+  return canvas.toDataURL('image/png');
+}
+
+async function captureAlertScreenshot(feature) {
+  const stage = document.getElementById('share-stage');
+  const statusEl = document.getElementById('share-status-msg');
+  stage.classList.add('loading');
+  statusEl.className = ''; statusEl.textContent = '';
+  if (!map) { stage.classList.remove('loading'); return; }
+
+  if (!shareOriginalMapView) shareOriginalMapView = { center: map.getCenter(), zoom: map.getZoom() };
+
+  const bounds = featureBoundsForShare(feature);
+  try {
+    if (feature.geometry?.type === 'Point') map.setView(bounds.getCenter(), 17, { animate:false });
+    else if (bounds) map.fitBounds(bounds.pad(0.4), { animate:false });
+
+    await waitForTilesLoaded(2500);
+    // Lascia respirare il layout dopo fitBounds prima di leggere le
+    // posizioni reali dei tile nel DOM.
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    const dataUrl = renderMapToCanvas();
+    document.getElementById('share-bg-img').src = dataUrl;
+  } catch (err) {
+    console.error('Cattura screenshot mappa fallita:', err);
+    statusEl.className = 'err';
+    statusEl.textContent = 'Cattura automatica non riuscita. Usa "Carica foto" per continuare con un\'immagine tua.';
+  } finally {
+    stage.classList.remove('loading');
+  }
+}
+document.getElementById('shareRetryBtn').onclick = () => { if (shareEditorFeature) captureAlertScreenshot(shareEditorFeature); };
+
+document.getElementById('shareUploadInput').addEventListener('change', (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      document.getElementById('share-stage').style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
+      document.getElementById('share-bg-img').src = reader.result;
+      const statusEl = document.getElementById('share-status-msg');
+      statusEl.className = ''; statusEl.textContent = 'Foto caricata.';
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+});
+
+// ── Elementi trascinabili (testo / segnali / frecce) ────────────────────────
+function selectShareElement(id) {
+  shareSelectedElId = id;
+  shareEditorElements.forEach((entry) => {
+    const isSel = entry.id === id;
+    if (entry.setSelected) entry.setSelected(isSel);
+    else entry.el.classList.toggle('selected', isSel);
+  });
+  const entry = shareEditorElements.find((e) => e.id === id);
+  if (entry?.getColor) highlightColorSwatch(entry.getColor());
+}
+function deselectAll() {
+  shareSelectedElId = null;
+  shareEditorElements.forEach((entry) => { if (entry.setSelected) entry.setSelected(false); else entry.el.classList.remove('selected'); });
+}
+function removeShareElement(id) {
+  const idx = shareEditorElements.findIndex((e) => e.id === id);
+  if (idx === -1) return;
+  const entry = shareEditorElements[idx];
+  entry.el.remove();
+  (entry.extraEls || []).forEach((e) => e.remove());
+  shareEditorElements.splice(idx, 1);
+  if (shareSelectedElId === id) shareSelectedElId = null;
+}
+function highlightColorSwatch(color) {
+  document.querySelectorAll('.share-color-dot').forEach((d) => d.classList.toggle('active', d.getAttribute('data-color') === color));
+}
+
+function makeDraggable(wrapperEl) {
+  wrapperEl.addEventListener('pointerdown', (e) => {
+    if (wrapperEl.isContentEditable) return;
+    if (e.target.closest('.share-el-chrome')) return;
+    e.stopPropagation();
+    selectShareElement(wrapperEl.dataset.elId);
+    wrapperEl.setPointerCapture(e.pointerId);
+    const stage = stageRect();
+    const startX = e.clientX, startY = e.clientY;
+    const startLeftPct = parseFloat(wrapperEl.style.left) || 0;
+    const startTopPct = parseFloat(wrapperEl.style.top) || 0;
+    const onMove = (ev) => {
+      const dxPct = (ev.clientX - startX) / stage.width * 100;
+      const dyPct = (ev.clientY - startY) / stage.height * 100;
+      wrapperEl.style.left = clamp(startLeftPct + dxPct, 0, 100) + '%';
+      wrapperEl.style.top = clamp(startTopPct + dyPct, 0, 100) + '%';
+    };
+    const onUp = () => { wrapperEl.removeEventListener('pointermove', onMove); wrapperEl.removeEventListener('pointerup', onUp); };
+    wrapperEl.addEventListener('pointermove', onMove);
+    wrapperEl.addEventListener('pointerup', onUp);
+  });
+}
+
+function attachDeleteHandle(el) {
+  const del = document.createElement('div');
+  del.className = 'share-el-chrome share-el-delete';
+  del.textContent = '✕';
+  del.addEventListener('pointerdown', (e) => e.stopPropagation());
+  del.addEventListener('click', (e) => { e.stopPropagation(); removeShareElement(el.dataset.elId); });
+  el.appendChild(del);
+}
+
+function attachResizeHandle(el, opts) {
+  const handle = document.createElement('div');
+  handle.className = 'share-el-chrome share-el-resize';
+  handle.textContent = '↘';
+  handle.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    selectShareElement(el.dataset.elId);
+    handle.setPointerCapture(e.pointerId);
+    const stage = stageRect();
+    const startX = e.clientX;
+    const startVal = opts.get();
+    const onMove = (ev) => { opts.set(clamp(startVal + (ev.clientX - startX) / stage.width * 100, opts.min, opts.max)); };
+    const onUp = () => { handle.removeEventListener('pointermove', onMove); handle.removeEventListener('pointerup', onUp); };
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', onUp);
+  });
+  el.appendChild(handle);
+}
+
+function createTextElement() {
+  const id = 'el' + (++shareIdCounter);
+  const el = document.createElement('div');
+  el.className = 'share-el share-el-text';
+  el.dataset.elId = id;
+  el.contentEditable = 'false';
+  el.style.left = '38%';
+  el.style.top = '38%';
+  el.style.fontSize = '6cqw';
+  el.style.color = shareCurrentColor;
+  el.textContent = 'Testo';
+  document.getElementById('share-overlay').appendChild(el);
+  makeDraggable(el);
+  el.addEventListener('dblclick', (e) => { e.stopPropagation(); enterTextEditMode(el); });
+  el.addEventListener('blur', () => { el.contentEditable = 'false'; if (!el.textContent.trim()) el.textContent = 'Testo'; });
+  attachResizeHandle(el, { get: () => parseFloat(el.style.fontSize), set: (v) => { el.style.fontSize = v + 'cqw'; }, min: 2, max: 30 });
+  attachDeleteHandle(el);
+  shareEditorElements.push({ id, type:'text', el, getColor: () => el.style.color, setColor: (c) => { el.style.color = c; } });
+  selectShareElement(id);
+  enterTextEditMode(el);
+}
+function enterTextEditMode(el) {
+  el.contentEditable = 'true';
+  el.focus();
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function createSignElement(imgUrl) {
+  const id = 'el' + (++shareIdCounter);
+  const wrapper = document.createElement('div');
+  wrapper.className = 'share-el share-el-sign';
+  wrapper.dataset.elId = id;
+  wrapper.style.left = '40%';
+  wrapper.style.top = '40%';
+  const img = document.createElement('img');
+  img.crossOrigin = 'anonymous';
+  img.alt = 'Segnale stradale';
+  wrapper.appendChild(img);
+  document.getElementById('share-overlay').appendChild(wrapper);
+  makeDraggable(wrapper);
+  attachDeleteHandle(wrapper);
+  img.onload = () => {
+    const natAspect = img.naturalHeight / img.naturalWidth || 1;
+    const stage = stageRect();
+    const widthPct = 16;
+    const heightPct = widthPct * (stage.width / stage.height) * natAspect;
+    wrapper.style.width = widthPct + '%';
+    wrapper.style.height = heightPct + '%';
+    attachResizeHandle(wrapper, {
+      get: () => parseFloat(wrapper.style.width),
+      set: (v) => { wrapper.style.width = v + '%'; const s = stageRect(); wrapper.style.height = (v * (s.width / s.height) * natAspect) + '%'; },
+      min: 4, max: 80
+    });
+  };
+  img.src = imgUrl;
+  shareEditorElements.push({ id, type:'sign', el: wrapper });
+  selectShareElement(id);
+}
+
+function createArrowElement() {
+  const id = 'el' + (++shareIdCounter);
+  const state = { x1:28, y1:62, x2:66, y2:32, color: shareCurrentColor };
+  const overlay = document.getElementById('share-overlay');
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'share-el share-el-arrow');
+  svg.dataset.elId = id;
+  svg.setAttribute('viewBox', '0 0 100 100');
+  svg.setAttribute('preserveAspectRatio', 'none');
+  Object.assign(svg.style, { position:'absolute', inset:'0', width:'100%', height:'100%', pointerEvents:'none', overflow:'visible' });
+  const markerId = 'arrowhead-' + id;
+  svg.innerHTML = `<defs><marker id="${markerId}" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L8,4 L0,8 Z" fill="${state.color}"></path></marker></defs><line class="arrow-hit" x1="${state.x1}" y1="${state.y1}" x2="${state.x2}" y2="${state.y2}" stroke="transparent" stroke-width="6" vector-effect="non-scaling-stroke" style="pointer-events:auto;cursor:move;"></line><line class="arrow-line" x1="${state.x1}" y1="${state.y1}" x2="${state.x2}" y2="${state.y2}" stroke="${state.color}" stroke-width="1.6" marker-end="url(#${markerId})" vector-effect="non-scaling-stroke" style="pointer-events:none;"></line>`;
+  overlay.appendChild(svg);
+
+  const deleteHandle = document.createElement('div');
+  deleteHandle.className = 'share-el-chrome share-el-delete';
+  deleteHandle.textContent = '✕';
+  deleteHandle.addEventListener('pointerdown', (e) => e.stopPropagation());
+  deleteHandle.addEventListener('click', (e) => { e.stopPropagation(); removeShareElement(id); });
+  overlay.appendChild(deleteHandle);
+
+  const h1 = document.createElement('div'); h1.className = 'share-el-handle';
+  const h2 = document.createElement('div'); h2.className = 'share-el-handle';
+  overlay.appendChild(h1); overlay.appendChild(h2);
+
+  function render() {
+    svg.querySelectorAll('line').forEach((l) => { l.setAttribute('x1', state.x1); l.setAttribute('y1', state.y1); l.setAttribute('x2', state.x2); l.setAttribute('y2', state.y2); });
+    svg.querySelector('.arrow-line').setAttribute('stroke', state.color);
+    svg.querySelector('marker path').setAttribute('fill', state.color);
+    h1.style.left = state.x1 + '%'; h1.style.top = state.y1 + '%';
+    h2.style.left = state.x2 + '%'; h2.style.top = state.y2 + '%';
+    deleteHandle.style.left = ((state.x1 + state.x2) / 2) + '%';
+    deleteHandle.style.top = ((state.y1 + state.y2) / 2) + '%';
+  }
+  function setSelected(sel) {
+    svg.classList.toggle('selected', sel);
+    h1.style.display = sel ? 'block' : 'none';
+    h2.style.display = sel ? 'block' : 'none';
+    deleteHandle.style.display = sel ? 'flex' : 'none';
+  }
+  render();
+  setSelected(false);
+
+  function endpointDrag(which) {
+    return (e) => {
+      e.stopPropagation();
+      selectShareElement(id);
+      const target = e.currentTarget;
+      target.setPointerCapture(e.pointerId);
+      const onMove = (ev) => {
+        const stage = stageRect();
+        const xPct = clamp((ev.clientX - stage.left) / stage.width * 100, 0, 100);
+        const yPct = clamp((ev.clientY - stage.top) / stage.height * 100, 0, 100);
+        if (which === 'a') { state.x1 = xPct; state.y1 = yPct; } else { state.x2 = xPct; state.y2 = yPct; }
+        render();
+      };
+      const onUp = () => { target.removeEventListener('pointermove', onMove); target.removeEventListener('pointerup', onUp); };
+      target.addEventListener('pointermove', onMove);
+      target.addEventListener('pointerup', onUp);
+    };
+  }
+  h1.addEventListener('pointerdown', endpointDrag('a'));
+  h2.addEventListener('pointerdown', endpointDrag('b'));
+
+  svg.querySelector('.arrow-hit').addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    selectShareElement(id);
+    const hit = e.currentTarget;
+    hit.setPointerCapture(e.pointerId);
+    const stage = stageRect();
+    const startX = e.clientX, startY = e.clientY;
+    const orig = { x1: state.x1, y1: state.y1, x2: state.x2, y2: state.y2 };
+    const onMove = (ev) => {
+      const dxPct = (ev.clientX - startX) / stage.width * 100;
+      const dyPct = (ev.clientY - startY) / stage.height * 100;
+      state.x1 = clamp(orig.x1 + dxPct, 0, 100); state.y1 = clamp(orig.y1 + dyPct, 0, 100);
+      state.x2 = clamp(orig.x2 + dxPct, 0, 100); state.y2 = clamp(orig.y2 + dyPct, 0, 100);
+      render();
+    };
+    const onUp = () => { hit.removeEventListener('pointermove', onMove); hit.removeEventListener('pointerup', onUp); };
+    hit.addEventListener('pointermove', onMove);
+    hit.addEventListener('pointerup', onUp);
+  });
+
+  shareEditorElements.push({
+    id, type:'arrow', el: svg, extraEls: [h1, h2, deleteHandle],
+    getColor: () => state.color, setColor: (c) => { state.color = c; render(); }, setSelected
+  });
+  selectShareElement(id);
+}
+
+document.getElementById('share-overlay').addEventListener('pointerdown', (e) => { if (e.target === e.currentTarget) deselectAll(); });
+document.getElementById('shareAddTextBtn').onclick = () => createTextElement();
+document.getElementById('shareAddArrowBtn').onclick = () => createArrowElement();
+document.getElementById('shareAddSignBtn').onclick = () => openSignPanel();
+document.getElementById('shareDeleteSelBtn').onclick = () => { if (shareSelectedElId) removeShareElement(shareSelectedElId); };
+document.getElementById('shareColorRow').addEventListener('click', (e) => {
+  const dot = e.target.closest('.share-color-dot');
+  if (!dot) return;
+  const color = dot.getAttribute('data-color');
+  shareCurrentColor = color;
+  highlightColorSwatch(color);
+  const entry = shareEditorElements.find((x) => x.id === shareSelectedElId);
+  if (entry?.setColor) entry.setColor(color);
+});
+document.addEventListener('keydown', (e) => {
+  if (!document.getElementById('share-editor-modal').classList.contains('open')) return;
+  if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+  const entry = shareEditorElements.find((x) => x.id === shareSelectedElId);
+  if (!entry) return;
+  if (entry.type === 'text' && entry.el.isContentEditable) return;
+  e.preventDefault();
+  removeShareElement(shareSelectedElId);
+});
+
+// ── Ricerca segnali stradali su Wikimedia Commons ───────────────────────────
+function openSignPanel() { document.getElementById('shareSignPanel').classList.add('open'); document.getElementById('shareSignSearch').focus(); }
+function closeSignPanel() { document.getElementById('shareSignPanel').classList.remove('open'); }
+document.getElementById('shareSignPanelCloseBtn').onclick = closeSignPanel;
+document.getElementById('shareSignSearchBtn').onclick = runSignSearch;
+document.getElementById('shareSignSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); runSignSearch(); } });
+
+async function runSignSearch() {
+  const query = document.getElementById('shareSignSearch').value.trim();
+  const resultsEl = document.getElementById('shareSignResults');
+  const hintEl = document.getElementById('shareSignHint');
+  if (!query) return;
+  if (shareSignSearchController) shareSignSearchController.abort();
+  shareSignSearchController = new AbortController();
+  hintEl.textContent = 'Ricerca in corso...';
+  resultsEl.innerHTML = '';
+  try {
+    const url = 'https://commons.wikimedia.org/w/api.php?' + new URLSearchParams({
+      action: 'query', format: 'json', origin: '*',
+      generator: 'search', gsrsearch: query, gsrnamespace: '6', gsrlimit: '24',
+      prop: 'imageinfo', iiprop: 'url', iiurlwidth: '150'
+    });
+    const res = await fetch(url, { signal: shareSignSearchController.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const pages = Object.values(data.query?.pages || {});
+    const withImages = pages.filter((p) => p.imageinfo?.[0]?.thumburl);
+    if (!withImages.length) { hintEl.textContent = 'Nessun risultato. Prova un altro termine di ricerca.'; return; }
+    hintEl.textContent = `${withImages.length} risultati da Wikimedia Commons — tocca per aggiungere.`;
+    withImages.forEach((p) => {
+      const thumbUrl = p.imageinfo[0].thumburl;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      const img = document.createElement('img');
+      img.src = thumbUrl;
+      img.loading = 'lazy';
+      img.alt = p.title || 'Segnale';
+      btn.appendChild(img);
+      btn.addEventListener('click', () => { createSignElement(thumbUrl); closeSignPanel(); });
+      resultsEl.appendChild(btn);
+    });
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    console.error('Ricerca Wikimedia fallita:', err);
+    hintEl.textContent = 'Ricerca non riuscita: verifica la connessione e riprova.';
+  }
+}
+
+// ── Esportazione / condivisione dell'immagine finale ────────────────────────
+document.getElementById('shareExportBtn').onclick = async () => {
+  const btn = document.getElementById('shareExportBtn');
+  const statusEl = document.getElementById('share-status-msg');
+  const stage = document.getElementById('share-stage');
+  deselectAll();
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.textContent = 'Generazione immagine...';
+  statusEl.className = ''; statusEl.textContent = '';
+  stage.classList.add('share-editor-exporting');
+  try {
+    const canvas = await html2canvas(stage, { backgroundColor: '#dfe3e8', useCORS: true, scale: 2 });
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    if (!blob) throw new Error('Generazione immagine fallita');
+    const fileName = `chiusura-${shareEditorFeature?.properties?.id || Date.now()}.png`;
+    const file = new File([blob], fileName, { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: shareEditorFeature?.properties?.title || 'Chiusura', text: shareEditorFeature?.properties?.title || '' });
+      statusEl.textContent = 'Condiviso.';
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = fileName;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      statusEl.textContent = 'Immagine scaricata.';
+    }
+  } catch (err) {
+    if (err?.name === 'AbortError') { /* condivisione annullata dall'utente, nessun errore da mostrare */ }
+    else { console.error('Export immagine chiusura fallito:', err); statusEl.className = 'err'; statusEl.textContent = 'Impossibile generare l\'immagine.'; }
+  } finally {
+    stage.classList.remove('share-editor-exporting');
+    btn.disabled = false; btn.innerHTML = original;
+  }
+};
+
 checkSession();
 
 /* ---------- UI only: tab mobile Form / Avvisi (non tocca il backend) ---------- */
