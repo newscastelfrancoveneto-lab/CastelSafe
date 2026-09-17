@@ -151,6 +151,9 @@
     .share-sign-panel{position:absolute;left:8px;right:8px;bottom:8px;top:8px;background:rgba(255,255,255,.98);border-radius:var(--r-md);box-shadow:var(--shadow-lg);padding:10px;display:none;flex-direction:column;gap:8px;z-index:30;}
     .share-sign-panel.open{display:flex;}
     .share-sign-panel-head{display:flex;gap:8px;}
+    .share-sign-cats{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;flex:none;}
+    .share-sign-cat-chip{flex:none;padding:6px 12px;border-radius:999px;border:1px solid var(--line-strong);background:#fff;color:var(--muted);font-size:.76rem;font-weight:700;cursor:pointer;white-space:nowrap;}
+    .share-sign-cat-chip.active{background:var(--primary);border-color:var(--primary);color:#fff;}
     .share-sign-panel-head input{flex:1;}
     .share-sign-results{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px;overflow-y:auto;}
     .share-sign-results button{padding:4px;background:#fff;border:1px solid var(--line-strong);display:flex;flex-direction:column;align-items:center;}
@@ -476,6 +479,7 @@
               <button type="button" class="btn-primary btn-small" id="shareSignSearchBtn">Cerca</button>
               <button type="button" class="btn-ghost btn-small" id="shareSignPanelCloseBtn">✕</button>
             </div>
+            <div class="share-sign-cats" id="shareSignCats"></div>
             <p class="share-sign-hint" id="shareSignHint">Caricamento segnali...</p>
             <div class="share-sign-results" id="shareSignResults"></div>
             <button type="button" class="btn-ghost btn-small" id="shareSignLoadMoreBtn" style="display:none;align-self:center;">Carica altri segnali</button>
@@ -1549,18 +1553,55 @@ document.addEventListener('keydown', (e) => {
   removeShareElement(shareSelectedElId);
 });
 
-// ── Segnali stradali (sfoglia + ricerca) su Wikimedia Commons ───────────────
-// Filtro base sempre applicato: solo l'albero della categoria Commons
-// indicata dall'utente (Category:Diagrams of road signs of Italy), incluse
-// le sue sotto-categorie (deepcategory:), ma ESCLUDENDO le sotto-categorie
-// di segnali storici/obsoleti — solo la segnaletica CdS attuale.
-const SHARE_SIGN_BASE_FILTER = 'deepcategory:"Diagrams of road signs of Italy" -deepcategory:"Diagrams of historic road signs of Italy" -incategory:"Diagrams of road signs of Italy obsoleted by SVG replacement"';
+// ── Segnali stradali (sfoglia per categoria + ricerca) su Wikimedia Commons ─
+// Filtro di base sempre applicato, per escludere segnali storici/obsoleti —
+// solo la segnaletica CdS attualmente in vigore.
+const SHARE_SIGN_EXCLUSIONS = '-deepcategory:"Diagrams of historic road signs of Italy" -incategory:"Diagrams of road signs of Italy obsoleted by SVG replacement"';
+// "Tutti" usa l'intera categoria indicata dall'utente (con tutte le
+// sotto-categorie); le altre voci restringono a una singola sotto-categoria
+// specifica. Nota: CirrusSearch non combina bene più deepcategory: con OR
+// nella stessa query (risultati inattendibili/azzerati), quindi ogni voce
+// usa un solo filtro di categoria, mai una combinazione.
+const SHARE_SIGN_CATEGORIES = [
+  { key: 'tutti', label: 'Tutti', filter: 'deepcategory:"Diagrams of road signs of Italy"' },
+  { key: 'divieto', label: 'Divieto', filter: 'deepcategory:"Diagrams of prohibitory road signs of Italy"' },
+  { key: 'obbligo', label: 'Obbligo', filter: 'deepcategory:"Diagrams of mandatory road signs of Italy"' },
+  { key: 'pericolo', label: 'Pericolo', filter: 'deepcategory:"Diagrams of warning road signs of Italy"' },
+  { key: 'precedenza', label: 'Precedenza', filter: 'deepcategory:"Diagrams of priority road signs of Italy"' },
+  { key: 'lavori', label: 'Lavori in corso', filter: 'deepcategory:"Diagrams of temporary road signs of Italy"' },
+  { key: 'autostrada', label: 'Autostrada', filter: 'deepcategory:"Diagrams of motorway signs of Italy"' },
+  { key: 'orizzontale', label: 'Segnaletica orizzontale', filter: 'deepcategory:"Diagrams of road markings of Italy"' }
+];
+let shareSignActiveCategory = 'tutti';
 let shareSignContinue = null; // parametri di paginazione ("continue") dell'ultima risposta, per "Carica altri"
+
+function renderShareSignCategories() {
+  const row = document.getElementById('shareSignCats');
+  if (row.children.length) { // già costruita: aggiorna solo lo stato attivo
+    row.querySelectorAll('button').forEach((btn) => btn.classList.toggle('active', btn.dataset.catKey === shareSignActiveCategory));
+    return;
+  }
+  SHARE_SIGN_CATEGORIES.forEach((cat) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'share-sign-cat-chip' + (cat.key === shareSignActiveCategory ? ' active' : '');
+    btn.textContent = cat.label;
+    btn.dataset.catKey = cat.key;
+    btn.addEventListener('click', () => {
+      shareSignActiveCategory = cat.key;
+      renderShareSignCategories();
+      runSignSearch({ reset: true });
+    });
+    row.appendChild(btn);
+  });
+}
 
 function openSignPanel() {
   document.getElementById('shareSignPanel').classList.add('open');
   document.getElementById('shareSignSearch').value = '';
   document.getElementById('shareSignSearch').focus();
+  shareSignActiveCategory = 'tutti';
+  renderShareSignCategories();
   runSignSearch({ reset: true });
 }
 function closeSignPanel() { document.getElementById('shareSignPanel').classList.remove('open'); }
@@ -1580,7 +1621,8 @@ async function runSignSearch({ reset = true } = {}) {
   hintEl.textContent = reset ? 'Caricamento segnali...' : 'Caricamento altri segnali...';
   loadMoreBtn.style.display = 'none';
   try {
-    const scopedQuery = query ? `${SHARE_SIGN_BASE_FILTER} ${query}` : SHARE_SIGN_BASE_FILTER;
+    const catFilter = (SHARE_SIGN_CATEGORIES.find((c) => c.key === shareSignActiveCategory) || SHARE_SIGN_CATEGORIES[0]).filter;
+    const scopedQuery = query ? `${catFilter} ${SHARE_SIGN_EXCLUSIONS} ${query}` : `${catFilter} ${SHARE_SIGN_EXCLUSIONS}`;
     const params = {
       action: 'query', format: 'json', origin: '*',
       generator: 'search', gsrsearch: scopedQuery, gsrnamespace: '6', gsrlimit: '30',
