@@ -690,7 +690,25 @@ document.getElementById('sendNotifBtn').onclick = async () => {
 };
 window.addEventListener('beforeunload', forceLogoutOnExit);
 window.addEventListener('pagehide', forceLogoutOnExit);
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') forceLogoutOnExit(); });
+// Mettere la scheda in background (cambio app, blocco schermo, minimizza)
+// non deve buttare fuori subito l'operatore: si concedono 30 minuti di
+// grazia prima di considerare la sessione scaduta, annullati se torna prima.
+const ADMIN_HIDDEN_LOGOUT_MS = 30 * 60 * 1000;
+let adminHiddenLogoutTimer = null;
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    clearTimeout(adminHiddenLogoutTimer);
+    adminHiddenLogoutTimer = setTimeout(forceLogoutOnExit, ADMIN_HIDDEN_LOGOUT_MS);
+  } else {
+    clearTimeout(adminHiddenLogoutTimer);
+    adminHiddenLogoutTimer = null;
+    // Se i 30 minuti sono scaduti mentre la scheda era in background, il
+    // token locale è già stato azzerato: ri-verifica per riportare subito
+    // alla schermata di login invece di lasciare in vista un pannello admin
+    // ormai "finto" che fallirebbe alla prima azione.
+    checkSession();
+  }
+});
 let map, draftLayer, alertsLayer, osmSourceLayer, trimHandlesLayer, baseTileLayer;
 let draftGeometry = null;
 let selectedOSMFeatures = [];
