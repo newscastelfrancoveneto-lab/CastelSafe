@@ -4783,7 +4783,7 @@ function arpavNetworkError(err, timedOut) {
   if (timedOut || err?.name === 'AbortError' || err?.name === 'TimeoutError') {
     return arpavFetchError('server_timeout', 'Il server CastelSafe non ha risposto in tempo.');
   }
-  return arpavFetchError('server_unreachable', 'Il server CastelSafe non è raggiungibile (Raspberry spento o senza rete).');
+  return arpavFetchError('server_unreachable', 'Il server CastelSafe non è raggiungibile.');
 }
 
 async function arpavErrorFromResponse(r) {
