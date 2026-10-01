@@ -1055,6 +1055,11 @@
     .spinner { width: 24px; height: 24px; border: 3px solid var(--primary-light); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .error-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: var(--radius-md); padding: 14px; font-size: 0.85rem; color: #b91c1c; line-height: 1.5; font-weight: 500; }
+    .error-box strong { display: block; margin-bottom: 4px; }
+    .error-tech { margin-top: 8px; font-size: 0.75rem; color: #7f1d1d; opacity: 0.85; word-break: break-word; }
+    .arpav-fallback-btn { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 12px; padding: 12px 14px; border-radius: var(--radius-md); background: var(--primary); color: #fff; font-weight: 700; font-size: 0.88rem; text-decoration: none; text-align: center; }
+    .arpav-fallback-btn:hover { filter: brightness(1.08); }
+    .error-retry-note { margin-top: 10px; font-size: 0.75rem; color: var(--text-muted); text-align: center; }
 
     /* ── MAPPA E MARKER ── */
     .stn-marker {
@@ -2671,6 +2676,7 @@ const STATIONS = [
     lat: 45.66983651,
     lon: 11.92027581,
     xmlUrl: `${API_BASE}/api/arpav/xml/0292`,
+    arpavPageUrl: 'https://www.arpa.veneto.it/dati-ambientali/dati-in-diretta/meteo-idro-nivo/variabili_meteo?codseqst=300001731&focus=PREC&return=replace',
     refreshInterval: 30,
     soglie: { s1: 1.8, s2: 2.5, s3: 2.9 }
   },
@@ -2681,6 +2687,7 @@ const STATIONS = [
     lat: 45.78576616,
     lon: 11.89466078,
     xmlUrl: `${API_BASE}/api/arpav/xml/0554`,
+    arpavPageUrl: 'https://www.arpa.veneto.it/dati-ambientali/dati-in-diretta/meteo-idro-nivo/variabili_idro?codseqst=300003340&focus=LIVIDRO&return=replace',
     refreshInterval: 30,
     soglie: null
   },
@@ -2692,6 +2699,7 @@ const STATIONS = [
     lat: 45.6747453,
     lon: 11.9285348,
     xmlUrl: `${API_BASE}/api/arpav/xml/0653`,
+    arpavPageUrl: 'https://www.arpa.veneto.it/dati-ambientali/dati-in-diretta/meteo-idro-nivo/variabili_idro?codseqst=300006480&focus=LIVIDRO&return=replace',
     refreshInterval: 30,
     soglie: { s1: 1.5, s2: 1.8, s3: 2.1 }
   },
@@ -2703,6 +2711,7 @@ const STATIONS = [
     lat: 45.6949262,
     lon: 11.9477799,
     xmlUrl: `${API_BASE}/api/arpav/xml/0102`,
+    arpavPageUrl: 'https://www.arpa.veneto.it/dati-ambientali/dati-in-diretta/meteo-idro-nivo/variabili_meteo?codseqst=300000047&focus=PREC&return=replace',
     refreshInterval: 30,
     soglie: null
   }
@@ -4752,9 +4761,48 @@ function isTimestampAfter(lhs, rhs) {
 
 const xmlInFlight = {};
 
+// Errori dei dati ARPAV classificati per capire DOVE si rompe la catena
+// telefono → server CastelSafe (Raspberry) → ARPAV. arpavKind:
+//   'offline'            il dispositivo non ha connessione
+//   'server_unreachable' il server CastelSafe non risponde (Pi spento/rete)
+//   'server_timeout'     il server CastelSafe non risponde in tempo
+//   'arpav'              il server risponde, ma lui non raggiunge ARPAV
+//   'server_http'        il server risponde con un errore suo
+//   'invalid'            risposta vuota o non leggibile
+function arpavFetchError(kind, message, extra = {}) {
+  const e = new Error(message);
+  e.arpavKind = kind;
+  Object.assign(e, extra);
+  return e;
+}
+
+function arpavNetworkError(err, timedOut) {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return arpavFetchError('offline', 'Il dispositivo non è connesso a internet.');
+  }
+  if (timedOut || err?.name === 'AbortError' || err?.name === 'TimeoutError') {
+    return arpavFetchError('server_timeout', 'Il server CastelSafe non ha risposto in tempo.');
+  }
+  return arpavFetchError('server_unreachable', 'Il server CastelSafe non è raggiungibile (Raspberry spento o senza rete).');
+}
+
+async function arpavErrorFromResponse(r) {
+  let body = null;
+  try { body = await r.json(); } catch (_) { /* risposta non JSON */ }
+  if (body?.upstream === 'arpav') {
+    return arpavFetchError('arpav', body.detail || 'Il server CastelSafe non riesce a raggiungere ARPAV.', {
+      status: r.status, arpavErrorKind: body.error_kind, arpavErrorType: body.error_type, arpavError: body.error
+    });
+  }
+  return arpavFetchError('server_http', `Il server CastelSafe ha risposto con un errore (HTTP ${r.status}).`, {
+    status: r.status, arpavError: body?.detail
+  });
+}
+
 function fetchXmlSource(url, timeoutMs) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, timeoutMs);
 
   const bypassUrl = withNgrokBypass(url);
 
@@ -4766,10 +4814,14 @@ function fetchXmlSource(url, timeoutMs) {
     headers: {
     }
   })
-    .then(r => r.ok ? r.arrayBuffer() : Promise.reject(new Error('http')))
+    .catch(err => { throw arpavNetworkError(err, timedOut); })
+    .then(async r => {
+      if (r.ok) return r.arrayBuffer();
+      throw await arpavErrorFromResponse(r);
+    })
     .then(buf => decodeXml(buf))
     .then(text => {
-      if (!text) throw new Error('empty');
+      if (!text) throw arpavFetchError('invalid', 'Il server ha restituito una risposta vuota.');
       return text;
     })
     .finally(() => clearTimeout(timer));
@@ -4821,6 +4873,7 @@ async function fetchText(url, maxRetries = 2, delayMs = 800, options = {}) {
   if (!bypassCache && xmlInFlight[cacheKey]) return xmlInFlight[cacheKey];
 
   const requestPromise = (async () => {
+    let lastErr = null;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       const urlCacheBust = `${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}-${attempt}`;
 
@@ -4829,6 +4882,7 @@ async function fetchText(url, maxRetries = 2, delayMs = 800, options = {}) {
         setArpavCache(cacheKey, result);
         return result;
       } catch (err) {
+        lastErr = err;
         if (attempt < maxRetries) {
           await new Promise(res => setTimeout(res, delayMs * attempt));
         }
@@ -4841,7 +4895,8 @@ async function fetchText(url, maxRetries = 2, delayMs = 800, options = {}) {
       return stalePersisted.data;
     }
 
-    throw new Error('Impossibile caricare i dati ARPAV');
+    if (lastErr?.arpavKind) throw lastErr;
+    throw arpavFetchError('invalid', 'Impossibile caricare i dati ARPAV.');
   })();
 
   if (!bypassCache) xmlInFlight[cacheKey] = requestPromise;
@@ -4879,14 +4934,22 @@ async function fetchWeatherXml(force = false) {
   // più", 2026-09-08), essendo servizi gratuiti che si rompono o iniziano a
   // rate-limitare senza preavviso. Restano come fallback, insieme al fetch
   // diretto, per resilienza se anche il nostro server fosse irraggiungibile.
+  // Errore del nostro server, conservato per spiegare all'utente dove si è
+  // rotto qualcosa se falliscono anche tutti i ripieghi sotto.
+  let serverErr = null;
   try {
     const r = await fetch(`${API_BASE}/api/arpav/bollettino-utenti?t=${Date.now()}`, { signal: AbortSignal.timeout(9000) });
     if (r.ok) {
       const buf = await r.arrayBuffer();
       const text = decodeXml(buf);
       if (text) { setArpavCache(cacheKey, text); return text; }
+      serverErr = arpavFetchError('invalid', 'Il server ha restituito un bollettino vuoto.');
+    } else {
+      serverErr = await arpavErrorFromResponse(r);
     }
-  } catch (_) {}
+  } catch (err) {
+    serverErr = arpavNetworkError(err, false);
+  }
 
   const bust = `${WEATHER_XML_URL}?t=${Date.now()}`;
   try {
@@ -4906,8 +4969,24 @@ async function fetchWeatherXml(force = false) {
     }
     const stale = getPersistentArpavCacheEntry(cacheKey, ARPAV_CACHE_FALLBACK_MAX_AGE_MS);
     if (stale?.data) return stale.data;
-    throw new Error('Impossibile caricare le previsioni ARPAV');
+    throw serverErr || arpavFetchError('invalid', 'Impossibile caricare le previsioni ARPAV.');
   }
+}
+
+const ARPAV_BOLLETTINO_PAGE_URL = 'https://www.arpa.veneto.it/dati-ambientali/bollettini/meteo/bollettino-meteo-veneto';
+
+function weatherErrorHtml(err) {
+  const title = ARPAV_ERROR_TITLES[err?.arpavKind] || 'Previsioni non disponibili';
+  const tech = err?.arpavErrorType
+    ? `<div class="error-tech">Dettaglio tecnico: ${escapeHtml(err.arpavErrorType)}${err.arpavError ? ' — ' + escapeHtml(err.arpavError) : ''}</div>`
+    : '';
+  return `
+    <div class="error-box">
+      <strong>${escapeHtml(title)}</strong>
+      <div>${escapeHtml(err?.message || 'Errore nel caricamento delle previsioni ARPAV.')}</div>
+      ${tech}
+    </div>
+    <a class="arpav-fallback-btn" href="${ARPAV_BOLLETTINO_PAGE_URL}" target="_blank" rel="noopener noreferrer">Apri il bollettino meteo sul sito ARPAV ↗</a>`;
 }
 
 // Formati visti nell'XML ARPAV:
@@ -5407,7 +5486,7 @@ function openWeatherModal() {
   }
   loadWeather().catch(err => {
     const errEl = document.getElementById('weather-error');
-    if (errEl) errEl.innerHTML = `<div class="error-box">${err.message || 'Errore nel caricamento delle previsioni ARPAV.'}</div>`;
+    if (errEl) errEl.innerHTML = weatherErrorHtml(err);
     if (!weatherState) document.getElementById('weather-emission').textContent = 'Previsioni non disponibili.';
   });
 }
@@ -5501,13 +5580,13 @@ async function loadStation(stn, options = false) {
 
     // parseXML restituisce null solo se la stazione non esiste nel file
     if (sensors === null) {
-      if (!silent) showError(`Stazione #${stn.id} non trovata nel file XML`);
+      if (!silent) showStationError(stn, arpavFetchError('invalid', `La stazione #${stn.id} non è presente nel file ARPAV.`));
       return { ok: false, hasNewData: false };
     }
 
     // Restituisce array vuoto se la stazione esiste ma non ha dati
     if (sensors.length === 0) {
-      if (!silent) showError(`Nessun dato disponibile per la stazione #${stn.id}`);
+      if (!silent) showStationError(stn, arpavFetchError('invalid', `ARPAV non ha dati recenti per la stazione #${stn.id}.`));
       return { ok: false, hasNewData: false };
     }
 
@@ -5586,7 +5665,7 @@ async function loadStation(stn, options = false) {
       } catch (_) { /* CSV fallback fallito */ }
     }
 
-    if (!silent) showError(e.message || `Nessun dato disponibile per la stazione ${stn.id}`);
+    if (!silent) showStationError(stn, e);
     return { ok: false, hasNewData: false };
   }
 }
@@ -6387,9 +6466,47 @@ function renderSensor(stn, sensor) {
   });
 }
 
-function showError(msg) {
+const ARPAV_ERROR_TITLES = {
+  offline: 'Nessuna connessione',
+  server_unreachable: 'Server CastelSafe non raggiungibile',
+  server_timeout: 'Server CastelSafe lento a rispondere',
+  arpav: 'ARPAV non raggiungibile dal server',
+  server_http: 'Errore del server CastelSafe',
+  invalid: 'Dati ARPAV non disponibili'
+};
+const STATION_ERROR_RETRY_MS = 60 * 1000;
+let stationErrorRetryTimer = null;
+
+// Errore di una stazione: spiega dove si interrompe la catena e offre il
+// grafico ufficiale ARPAV della stessa stazione come ripiego. Riprova da solo
+// finché il pannello di quella stazione resta aperto sull'errore, così
+// quando server o ARPAV tornano su i dati ricompaiono senza fare nulla.
+function showStationError(stn, err) {
+  const info = typeof err === 'string' ? { message: err } : (err || {});
+  const title = ARPAV_ERROR_TITLES[info.arpavKind] || 'Dati non disponibili';
+  const tech = info.arpavErrorType
+    ? `<div class="error-tech">Dettaglio tecnico: ${escapeHtml(info.arpavErrorType)}${info.arpavError ? ' — ' + escapeHtml(info.arpavError) : ''}</div>`
+    : '';
+  const fallback = stn?.arpavPageUrl
+    ? `<a class="arpav-fallback-btn" href="${escapeHtml(stn.arpavPageUrl)}" target="_blank" rel="noopener noreferrer">Apri il grafico sul sito ARPAV ↗</a>`
+    : '';
+
   document.getElementById('sensor-tabs').style.display = 'none';
-  document.getElementById('panel-body').innerHTML = `<div class="error-box">Errore: ${msg}</div>`;
+  document.getElementById('panel-body').innerHTML = `
+    <div class="error-box station-error">
+      <strong>${escapeHtml(title)}</strong>
+      <div>${escapeHtml(info.message || 'Impossibile caricare i dati ARPAV.')}</div>
+      ${tech}
+    </div>
+    ${fallback}
+    <div class="error-retry-note">Nuovo tentativo automatico tra ${Math.round(STATION_ERROR_RETRY_MS / 1000)} secondi.</div>`;
+
+  clearTimeout(stationErrorRetryTimer);
+  stationErrorRetryTimer = setTimeout(() => {
+    if (currentStnRef?.id === stn?.id && document.querySelector('#panel-body .station-error')) {
+      loadStation(stn);
+    }
+  }, STATION_ERROR_RETRY_MS);
 }
 
 // ── AUTO-REFRESH ──────────────────────────────────────────────────────────────
