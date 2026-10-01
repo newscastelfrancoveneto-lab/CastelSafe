@@ -2,7 +2,7 @@
 // modifica index.html (o altri asset), anche se sw.js non cambia altrimenti.
 // È l'unico modo per cui il browser rileva una nuova versione disponibile e
 // mostra il badge "Aggiornamento disponibile" nell'app.
-const APP_VERSION = '2026-10-01-2';
+const APP_VERSION = '2026-10-01-3';
 
 // Cache dedicata alle icone usate dalle notifiche: le pre-carichiamo così
 // sono sempre disponibili anche se la rete è debole/assente nel momento
@@ -63,7 +63,11 @@ self.addEventListener('fetch', event => {
   // Navigazione verso l'app (apertura da icona Home): cache-first per un
   // avvio sempre istantaneo, con aggiornamento della cache in background così
   // la prossima apertura ha comunque l'ultima versione scaricata con successo.
-  if (event.request.mode === 'navigate') {
+  // Solo per la pagina principale: le altre pagine (es. admin.html) vanno in
+  // rete normalmente, altrimenti riceverebbero l'index dalla cache.
+  const scopePath = new URL(SHELL_URL).pathname;
+  const isShellNavigation = url.pathname === scopePath || url.pathname === scopePath + 'index.html';
+  if (event.request.mode === 'navigate' && isShellNavigation) {
     event.respondWith(
       caches.match(SHELL_URL).then(cached => {
         const network = fetch(event.request).then(response => {
