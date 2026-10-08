@@ -303,6 +303,8 @@
     .diag-kv dt{color:var(--muted);font-weight:600;}
     .diag-kv dd{margin:0;min-width:0;overflow-wrap:anywhere;}
     .diag-err-text{color:var(--danger);font-size:.8rem;overflow-wrap:anywhere;}
+    .diag-err-text.resolved{color:var(--muted);}
+    .diag-badge.past{background:#f1f3f6;color:var(--muted);border:1px solid var(--line);}
     .diag-msg{font-size:.85rem;padding:12px 14px;border-radius:var(--r-sm);line-height:1.5;color:var(--danger);background:var(--danger-50);border:1px solid var(--danger-100);margin-top:12px;}
     .diag-card details{margin-top:12px;}
     .diag-card summary{cursor:pointer;font-size:.82rem;font-weight:700;color:var(--muted);}
@@ -688,7 +690,11 @@ function renderDiagStations(health, stato){
     else if (stale) badge = '<span class="diag-badge warn">Non aggiornata</span>';
     else if (fails) badge = '<span class="diag-badge warn">Errori recenti</span>';
     else badge = '<span class="diag-badge ok">OK</span>';
-    const err = hs.last_error ? `<div class="diag-err-text">${diagEsc(hs.last_error)}</div><div class="diag-sub">${diagTime(hs.last_error_at)}</div>` : '—';
+    // Un errore seguito da una lettura riuscita è storico: lo mostriamo
+    // attenuato, altrimenti un guasto di giorni fa sembra ancora in corso.
+    const resolved = hs.last_error && !fails && diagIsAfter(hs.last_ok, hs.last_error_at);
+    const err = !hs.last_error ? '—'
+      : `<div class="diag-err-text${resolved ? ' resolved' : ''}">${resolved ? '<span class="diag-badge past">Risolto</span> ' : ''}${diagEsc(hs.last_error)}</div><div class="diag-sub">${diagTime(hs.last_error_at)}</div>`;
     return `<tr>
       <td><strong>${diagEsc(id)}</strong><div class="diag-sub">${diagEsc(DIAG_STATION_NAMES[id] || '')}</div></td>
       <td>${badge}</td>
@@ -703,6 +709,7 @@ function renderDiagStations(health, stato){
     <thead><tr><th>Stazione</th><th>Stato</th><th>Ultimo dato</th><th>Fallimenti consecutivi</th><th>Ultimo errore</th></tr></thead>
     <tbody>${rows}</tbody></table></div>${interval}${diagRawBlock({ health: h, stato: st })}`;
 }
+function diagIsAfter(a, b){ return !!a && !!b && new Date(a) > new Date(b); }
 function renderDiagSsl(health){
   const box = document.getElementById('diagSsl');
   if (health.error) { box.innerHTML = `<div class="diag-msg">${diagEsc(health.error)}</div>`; return; }
@@ -711,12 +718,17 @@ function renderDiagSsl(health){
   const testBadge = !test ? '<span class="diag-badge warn">Non eseguito</span>'
     : /^FALLITO/i.test(test) ? '<span class="diag-badge err">Fallito</span>' : '<span class="diag-badge ok">OK</span>';
   const fix = s.ultima_riparazione || '';
+  // Se dopo il tentativo tutte le stazioni sono tornate a leggere da ARPAV, il
+  // guasto TLS è rientrato (es. ARPAV ha sistemato la catena da sola).
+  const stazioni = Object.values((health.data || {}).stazioni || {});
+  const rientrato = stazioni.length > 0 && stazioni.every(st => !st.consecutive_failures && diagIsAfter(st.last_ok, s.ultima_riparazione_at));
   const fixBadge = !fix ? '<span class="diag-badge ok">Mai servita</span>'
-    : /^fallita/i.test(fix) ? '<span class="diag-badge err">Fallita</span>'
+    : /^fallita/i.test(fix) ? (rientrato ? '<span class="diag-badge past">Fallita · poi rientrato</span>' : '<span class="diag-badge err">Fallita</span>')
     : /^aggiunto/i.test(fix) ? '<span class="diag-badge warn">Eseguita</span>' : '<span class="diag-badge ok">Nessuna modifica</span>';
   box.innerHTML = `<dl class="diag-kv">
     <dt>Controllo all'avvio</dt><dd>${testBadge} ${diagEsc(test)}<div class="diag-sub">${diagTime(s.self_test_at)}</div></dd>
     <dt>Riparazione automatica</dt><dd>${fixBadge} ${diagEsc(fix)}${fix ? `<div class="diag-sub">${diagTime(s.ultima_riparazione_at)}</div>` : ''}</dd>
+    ${s.certificato_al_guasto ? `<dt>Certificato al guasto</dt><dd>${diagEsc(s.certificato_al_guasto)}</dd>` : ''}
   </dl>`;
 }
 function renderDiagSensors(debug){
