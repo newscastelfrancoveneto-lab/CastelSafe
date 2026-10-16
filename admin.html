@@ -433,6 +433,11 @@
       <button class="btn-ghost" id="diagRefreshBtn" type="button"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"></path></svg>Aggiorna</button>
     </div>
     <div class="diag-card">
+      <h2>Statistiche utenti</h2>
+      <p class="hint">Conteggi anonimi (nessun IP, nessun cookie). Gli utenti unici sono per giorno e non sommabili tra giorni.</p>
+      <div id="diagAnalytics"></div>
+    </div>
+    <div class="diag-card">
       <h2>Monitor stazioni</h2>
       <p class="hint">Esito delle letture periodiche per ogni stazione. È "non aggiornata" se l'ultimo dato valido ha più di <span id="diagStaleMin">90</span> minuti: in quel caso non genera notifiche.</p>
       <div id="diagStations"></div>
@@ -758,15 +763,31 @@ function renderDiagSensors(debug){
     : '<div class="empty" style="margin-top:12px;">Nessun valore letto finora.</div>') + diagRawBlock(d);
 }
 let diagLoading = false;
+function renderDiagAnalytics(res){
+  const el = document.getElementById('diagAnalytics');
+  const d = res && res.data;
+  if (!d || !Array.isArray(d.daily)) { el.innerHTML = `<p class="hint">${(res && res.error) || 'Statistiche non disponibili.'}</p>`; return; }
+  const t = d.today || {users:0, opens:0, installed:0};
+  const tile = (n, l) => `<div style="flex:1;min-width:110px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;"><div style="font-size:1.5rem;font-weight:800;">${n}</div><div class="hint">${l}</div></div>`;
+  const max = Math.max(1, ...d.daily.map(r => r.users));
+  const bars = d.daily.map(r => `<div title="${r.day}: ${r.users} utenti, ${r.opens} aperture" style="flex:1;min-width:3px;background:var(--accent,#2563eb);border-radius:2px 2px 0 0;height:${Math.max(2, Math.round(r.users / max * 100))}%;"></div>`).join('');
+  el.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">`
+    + tile(d.online_now, 'online ora') + tile(t.users, 'utenti oggi') + tile(t.opens, 'aperture oggi')
+    + tile(t.installed, 'con app installata (oggi)') + tile(d.push_subscribers, 'iscritti notifiche push') + `</div>`
+    + `<div style="display:flex;align-items:flex-end;gap:2px;height:90px;">${bars}</div>`
+    + `<p class="hint" style="margin-top:6px;">Utenti unici al giorno, ultimi ${d.daily.length} giorni (passa il mouse sulle barre)</p>`;
+}
 async function refreshDiagnostics(){
   if (diagLoading) return;
   diagLoading = true;
   const btn = document.getElementById('diagRefreshBtn');
   btn.disabled = true;
   document.getElementById('diagUpdated').textContent = 'Caricamento…';
-  const [health, stato, debug] = await Promise.all([
-    diagFetch('/api/monitor/health'), diagFetch('/api/monitor/stato'), diagFetch('/api/debug/stato-sensori')
+  const [health, stato, debug, analytics] = await Promise.all([
+    diagFetch('/api/monitor/health'), diagFetch('/api/monitor/stato'), diagFetch('/api/debug/stato-sensori'),
+    diagFetch('/api/admin/analytics?days=30')
   ]);
+  renderDiagAnalytics(analytics);
   renderDiagStations(health, stato);
   renderDiagSsl(health);
   renderDiagSensors(debug);
