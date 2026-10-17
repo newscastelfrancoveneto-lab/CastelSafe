@@ -434,7 +434,7 @@
     </div>
     <div class="diag-card">
       <h2>Statistiche utenti</h2>
-      <p class="hint">Conteggi anonimi (nessun IP, nessun cookie). Gli utenti unici sono per giorno e non sommabili tra giorni.</p>
+      <p class="hint">Conteggi anonimi: nessun cookie e nessun IP salvato; il browser conserva solo un codice casuale, reso irriconoscibile dal server con una chiave che cambia ogni giorno. Gli utenti unici sono per giorno e non sommabili tra giorni.</p>
       <div id="diagAnalytics"></div>
     </div>
     <div class="diag-card">
@@ -766,7 +766,7 @@ let diagLoading = false;
 function renderDiagAnalytics(res){
   const el = document.getElementById('diagAnalytics');
   const d = res && res.data;
-  if (!d || !Array.isArray(d.daily)) { el.innerHTML = `<p class="hint">${(res && res.error) || 'Statistiche non disponibili.'}</p>`; return; }
+  if (!d || !Array.isArray(d.daily)) { el.innerHTML = `<p class="hint">${diagEsc((res && res.error) || 'Statistiche non disponibili.')}</p>`; return; }
   const t = d.today || {users:0, opens:0, installed:0};
   const tile = (n, l) => `<div style="flex:1;min-width:110px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;"><div style="font-size:1.5rem;font-weight:800;">${n}</div><div class="hint">${l}</div></div>`;
   const max = Math.max(1, ...d.daily.map(r => r.users));
