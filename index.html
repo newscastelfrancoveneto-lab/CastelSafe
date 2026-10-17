@@ -2290,6 +2290,10 @@
       compare un avviso con il pulsante <strong>Aggiorna</strong>. Se non lo tocchi, l'app resta comunque
       utilizzabile con l'ultima versione scaricata finché non la riavvii.
     </p>
+    <p>
+      Su Android è disponibile anche l'<strong>app nativa</strong>, con notifiche personalizzabili e allarme sonoro:
+      <a href="https://github.com/newscastelfrancoveneto-lab/CastelSafe-APK/releases/latest" target="_blank" rel="noopener">scarica l'APK</a>.
+    </p>
 
     <h3>Dati geografici</h3>
     <p>
@@ -2575,12 +2579,59 @@ const PROXY = 'https://api.allorigins.win/raw?url=';
 
 let deferredInstallPrompt = null;
 
+// Su Android l'app vera e propria è l'APK (notifiche più affidabili, allarme sonoro):
+// il banner propone quello al posto dell'installazione come PWA.
+const ANDROID_APK_URL = 'https://github.com/newscastelfrancoveneto-lab/CastelSafe-APK/releases/latest';
+const IS_ANDROID = /Android/i.test(navigator.userAgent);
+
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredInstallPrompt = e;
 
-  setTimeout(showInstallBanner, 3000);
+  if (!IS_ANDROID) setTimeout(showInstallBanner, 3000);
 });
+
+if (IS_ANDROID) setTimeout(showApkBanner, 3000);
+
+function apkBannerDismissed() {
+  try { return localStorage.getItem('apk-banner-dismissed') === '1'; } catch { return false; }
+}
+
+function showApkBanner() {
+  if (apkBannerDismissed() || document.getElementById('install-banner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'install-banner';
+  banner.style.cssText = `
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e293b;
+    color: #fff;
+    padding: 12px 18px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 99999;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    font-size: 0.85rem;
+    font-weight: 600;
+    max-width: calc(100vw - 24px);
+  `;
+  banner.innerHTML = `
+    <span>Scarica l'app Android</span>
+    <a id="btn-do-install" href="${ANDROID_APK_URL}" target="_blank" rel="noopener" style="background:#8d021f;color:#fff;border:none;border-radius:999px;padding:6px 14px;font-weight:700;cursor:pointer;font-size:0.82rem;text-decoration:none;">Scarica</a>
+    <button type="button" style="background:rgba(255,255,255,0.14);color:#fff;border:none;border-radius:999px;padding:6px 10px;cursor:pointer;font-size:0.82rem;" aria-label="Chiudi">✕</button>
+  `;
+  document.body.appendChild(banner);
+  const dismiss = () => {
+    banner.remove();
+    try { localStorage.setItem('apk-banner-dismissed', '1'); } catch {}
+  };
+  banner.querySelector('button').addEventListener('click', dismiss);
+  banner.querySelector('a').addEventListener('click', dismiss);
+}
 
 function showInstallBanner() {
   if (!deferredInstallPrompt) return;
