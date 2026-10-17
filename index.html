@@ -2297,6 +2297,16 @@
       <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>.
     </p>
 
+    <h3>Privacy e statistiche</h3>
+    <p>
+      L'app non usa cookie, non richiede registrazione e non salva il tuo indirizzo IP.
+      Per contare quante persone la usano, il browser conserva un codice casuale generato
+      sul tuo dispositivo, che non contiene dati personali: il server lo trasforma con una
+      chiave che cambia ogni giorno, così si contano solo gli utenti unici della giornata
+      e non è possibile seguire la stessa persona da un giorno all'altro.
+      Puoi cancellare il codice in qualsiasi momento svuotando i dati del sito nel browser.
+    </p>
+
     <h3>Nota importante</h3>
     <p>
       Questa app è uno strumento informativo e di supporto alla consultazione rapida del territorio.
@@ -2616,7 +2626,8 @@ window.addEventListener('appinstalled', () => {
   deferredInstallPrompt = null;
 });
 
-// ── Statistiche anonime (nessun cookie/IP: ID casuale locale, hashato lato server con sale giornaliero) ──
+// ── Statistiche anonime (nessun cookie, nessun IP salvato: ID casuale in localStorage,
+//    hashato lato server con sale giornaliero; spiegato in "Privacy e statistiche" nel pannello Informazioni) ──
 (function(){
   try {
     let cid = localStorage.getItem('cs_cid');
