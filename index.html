@@ -6052,20 +6052,10 @@ function parseArpavDate(ts) {
 }
 
 function buildPrecipitationBars(rows) {
-  const values = rows.map(r => Number.isFinite(r.val) ? r.val : 0);
-  const decreases = values.slice(1).reduce((acc, current, idx) => acc + (current < values[idx] ? 1 : 0), 0);
-  const looksCumulative = decreases <= Math.max(2, Math.floor(values.length * 0.1));
-
-  return values.map((current, i) => {
-    if (!looksCumulative) return current;
-    if (i === 0) {
-      // Primo campione di una serie cumulata: manca il valore precedente,
-      // quindi non possiamo stimare correttamente lo step.
-      return 0;
-    }
-    const prev = values[i - 1];
-    return current >= prev ? current - prev : current;
-  }).map(v => Math.max(0, Number(v.toFixed(3))));
+  // ARPAV (TYPE PREC) dà già i mm caduti in ogni intervallo, non un totale
+  // progressivo: indovinare se la serie è cumulata la sbagliava quando piove
+  // poco (pochi cali) e buttava via parte della pioggia.
+  return rows.map(r => Number.isFinite(r.val) ? Math.max(0, Number(r.val.toFixed(3))) : 0);
 }
 
 function normalizeSensorText(sensor) {
@@ -6153,7 +6143,8 @@ async function buildRolling24hAccumulation(rows, bars, renderToken) {
     while (rollingStart <= i) {
       const candidateDate = parsedDates[rollingStart];
       if (currentDate && candidateDate) {
-        if ((currentDate - candidateDate) <= windowMs) break;
+        // ogni valore copre la mezz'ora che finisce al suo istante: 24h = 48 valori
+        if ((currentDate - candidateDate) < windowMs) break;
       } else if ((i - rollingStart + 1) <= fallbackWindow) {
         break;
       }
@@ -6225,7 +6216,7 @@ async function buildDryingAdjusted24hAccumulation(rows, bars, supportSeries, ren
     while (remainingRainQueue.length) {
       const candidate = remainingRainQueue[0];
       const tooOldByDate = currentDate && candidate.date
-        ? (currentDate - candidate.date) > windowMs
+        ? (currentDate - candidate.date) >= windowMs
         : (i - candidate.idx + 1) > fallbackWindow;
       if (!tooOldByDate) break;
       rollingSum = Number(Math.max(0, rollingSum - candidate.remaining).toFixed(3));
@@ -6270,7 +6261,7 @@ const supportSummary = [
   if (renderToken !== currentRenderToken) return;
 
   const lastStep = bars.at(-1) ?? 0;
-  const total48h = bars.reduce((sum, v) => sum + v, 0);
+  const totalPeriod = bars.reduce((sum, v) => sum + v, 0);
 
 document.getElementById('panel-body').innerHTML =
   `<div class="stat-row">
@@ -6278,7 +6269,7 @@ document.getElementById('panel-body').innerHTML =
     ${!hasDryingSupport ? `<div class="stat-card"><div class="val" id="precip-acc-last">—</div><div class="lbl">Accumulo 24h (${unit})</div></div>` : ''}
     ${hasDryingSupport ? `<div class="stat-card"><div class="val" id="precip-acc-drying">—</div><div class="lbl">Accumulo 24h corretto (${unit})</div></div>` : ''}
     <div class="stat-card"><div class="val" id="precip-acc-peak">—</div><div class="lbl">Picco 24h (${unit})</div></div>
-    <div class="stat-card"><div class="val">${total48h.toFixed(2)}</div><div class="lbl">Totale 48h (${unit})</div></div>
+    <div class="stat-card"><div class="val">${totalPeriod.toFixed(2)}</div><div class="lbl">Totale (${unit})</div></div>
   </div>
   <small id="precip-acc-status" style="display:block;margin:10px 4px 0;color:#64748b;font-weight:600;">Calcolo accumulo 24h in background…</small>
   <div class="chart-box">${chartFullscreenBtnHtml()}<div class="chart-wrap"><canvas id="sensorChart"></canvas></div></div>
