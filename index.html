@@ -6079,41 +6079,59 @@ function buildPrecipitationSupportSeries(rows, sensors, currentSensor) {
     const siblingSensors = sensors.filter(sensor => sensor !== currentSensor);
     const temperatureSensor = findSupportSensor(siblingSensors, ['temperat', 'temp aria', 'temp']);
     const radiationSensor  = findSupportSensor(siblingSensors, ['radiaz', 'solar', 'solare', 'globale']);
-    const humiditySensor   = findSupportSensor(siblingSensors, ['umid', 'humid', 'relat']); // ← NUOVO
+    const humiditySensor   = findSupportSensor(siblingSensors, ['umid', 'humid', 'relat']);
+    const windSensor       = siblingSensors.find(sensor => sensor?.isWindCombined || String(sensor?.type || '').toUpperCase() === 'VVENTO') || null;
 
     const temperatureMap = buildTimestampValueMap(temperatureSensor?.rows);
     const radiationMap   = buildTimestampValueMap(radiationSensor?.rows);
-    const humidityMap    = buildTimestampValueMap(humiditySensor?.rows);   // ← NUOVO
+    const humidityMap    = buildTimestampValueMap(humiditySensor?.rows);
+    const windMap        = buildTimestampValueMap(windSensor?.rows);
 
     return {
-        temperatureSensor, radiationSensor, humiditySensor,               // ← NUOVO
+        temperatureSensor, radiationSensor, humiditySensor, windSensor,
         temperatureSeries: rows.map(row => temperatureMap.get(row.dt) ?? null),
         radiationSeries:   rows.map(row => radiationMap.get(row.dt)   ?? null),
-        humiditySeries:    rows.map(row => humidityMap.get(row.dt)    ?? null), // ← NUOVO
+        humiditySeries:    rows.map(row => humidityMap.get(row.dt)    ?? null),
+        windSeries:        rows.map(row => windMap.get(row.dt)        ?? null),
     };
 }
 
+// Stazione meteo di Castelfranco (102), l'unica con i sensori per l'evaporazione.
+const ET0_LAT = 45.6949 * Math.PI / 180, ET0_LON = 11.9478, ET0_QUOTA = 49;
 
-function estimateDryingLossMm(stepHours, temperature, radiation, humidity) { // ← +humidity
-    const safeStepHours = Math.max(0, Number.isFinite(stepHours) ? stepHours : 0.5);
-    const temp = Number.isFinite(temperature) ? temperature : null;
-    const rad  = Number.isFinite(radiation)   ? radiation   : null;
-    const rh   = Number.isFinite(humidity)    ? Math.min(100, Math.max(0, humidity)) : null;
-
-    // RH=100% → nessuna evaporazione; RH=0% → massima
-    const humFactor = rh !== null ? Math.max(0, 1 - rh / 100) : 1.0;
-
-    let lossRateMmPerHour = 0;
-    if (temp !== null && rad !== null) {
-        // combina i due contributi invece di sovrascrivere
-        lossRateMmPerHour = Math.max(0, (temp - 4) * 0.015 + rad * 0.00025);
-    } else if (rad !== null) {
-        lossRateMmPerHour = Math.max(0, rad * 0.00035);
-    } else if (temp !== null) {
-        lossRateMmPerHour = Math.max(0, (temp - 4) * 0.03);
-    }
-
-    return Number(Math.max(0, lossRateMmPerHour * humFactor * safeStepHours).toFixed(3));
+// Evapotraspirazione di riferimento FAO-56 Penman-Monteith (forma oraria ASCE) in mm
+// nel passo che finisce a endDate (ora solare ARPAV, UTC+1). Senza temperatura,
+// umidità o radiazione: 0. Vento a 10 m; se manca, il valore tipico FAO di 2 m/s a 2 m.
+function fao56Et0Mm(endDate, stepHours, temperature, humidity, radiation, wind10) {
+    const ore = Number.isFinite(stepHours) ? stepHours : 0.5;
+    if (!endDate || ore <= 0 || ![temperature, humidity, radiation].every(Number.isFinite)) return 0;
+    const t = temperature;
+    const es = 0.6108 * Math.exp(17.27 * t / (t + 237.3));
+    const ea = es * Math.min(100, Math.max(0, humidity)) / 100;
+    const delta = 4098 * es / Math.pow(t + 237.3, 2);
+    const gamma = 0.000665 * 101.3 * Math.pow((293 - 0.0065 * ET0_QUOTA) / 293, 5.26);
+    const u2 = Number.isFinite(wind10) ? Math.max(0, wind10) * 4.87 / Math.log(67.8 * 10 - 5.42) : 2;
+    const rs = Math.max(0, radiation) * 0.0036 * ore;                  // MJ/m² nel passo
+    // radiazione extraterrestre nel passo (FAO-56 eq. 28), a metà intervallo
+    const mezzo = new Date(endDate.getTime() - ore * 1800 * 1000);
+    const j = Math.round((Date.UTC(mezzo.getFullYear(), mezzo.getMonth(), mezzo.getDate()) - Date.UTC(mezzo.getFullYear(), 0, 0)) / 86400000);
+    const b = 2 * Math.PI * (j - 81) / 364;
+    const sc = 0.1645 * Math.sin(2 * b) - 0.1255 * Math.cos(b) - 0.025 * Math.sin(b);
+    const w = Math.PI / 12 * (mezzo.getHours() + mezzo.getMinutes() / 60 + 0.06667 * (15 - ET0_LON) + sc - 12);
+    const w1 = w - Math.PI * ore / 24, w2 = w + Math.PI * ore / 24;
+    const dr = 1 + 0.033 * Math.cos(2 * Math.PI * j / 365);
+    const dec = 0.409 * Math.sin(2 * Math.PI * j / 365 - 1.39);
+    const ra = Math.max(0, 12 * 60 / Math.PI * 0.082 * dr * ((w2 - w1) * Math.sin(ET0_LAT) * Math.sin(dec) + Math.cos(ET0_LAT) * Math.cos(dec) * (Math.sin(w2) - Math.sin(w1))));
+    const rso = (0.75 + 2e-5 * ET0_QUOTA) * ra;
+    // copertura del cielo da radiazione misurata / attesa a cielo sereno; di notte un valore tipico
+    const cielo = rso > 0.05 ? Math.min(1, Math.max(0.25, rs / rso)) : 0.8;
+    const rnl = 4.903e-9 / 24 * ore * Math.pow(t + 273.16, 4) * (0.34 - 0.14 * Math.sqrt(ea)) * (1.35 * cielo - 0.35);
+    const rn = 0.77 * rs - rnl;
+    const giorno = rn > 0;
+    const g = (giorno ? 0.1 : 0.5) * rn;
+    const cd = giorno ? 0.24 : 0.96;
+    const et = (0.408 * delta * (rn - g) + gamma * 37 / (t + 273) * u2 * (es - ea) * ore) / (delta + gamma * (1 + cd * u2));
+    return Math.max(0, et);
 }
 
 
@@ -6163,7 +6181,9 @@ async function buildDryingAdjusted24hAccumulation(rows, bars, supportSeries, ren
   const parsedDates = rows.map(r => parseArpavDate(r.dt));
   const temperatureSeries = supportSeries?.temperatureSeries || [];
   const radiationSeries = supportSeries?.radiationSeries || [];
-  const hasSupport = temperatureSeries.some(Number.isFinite) || radiationSeries.some(Number.isFinite);
+  const humiditySeries = supportSeries?.humiditySeries || [];
+  const windSeries = supportSeries?.windSeries || [];
+  const hasSupport = temperatureSeries.some(Number.isFinite) && radiationSeries.some(Number.isFinite) && humiditySeries.some(Number.isFinite);
   if (!hasSupport) return null;
 
   let inferredStepMs = 30 * 60 * 1000;
@@ -6187,12 +6207,13 @@ async function buildDryingAdjusted24hAccumulation(rows, bars, supportSeries, ren
     const currentDate = parsedDates[i];
     const prevDate = i > 0 ? parsedDates[i - 1] : null;
     const stepMs = currentDate && prevDate && currentDate > prevDate ? (currentDate - prevDate) : inferredStepMs;
-	const humiditySeries = supportSeries?.humiditySeries;
-    let dryingLoss = estimateDryingLossMm(
+    let dryingLoss = fao56Et0Mm(
+      currentDate,
       stepMs / (60 * 60 * 1000),
       temperatureSeries[i],
+      humiditySeries[i],
       radiationSeries[i],
-	  humiditySeries?.[i]
+      windSeries[i]
     );
 
     if (bars[i] > 0) {
@@ -6242,7 +6263,7 @@ async function renderSpecialPrecipitation(stn, sensor, renderToken) {
   const rows = [...sensor.rows].reverse();
   const unit = sensor.unitnm || 'mm';
   const supportSeries = buildPrecipitationSupportSeries(rows, currentSensors, sensor);
-const hasDryingSupport = !!supportSeries.temperatureSensor || !!supportSeries.radiationSensor || !!supportSeries.humiditySensor;
+const hasDryingSupport = !!supportSeries.temperatureSensor && !!supportSeries.radiationSensor && !!supportSeries.humiditySensor;
 
 const supportSummary = [
     supportSeries.temperatureSensor ? `temperatura: ${supportSeries.temperatureSensor.paramnm}` : null,
