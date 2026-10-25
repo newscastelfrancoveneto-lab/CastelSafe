@@ -5783,13 +5783,18 @@ function parseXML(xmlText, stationId) {
       const vmRaw = dati.querySelector('VM')?.textContent?.trim();
       const vm = parseFloat(vmRaw);
       const hasVal = !(!vmRaw || vmRaw === '--' || vmRaw === '' || isNaN(vm));
-      if (ist) rows.push({ dt: ist, label: fmtIstante(ist), val: hasVal ? vm : null });
+      // dt = ora legale (quella che si legge); ds = ora solare ARPAV (UTC+1) mandata dal
+      // server: non si ripete e non salta mai, quindi è il tempo giusto per ordinare e fare i conti
+      if (ist) rows.push({ dt: ist, ds: dati.getAttribute('SOLARE') || ist, label: fmtIstante(ist), val: hasVal ? vm : null });
     }
-    rows.sort((a, b) => a.dt > b.dt ? -1 : a.dt < b.dt ? 1 : 0);
+    rows.sort((a, b) => a.ds > b.ds ? -1 : a.ds < b.ds ? 1 : 0);
     if (rows.length > 0) sensors.push({ type, paramnm, unitnm, rows, soglie: !isNaN(g1) ? { s1: g1, s2: g2, s3: g3 } : null });
   }
   return sensors;
 }
+
+// Chiave temporale di una riga per ordinare, allineare sensori e misurare intervalli.
+const rowTime = r => r.ds || r.dt;
 
 function fmtIstante(s) {
   if (s.length < 12) return s;
@@ -5835,9 +5840,9 @@ function mergeWindSensors(sensors) {
 function renderWindCombined(stn, sensor) {
   const velRows = sensor.rows;
   const dirRows = sensor.dirRows || [];
-  const dirMap  = Object.fromEntries(dirRows.map(r => [r.dt, r.val]));
+  const dirMap  = Object.fromEntries(dirRows.map(r => [rowTime(r), r.val]));
   const last    = velRows[0];
-  const lastDir = last ? dirMap[last.dt] : null;
+  const lastDir = last ? dirMap[rowTime(last)] : null;
 
   function windDir(deg) {
     if (deg == null || isNaN(Number(deg))) return '—';
@@ -5858,7 +5863,7 @@ function renderWindCombined(stn, sensor) {
   </div>`;
 
   const tableRows = velRows.map((r, i) => {
-    const dv = dirMap[r.dt];
+    const dv = dirMap[rowTime(r)];
     return `<tr class="${i === 0 ? 'latest' : ''}">
       <td>${r.label}</td>
       <td>${r.val.toFixed(1)} ${sensor.unitnm}</td>
@@ -5883,7 +5888,7 @@ function renderWindCombined(stn, sensor) {
 
   // Frecce direzione vento — nord = cima pagina = su
   const directions = chartRows.map(r => {
-    const v = dirMap[r.dt];
+    const v = dirMap[rowTime(r)];
     return (v != null && !isNaN(Number(v))) ? Number(v) : null;
   });
   const windArrowPlugin = {
@@ -6047,7 +6052,8 @@ function parseArpavDate(ts) {
   const dd = Number(ts.slice(6, 8));
   const hh = Number(ts.slice(8, 10));
   const mi = Number(ts.slice(10, 12));
-  const d = new Date(yyyy, mm - 1, dd, hh, mi, 0, 0);
+  // UTC "finto": le differenze tra due date restano esatte anche nei giorni del cambio d'ora
+  const d = new Date(Date.UTC(yyyy, mm - 1, dd, hh, mi, 0, 0));
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
@@ -6072,7 +6078,7 @@ function findSupportSensor(sensors, matchers) {
 function buildTimestampValueMap(rows) {
   return new Map((rows || [])
     .filter(row => row?.dt)
-    .map(row => [row.dt, Number.isFinite(row.val) ? row.val : null]));
+    .map(row => [rowTime(row), Number.isFinite(row.val) ? row.val : null]));
 }
 
 function buildPrecipitationSupportSeries(rows, sensors, currentSensor) {
@@ -6089,10 +6095,10 @@ function buildPrecipitationSupportSeries(rows, sensors, currentSensor) {
 
     return {
         temperatureSensor, radiationSensor, humiditySensor, windSensor,
-        temperatureSeries: rows.map(row => temperatureMap.get(row.dt) ?? null),
-        radiationSeries:   rows.map(row => radiationMap.get(row.dt)   ?? null),
-        humiditySeries:    rows.map(row => humidityMap.get(row.dt)    ?? null),
-        windSeries:        rows.map(row => windMap.get(row.dt)        ?? null),
+        temperatureSeries: rows.map(row => temperatureMap.get(rowTime(row)) ?? null),
+        radiationSeries:   rows.map(row => radiationMap.get(rowTime(row))   ?? null),
+        humiditySeries:    rows.map(row => humidityMap.get(rowTime(row))    ?? null),
+        windSeries:        rows.map(row => windMap.get(rowTime(row))        ?? null),
     };
 }
 
@@ -6100,7 +6106,7 @@ function buildPrecipitationSupportSeries(rows, sensors, currentSensor) {
 const ET0_LAT = 45.6949 * Math.PI / 180, ET0_LON = 11.9478, ET0_QUOTA = 49;
 
 // Evapotraspirazione di riferimento FAO-56 Penman-Monteith (forma oraria ASCE) in mm
-// nel passo che finisce a endDate (ora solare ARPAV, UTC+1). Senza temperatura,
+// nel passo che finisce a endDate (ora solare ARPAV, UTC+1, data "finta UTC" da parseArpavDate). Senza temperatura,
 // umidità o radiazione: 0. Vento a 10 m; se manca, il valore tipico FAO di 2 m/s a 2 m.
 function fao56Et0Mm(endDate, stepHours, temperature, humidity, radiation, wind10) {
     const ore = Number.isFinite(stepHours) ? stepHours : 0.5;
@@ -6114,10 +6120,10 @@ function fao56Et0Mm(endDate, stepHours, temperature, humidity, radiation, wind10
     const rs = Math.max(0, radiation) * 0.0036 * ore;                  // MJ/m² nel passo
     // radiazione extraterrestre nel passo (FAO-56 eq. 28), a metà intervallo
     const mezzo = new Date(endDate.getTime() - ore * 1800 * 1000);
-    const j = Math.round((Date.UTC(mezzo.getFullYear(), mezzo.getMonth(), mezzo.getDate()) - Date.UTC(mezzo.getFullYear(), 0, 0)) / 86400000);
+    const j = Math.round((Date.UTC(mezzo.getUTCFullYear(), mezzo.getUTCMonth(), mezzo.getUTCDate()) - Date.UTC(mezzo.getUTCFullYear(), 0, 0)) / 86400000);
     const b = 2 * Math.PI * (j - 81) / 364;
     const sc = 0.1645 * Math.sin(2 * b) - 0.1255 * Math.cos(b) - 0.025 * Math.sin(b);
-    const w = Math.PI / 12 * (mezzo.getHours() + mezzo.getMinutes() / 60 + 0.06667 * (15 - ET0_LON) + sc - 12);
+    const w = Math.PI / 12 * (mezzo.getUTCHours() + mezzo.getUTCMinutes() / 60 + 0.06667 * (15 - ET0_LON) + sc - 12);
     const w1 = w - Math.PI * ore / 24, w2 = w + Math.PI * ore / 24;
     const dr = 1 + 0.033 * Math.cos(2 * Math.PI * j / 365);
     const dec = 0.409 * Math.sin(2 * Math.PI * j / 365 - 1.39);
@@ -6137,7 +6143,7 @@ function fao56Et0Mm(endDate, stepHours, temperature, humidity, radiation, wind10
 
 async function buildRolling24hAccumulation(rows, bars, renderToken) {
   const windowMs = 24 * 60 * 60 * 1000;
-  const parsedDates = rows.map(r => parseArpavDate(r.dt));
+  const parsedDates = rows.map(r => parseArpavDate(rowTime(r)));
 
   let inferredStepMs = 30 * 60 * 1000;
   for (let i = 1; i < parsedDates.length; i++) {
@@ -6178,7 +6184,7 @@ async function buildRolling24hAccumulation(rows, bars, renderToken) {
 
 async function buildDryingAdjusted24hAccumulation(rows, bars, supportSeries, renderToken) {
   const windowMs = 24 * 60 * 60 * 1000;
-  const parsedDates = rows.map(r => parseArpavDate(r.dt));
+  const parsedDates = rows.map(r => parseArpavDate(rowTime(r)));
   const temperatureSeries = supportSeries?.temperatureSeries || [];
   const radiationSeries = supportSeries?.radiationSeries || [];
   const humiditySeries = supportSeries?.humiditySeries || [];
