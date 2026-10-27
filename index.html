@@ -6287,12 +6287,12 @@ const supportSummary = [
   const bars = buildPrecipitationBars(rows);
   if (renderToken !== currentRenderToken) return;
 
-  const lastStep = bars.at(-1) ?? 0;
+  const lastStep = Number.isFinite(rows.at(-1)?.val) ? (bars.at(-1) ?? 0) : null;
   const totalPeriod = bars.reduce((sum, v) => sum + v, 0);
 
 document.getElementById('panel-body').innerHTML =
   `<div class="stat-row">
-    <div class="stat-card"><div class="val">${lastStep.toFixed(2)}</div><div class="lbl">Ultimo step (${unit})</div></div>
+    <div class="stat-card"><div class="val">${lastStep === null ? "—" : lastStep.toFixed(2)}</div><div class="lbl">Ultimo step (${unit})</div></div>
     ${!hasDryingSupport ? `<div class="stat-card"><div class="val" id="precip-acc-last">—</div><div class="lbl">Accumulo 24h (${unit})</div></div>` : ''}
     ${hasDryingSupport ? `<div class="stat-card"><div class="val" id="precip-acc-drying">—</div><div class="lbl">Accumulo 24h corretto (${unit})</div></div>` : ''}
     <div class="stat-card"><div class="val" id="precip-acc-peak">—</div><div class="lbl">Picco 24h (${unit})</div></div>
