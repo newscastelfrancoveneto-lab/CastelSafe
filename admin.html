@@ -827,7 +827,7 @@ function renderDiagRaspi(res){
     const thr = sys.throttled == null ? '' : (sys.throttled === '0x0' ? '<span class="diag-badge ok">Nessuna</span>' : `<span class="diag-badge warn">${diagEsc(sys.throttled)}</span>`);
     kv = `${stale ? `<div class="diag-msg">Il monitor non aggiorna da ${Math.round(st.eta_secondi / 60)} min.</div>` : ''}<dl class="diag-kv">
       <dt>Alimentazione</dt><dd>${acBadge}${st.ac_lost && st.est_minutes ? ` <span class="diag-sub">residuo stimato ${Math.round(st.est_minutes)} min</span>` : ''}</dd>
-      <dt>Batteria</dt><dd>${vBadge} <strong>${v.toFixed(2)} V</strong> <span class="diag-sub">(carica stimata dalla tensione: ${Math.min(st.percent, 100).toFixed(0)}%)</span></dd>
+      <dt>Batteria</dt><dd>${vBadge} <strong>${v.toFixed(2)} V</strong> <span class="diag-sub">(carica stimata dalla tensione: ${Math.min(st.percent, 100).toFixed(0)}%${st.charging ? ', in carica: valore per eccesso' : ''})</span></dd>
       <dt>Internet</dt><dd>${net}</dd>
       <dt>Collegamento</dt><dd>${raspiIface(st.iface)}</dd>
       ${raspiUplink(st.uplink)}
