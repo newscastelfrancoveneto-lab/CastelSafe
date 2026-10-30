@@ -311,6 +311,15 @@
     .rp-chart{position:relative;margin-top:8px;touch-action:pan-y;}
     .rp-chart svg{display:block;width:100%;height:auto;}
     .rp-tip{position:absolute;pointer-events:none;background:#171b22;color:#fff;border-radius:8px;padding:6px 9px;font-size:.76rem;line-height:1.35;white-space:nowrap;transform:translate(-50%,-100%);margin-top:-10px;display:none;z-index:2;}
+    .rp-wrap{display:block;}
+    .rp-wrap.rp-full{position:fixed;inset:0;z-index:9999;background:var(--panel);padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;overflow:hidden;}
+    .rp-wrap.rp-full .rp-chart{flex:1;min-height:0;margin-top:4px;}
+    .rp-wrap.rp-full .rp-chart svg{position:absolute;inset:0;width:100%;height:100%;}
+    body.rp-lock{overflow:hidden;}
+    .rp-range .rp-full-btn{margin-left:auto;display:inline-flex;align-items:center;gap:6px;}
+    .rp-rotate{display:none;font-size:.78rem;color:var(--muted);}
+    @media (orientation:portrait){.rp-wrap.rp-full .rp-rotate{display:block;}}
+    .rp-ico{display:inline-block;vertical-align:-3px;margin-right:4px;}
     .rp-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:.76rem;color:var(--muted);}
     .rp-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:5px;}
     .diag-msg{font-size:.85rem;padding:12px 14px;border-radius:var(--r-sm);line-height:1.5;color:var(--danger);background:var(--danger-50);border:1px solid var(--danger-100);margin-top:12px;}
@@ -778,6 +787,24 @@ function renderDiagSensors(debug){
 let diagLoading = false;
 let raspiOre = 24;
 let raspiData = null;
+const RP_ICO_ETH = '<svg class="rp-ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14v9h-3v4H8v-4H5z"/><path d="M9 4v4M12 4v4M15 4v4"/><path d="M12 17v3"/></svg>';
+const RP_ICO_WIFI = '<svg class="rp-ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8.8a15 15 0 0 1 20 0"/><path d="M5 12.5a10 10 0 0 1 14 0"/><path d="M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.2" r="1" fill="currentColor"/></svg>';
+const RP_ICO_FULL = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
+function raspiIface(iface){
+  const n = String(iface || '');
+  if (/^(eth|en)/.test(n)) return `${RP_ICO_ETH}Ethernet <span class="diag-sub">(${diagEsc(n)}, via Cudy)</span>`;
+  if (/^(wl|wlan)/.test(n)) return `${RP_ICO_WIFI}Wi-Fi <span class="diag-sub">(${diagEsc(n)}, rete di riserva)</span>`;
+  return diagEsc(n || 'n/d');
+}
+function raspiUplink(u){
+  if (!u) return '';
+  const t = u.tipo;
+  const badge = t === 'WAN' ? '<span class="diag-badge ok">WAN (cavo)</span>'
+    : t === 'SIM' ? '<span class="diag-badge warn">SIM</span>'
+    : '<span class="diag-badge err">Nessuna connessione</span>';
+  const ip = u.ext_ip ? ` <span class="diag-sub">IP esterno del Cudy: ${diagEsc(u.ext_ip)}</span>` : '';
+  return `<dt>Uscita del Cudy</dt><dd>${badge}${ip}</dd>`;
+}
 function raspiUptime(sec){
   const g = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60);
   return g ? `${g} g ${h} h ${m} min` : `${h} h ${m} min`;
@@ -800,8 +827,10 @@ function renderDiagRaspi(res){
     const thr = sys.throttled == null ? '' : (sys.throttled === '0x0' ? '<span class="diag-badge ok">Nessuna</span>' : `<span class="diag-badge warn">${diagEsc(sys.throttled)}</span>`);
     kv = `${stale ? `<div class="diag-msg">Il monitor non aggiorna da ${Math.round(st.eta_secondi / 60)} min.</div>` : ''}<dl class="diag-kv">
       <dt>Alimentazione</dt><dd>${acBadge}${st.ac_lost && st.est_minutes ? ` <span class="diag-sub">residuo stimato ${Math.round(st.est_minutes)} min</span>` : ''}</dd>
-      <dt>Batteria</dt><dd>${vBadge} <strong>${v.toFixed(2)} V</strong> <span class="diag-sub">(la percentuale del chip non è affidabile: ${Math.min(st.percent, 100).toFixed(0)}%)</span></dd>
-      <dt>Internet</dt><dd>${net} <span class="diag-sub">rete: ${diagEsc(st.iface || 'n/d')}</span></dd>
+      <dt>Batteria</dt><dd>${vBadge} <strong>${v.toFixed(2)} V</strong> <span class="diag-sub">(carica stimata dalla tensione: ${Math.min(st.percent, 100).toFixed(0)}%)</span></dd>
+      <dt>Internet</dt><dd>${net}</dd>
+      <dt>Collegamento</dt><dd>${raspiIface(st.iface)}</dd>
+      ${raspiUplink(st.uplink)}
       ${sys.uptime_s != null ? `<dt>Acceso da</dt><dd>${raspiUptime(sys.uptime_s)}</dd>` : ''}
       ${sys.temp_c != null ? `<dt>Temperatura CPU</dt><dd>${sys.temp_c.toFixed(0)} °C</dd>` : ''}
       ${thr ? `<dt>Sotto-tensione dall'avvio</dt><dd>${thr}</dd>` : ''}
@@ -809,9 +838,13 @@ function renderDiagRaspi(res){
   }
   const ranges = [[6, '6 ore'], [24, '24 ore'], [72, '3 giorni'], [168, '7 giorni']];
   box.innerHTML = kv
-    + `<div class="rp-range">${ranges.map(([h, l]) => `<button type="button" data-ore="${h}" class="${h === raspiOre ? 'active' : ''}">${l}</button>`).join('')}</div>`
+    + `<div class="rp-wrap" id="rpWrap"><div class="rp-range">${ranges.map(([h, l]) => `<button type="button" data-ore="${h}" class="${h === raspiOre ? 'active' : ''}">${l}</button>`).join('')}<button type="button" class="rp-full-btn" id="rpFullBtn" aria-label="Grafico a schermo intero">${RP_ICO_FULL}<span id="rpFullLbl">Schermo intero</span></button></div>`
+    + `<div class="rp-rotate">Ruota il telefono in orizzontale per vedere meglio il grafico.</div>`
     + `<div class="rp-chart" id="rpChart"></div>`
-    + `<div class="rp-legend"><span><i style="background:#2563eb"></i>Tensione batteria</span><span><i style="background:#fde2e2"></i>Senza corrente di rete</span><span><i style="background:#e5e7eb"></i>Pi spento / nessun dato</span></div>`;
+    + `<div class="rp-legend"><span><i style="background:#2563eb"></i>Tensione batteria</span><span><i style="background:#fde2e2"></i>Senza corrente di rete</span><span><i style="background:#e5e7eb"></i>Pi spento / nessun dato</span><span><i style="background:#0ea5e9"></i>Cudy su SIM</span></div></div>`;
+  raspiFull = false;
+  document.body.classList.remove('rp-lock');
+  document.getElementById('rpFullBtn').addEventListener('click', toggleRaspiFull);
   box.querySelectorAll('.rp-range button').forEach(b => b.addEventListener('click', async () => {
     raspiOre = Number(b.dataset.ore);
     box.querySelectorAll('.rp-range button').forEach(x => x.classList.toggle('active', x === b));
@@ -820,13 +853,43 @@ function renderDiagRaspi(res){
   }));
   drawRaspiChart();
 }
+let raspiFull = false;
+async function toggleRaspiFull(){
+  if (raspiFull) return exitRaspiFull();
+  const wrap = document.getElementById('rpWrap');
+  if (!wrap) return;
+  raspiFull = true;
+  wrap.classList.add('rp-full');
+  document.body.classList.add('rp-lock');
+  document.getElementById('rpFullLbl').textContent = 'Chiudi';
+  // schermo intero vero dove esiste (Android/desktop); su iPhone resta la vista a tutta pagina
+  try { if (wrap.requestFullscreen) await wrap.requestFullscreen(); } catch {}
+  try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); } catch {}
+  requestAnimationFrame(drawRaspiChart);
+}
+function exitRaspiFull(){
+  const wrap = document.getElementById('rpWrap');
+  raspiFull = false;
+  if (wrap) wrap.classList.remove('rp-full');
+  document.body.classList.remove('rp-lock');
+  const lbl = document.getElementById('rpFullLbl');
+  if (lbl) lbl.textContent = 'Schermo intero';
+  try { if (document.fullscreenElement) document.exitFullscreen(); } catch {}
+  try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch {}
+  requestAnimationFrame(drawRaspiChart);
+}
+document.addEventListener('fullscreenchange', () => { if (raspiFull && !document.fullscreenElement) exitRaspiFull(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && raspiFull) exitRaspiFull(); });
+window.addEventListener('resize', () => { if (raspiFull) drawRaspiChart(); });
+window.addEventListener('orientationchange', () => { if (raspiFull) setTimeout(drawRaspiChart, 250); });
 function drawRaspiChart(){
   const host = document.getElementById('rpChart');
   const d = raspiData;
   if (!host || !d) return;
   const pts = d.storico || [];
   if (pts.length < 2) { host.innerHTML = '<div class="empty" style="margin-top:6px;">Storico ancora troppo breve: servono un paio di minuti di dati.</div>'; return; }
-  const W = 720, H = 300, L = 46, R = 14, T = 14, B = 34;
+  const full = raspiFull && host.clientWidth > 0 && host.clientHeight > 0;
+  const W = full ? Math.round(host.clientWidth) : 720, H = full ? Math.max(180, Math.round(host.clientHeight)) : 300, L = 46, R = 14, T = 14, B = 34;
   const t1 = d.adesso, t0 = t1 - raspiOre * 3600;
   const vmin = Math.min(2.6, Math.min(...pts.map(p => p[1])) - 0.05);
   const vmax = Math.max(4.4, Math.max(...pts.map(p => p[1])) + 0.05);
@@ -844,6 +907,10 @@ function drawRaspiChart(){
     cur.push(`${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`);
   });
   flush();
+  pts.forEach((p, i) => {
+    const nx = pts[i + 1];
+    if (p[3] && nx && nx[0] - p[0] <= GAP) bands += `<rect x="${X(p[0])}" y="${T}" width="${Math.max(1, X(nx[0]) - X(p[0]))}" height="6" fill="#0ea5e9"/>`;
+  });
   const last = pts[pts.length - 1];
   if (t1 - last[0] > GAP) bands += `<rect x="${X(last[0])}" y="${T}" width="${X(t1) - X(last[0])}" height="${H - T - B}" fill="#e5e7eb"/>`;
   let grid = '';
@@ -876,7 +943,7 @@ function drawRaspiChart(){
     curLine.setAttribute('x1', X(p[0])); curLine.setAttribute('x2', X(p[0]));
     curDot.setAttribute('cx', X(p[0])); curDot.setAttribute('cy', Y(p[1]));
     const when = new Date(p[0] * 1000).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-    tip.innerHTML = `<strong>${p[1].toFixed(2)} V</strong><br>${when}${p[2] ? '<br>senza corrente di rete' : ''}`;
+    tip.innerHTML = `<strong>${p[1].toFixed(2)} V</strong><br>${when}${p[2] ? '<br>senza corrente di rete' : ''}${p[3] ? '<br>Cudy su SIM' : ''}`;
     tip.style.display = 'block';
     tip.style.left = Math.min(Math.max(X(p[0]) / W * rect.width, 60), rect.width - 60) + 'px';
     tip.style.top = (Y(p[1]) / H * rect.height) + 'px';
