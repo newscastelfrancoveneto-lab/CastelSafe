@@ -827,7 +827,7 @@ function renderDiagRaspi(res){
     const thr = sys.throttled == null ? '' : (sys.throttled === '0x0' ? '<span class="diag-badge ok">Nessuna</span>' : `<span class="diag-badge warn">${diagEsc(sys.throttled)}</span>`);
     kv = `${stale ? `<div class="diag-msg">Il monitor non aggiorna da ${Math.round(st.eta_secondi / 60)} min.</div>` : ''}<dl class="diag-kv">
       <dt>Alimentazione</dt><dd>${acBadge}${st.ac_lost && st.est_minutes ? ` <span class="diag-sub">residuo stimato ${Math.round(st.est_minutes)} min</span>` : ''}</dd>
-      <dt>Batteria</dt><dd>${vBadge} <strong>${v.toFixed(2)} V</strong> <span class="diag-sub">(la percentuale del chip non è affidabile: ${Math.min(st.percent, 100).toFixed(0)}%)</span></dd>
+      <dt>Batteria</dt><dd>${vBadge} <strong>${v.toFixed(2)} V</strong> <span class="diag-sub">(carica stimata dalla tensione: ${Math.min(st.percent, 100).toFixed(0)}%)</span></dd>
       <dt>Internet</dt><dd>${net}</dd>
       <dt>Collegamento</dt><dd>${raspiIface(st.iface)}</dd>
       ${raspiUplink(st.uplink)}
@@ -841,7 +841,7 @@ function renderDiagRaspi(res){
     + `<div class="rp-wrap" id="rpWrap"><div class="rp-range">${ranges.map(([h, l]) => `<button type="button" data-ore="${h}" class="${h === raspiOre ? 'active' : ''}">${l}</button>`).join('')}<button type="button" class="rp-full-btn" id="rpFullBtn" aria-label="Grafico a schermo intero">${RP_ICO_FULL}<span id="rpFullLbl">Schermo intero</span></button></div>`
     + `<div class="rp-rotate">Ruota il telefono in orizzontale per vedere meglio il grafico.</div>`
     + `<div class="rp-chart" id="rpChart"></div>`
-    + `<div class="rp-legend"><span><i style="background:#2563eb"></i>Tensione batteria</span><span><i style="background:#fde2e2"></i>Senza corrente di rete</span><span><i style="background:#e5e7eb"></i>Pi spento / nessun dato</span></div></div>`;
+    + `<div class="rp-legend"><span><i style="background:#2563eb"></i>Tensione batteria</span><span><i style="background:#fde2e2"></i>Senza corrente di rete</span><span><i style="background:#e5e7eb"></i>Pi spento / nessun dato</span><span><i style="background:#0ea5e9"></i>Cudy su SIM</span></div></div>`;
   raspiFull = false;
   document.body.classList.remove('rp-lock');
   document.getElementById('rpFullBtn').addEventListener('click', toggleRaspiFull);
@@ -907,6 +907,10 @@ function drawRaspiChart(){
     cur.push(`${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`);
   });
   flush();
+  pts.forEach((p, i) => {
+    const nx = pts[i + 1];
+    if (p[3] && nx && nx[0] - p[0] <= GAP) bands += `<rect x="${X(p[0])}" y="${T}" width="${Math.max(1, X(nx[0]) - X(p[0]))}" height="6" fill="#0ea5e9"/>`;
+  });
   const last = pts[pts.length - 1];
   if (t1 - last[0] > GAP) bands += `<rect x="${X(last[0])}" y="${T}" width="${X(t1) - X(last[0])}" height="${H - T - B}" fill="#e5e7eb"/>`;
   let grid = '';
@@ -939,7 +943,7 @@ function drawRaspiChart(){
     curLine.setAttribute('x1', X(p[0])); curLine.setAttribute('x2', X(p[0]));
     curDot.setAttribute('cx', X(p[0])); curDot.setAttribute('cy', Y(p[1]));
     const when = new Date(p[0] * 1000).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-    tip.innerHTML = `<strong>${p[1].toFixed(2)} V</strong><br>${when}${p[2] ? '<br>senza corrente di rete' : ''}`;
+    tip.innerHTML = `<strong>${p[1].toFixed(2)} V</strong><br>${when}${p[2] ? '<br>senza corrente di rete' : ''}${p[3] ? '<br>Cudy su SIM' : ''}`;
     tip.style.display = 'block';
     tip.style.left = Math.min(Math.max(X(p[0]) / W * rect.width, 60), rect.width - 60) + 'px';
     tip.style.top = (Y(p[1]) / H * rect.height) + 'px';
