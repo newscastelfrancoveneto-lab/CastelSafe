@@ -845,9 +845,9 @@ function renderDiagRaspi(res){
   raspiFull = false;
   document.body.classList.remove('rp-lock');
   document.getElementById('rpFullBtn').addEventListener('click', toggleRaspiFull);
-  box.querySelectorAll('.rp-range button').forEach(b => b.addEventListener('click', async () => {
+  box.querySelectorAll('.rp-range button[data-ore]').forEach(b => b.addEventListener('click', async () => {
     raspiOre = Number(b.dataset.ore);
-    box.querySelectorAll('.rp-range button').forEach(x => x.classList.toggle('active', x === b));
+    box.querySelectorAll('.rp-range button[data-ore]').forEach(x => x.classList.toggle('active', x === b));
     const r = await diagFetch(`/api/admin/raspi?ore=${raspiOre}`);
     if (r.data) { raspiData = r.data; drawRaspiChart(); }
   }));
