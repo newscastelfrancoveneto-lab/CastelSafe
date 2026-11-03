@@ -2305,7 +2305,7 @@
     </p>
     <p>
       Su Android è disponibile anche l'<strong>app nativa</strong>, con notifiche personalizzabili e allarme sonoro:
-      <a href="https://github.com/newscastelfrancoveneto-lab/CastelSafe-APK/releases/latest" target="_blank" rel="noopener">scarica l'APK</a>.
+      <a data-apk href="https://github.com/newscastelfrancoveneto-lab/CastelSafe-APK/releases/latest" target="_blank" rel="noopener">scarica l'APK</a>.
     </p>
 
     <h3>Dati geografici</h3>
@@ -2606,8 +2606,31 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 if (IS_ANDROID) setTimeout(showApkBanner, 3000);
 
+// Link diretto al file dell'ultima release: toccando "Scarica" parte il download, senza passare dalla pagina di GitHub.
+// Se GitHub non risponde resta la pagina della release.
+let apkDirectUrl = ANDROID_APK_URL;
+function applyApkUrl() {
+  document.querySelectorAll('a[data-apk]').forEach(el => {
+    el.href = apkDirectUrl;
+    if (apkDirectUrl !== ANDROID_APK_URL) el.removeAttribute('target');
+  });
+}
+if (IS_ANDROID) fetch('https://api.github.com/repos/newscastelfrancoveneto-lab/CastelSafe-APK/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
+  .then(r => (r.ok ? r.json() : Promise.reject()))
+  .then(rel => {
+    const apk = (rel.assets || []).find(a => /\.apk$/i.test(a.name));
+    if (apk) { apkDirectUrl = apk.browser_download_url; applyApkUrl(); }
+  })
+  .catch(() => {});
+
+// Il banner non si nasconde per sempre: anche con la PWA già installata torna dopo qualche giorno,
+// finché non si installa l'app Android (✕ = 3 giorni, "Scarica" = 30 giorni).
+const APK_BANNER_KEY = 'apk-banner-until';
 function apkBannerDismissed() {
-  try { return localStorage.getItem('apk-banner-dismissed') === '1'; } catch { return false; }
+  try { return Date.now() < Number(localStorage.getItem(APK_BANNER_KEY) || 0); } catch { return false; }
+}
+function snoozeApkBanner(days) {
+  try { localStorage.setItem(APK_BANNER_KEY, String(Date.now() + days * 86400000)); } catch {}
 }
 
 function showApkBanner() {
@@ -2634,16 +2657,12 @@ function showApkBanner() {
   `;
   banner.innerHTML = `
     <span>Scarica l'app Android</span>
-    <a id="btn-do-install" href="${ANDROID_APK_URL}" target="_blank" rel="noopener" style="background:#8d021f;color:#fff;border:none;border-radius:999px;padding:6px 14px;font-weight:700;cursor:pointer;font-size:0.82rem;text-decoration:none;">Scarica</a>
+    <a id="btn-do-install" data-apk href="${apkDirectUrl}" ${apkDirectUrl === ANDROID_APK_URL ? 'target="_blank" ' : ''}rel="noopener" style="background:#8d021f;color:#fff;border:none;border-radius:999px;padding:6px 14px;font-weight:700;cursor:pointer;font-size:0.82rem;text-decoration:none;">Scarica</a>
     <button type="button" style="background:rgba(255,255,255,0.14);color:#fff;border:none;border-radius:999px;padding:6px 10px;cursor:pointer;font-size:0.82rem;" aria-label="Chiudi">✕</button>
   `;
   document.body.appendChild(banner);
-  const dismiss = () => {
-    banner.remove();
-    try { localStorage.setItem('apk-banner-dismissed', '1'); } catch {}
-  };
-  banner.querySelector('button').addEventListener('click', dismiss);
-  banner.querySelector('a').addEventListener('click', dismiss);
+  banner.querySelector('button').addEventListener('click', () => { banner.remove(); snoozeApkBanner(3); });
+  banner.querySelector('a').addEventListener('click', () => { banner.remove(); snoozeApkBanner(30); });
 }
 
 function showInstallBanner() {
