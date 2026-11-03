@@ -1274,9 +1274,13 @@ function restyleOsmFeature(osmId) { const layer = osmLayerById.get(osmId); if (l
 const osmFeatureBounds = new WeakMap();
 function getOsmFeatureBounds(feature) { let b = osmFeatureBounds.get(feature); if (b) return b; const geom = feature?.geometry; const pts = !geom ? [] : geom.type === 'Point' ? [geom.coordinates] : geom.type === 'Polygon' ? (geom.coordinates?.[0] || []) : geom.type === 'LineString' ? (geom.coordinates || []) : []; b = [Infinity, Infinity, -Infinity, -Infinity]; pts.forEach(([lon, lat]) => { if (lon < b[0]) b[0] = lon; if (lat < b[1]) b[1] = lat; if (lon > b[2]) b[2] = lon; if (lat > b[3]) b[3] = lat; }); osmFeatureBounds.set(feature, b); return b; }
 function overpassQueryForBounds(bounds) { const south = bounds.getSouth().toFixed(6); const west = bounds.getWest().toFixed(6); const north = bounds.getNorth().toFixed(6); const east = bounds.getEast().toFixed(6); const bb = `${south},${west},${north},${east}`; const zoom = map ? map.getZoom() : 13; let parts = `way["highway"](${bb});way["waterway"](${bb});node["highway"="bus_stop"](${bb});`; if (zoom >= 15) parts += `node["amenity"](${bb});node["shop"](${bb});way["amenity"](${bb});way["leisure"](${bb});way["landuse"](${bb});`; if (zoom >= 17) parts += `way["building"](${bb});`; return `[out:json][timeout:45];(${parts});out geom;`; }
-function getViewportCacheKey(bounds, zoom) { return [bounds.getSouth().toFixed(3), bounds.getWest().toFixed(3), bounds.getNorth().toFixed(3), bounds.getEast().toFixed(3), Number(zoom || 0).toFixed(1)].join('|'); }
-function readViewportCache(cacheKey) { const cached = osmViewportCache.get(cacheKey); if (!cached) return false; if (Date.now() - cached.timestamp > OSM_CACHE_TTL_MS) { osmViewportCache.delete(cacheKey); return false; } return true; }
-function writeViewportCache(cacheKey) { if (!cacheKey) return; osmViewportCache.set(cacheKey, { timestamp: Date.now() }); if (osmViewportCache.size <= OSM_CACHE_MAX_ENTRIES) return; const oldestKey = osmViewportCache.keys().next().value; if (oldestKey) osmViewportCache.delete(oldestKey); }
+// Le aree già scaricate si ricordano come riquadri: se la vista attuale sta
+// tutta dentro un'area caricata con almeno gli stessi filtri (0 base,
+// 1 da zoom 15, 2 da zoom 17), non si rifà la richiesta. Prima la chiave era
+// il bbox esatto e bastava spostare la mappa di poco per riscaricare tutto.
+function osmQueryLevel(zoom) { return zoom >= 17 ? 2 : zoom >= 15 ? 1 : 0; }
+function isViewportLoaded(viewBounds, level) { const now = Date.now(); for (const [key, area] of osmViewportCache) { if (now - area.timestamp > OSM_CACHE_TTL_MS) { osmViewportCache.delete(key); continue; } if (area.level >= level && area.bounds.contains(viewBounds)) return true; } return false; }
+function markViewportLoaded(bounds, level) { osmViewportCache.set(bounds.toBBoxString() + '|' + level, { bounds, level, timestamp: Date.now() }); if (osmViewportCache.size <= OSM_CACHE_MAX_ENTRIES) return; const oldestKey = osmViewportCache.keys().next().value; if (oldestKey) osmViewportCache.delete(oldestKey); }
 function overpassToFeature(element) { const id = `${element.type}/${element.id}`; if (element.type === 'node' && typeof element.lon === 'number' && typeof element.lat === 'number') return { type:'Feature', geometry:{ type:'Point', coordinates:[element.lon, element.lat] }, properties:{ _osmId:id, _osmType:element.type, ...(element.tags || {}) } }; if (element.type !== 'way' || !Array.isArray(element.geometry) || element.geometry.length < 2) return null; const coords = element.geometry.map((p) => [p.lon, p.lat]); const first = coords[0]; const last = coords[coords.length - 1]; const isClosed = first && last && first[0] === last[0] && first[1] === last[1]; return { type:'Feature', geometry:isClosed ? { type:'Polygon', coordinates:[coords] } : { type:'LineString', coordinates:coords }, properties:{ _osmId:id, _osmType:element.type, ...(element.tags || {}) } }; }
 // ── RITAGLIO PARZIALE DELLE VIE SELEZIONATE ─────────────────────────────────
 // Le chiusure reali spesso interessano solo un tratto della via OSM (es. un
@@ -1326,27 +1330,13 @@ function getSelectedOSMNames() { const uniqueNames = new Set(); selectedOSMFeatu
 async function overpassFetch(query, signal) {
   const body = new URLSearchParams({ data: query });
   const headers = { 'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8' };
-  // I mirror vanno e vengono: si riprovano a ogni caricamento invece di
-  // escluderli per tutta la sessione dopo il primo fallimento.
-  const controllers = [];
-  try {
-    const requests = OVERPASS_ENDPOINTS.map((endpoint) => {
-      const controller = new AbortController();
-      controllers.push(controller);
-      return fetch(endpoint, { method:'POST', headers, body, signal: AbortSignal.any([controller.signal, signal, AbortSignal.timeout(12000)]) })
-        .then(async (response) => { if (!response.ok) throw new Error(`${endpoint} -> HTTP ${response.status}`); return response.json(); });
-    });
-    return await Promise.any(requests);
-  } catch (directErr) {
-    if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
-    console.warn('Overpass diretto fallito, provo il proxy del server:', directErr?.message || directErr);
-  } finally {
-    controllers.forEach((c) => c.abort());
-  }
+  // Prima il proxy: tiene in cache i tasselli già scaricati e risponde in
+  // pochi secondi. Un 504 vuol dire che sta ancora riempiendo la cache e il
+  // download continua sul server, quindi il tentativo successivo la trova.
   let lastErr = null;
   for (let attempt = 1; attempt <= OVERPASS_PROXY_ATTEMPTS; attempt++) {
     if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
-    if (attempt > 1) setOsmLoaderState(true, `Server OSM lento, nuovo tentativo ${attempt}/${OVERPASS_PROXY_ATTEMPTS}...`);
+    if (attempt > 1) setOsmLoaderState(true, `Il server sta preparando i dati OSM, tentativo ${attempt}/${OVERPASS_PROXY_ATTEMPTS}...`);
     try {
       const proxyRes = await fetch(OVERPASS_PROXY, { method:'POST', headers, body, signal: AbortSignal.any([signal, AbortSignal.timeout(60000)]) });
       if (proxyRes.ok) return await proxyRes.json();
@@ -1358,9 +1348,26 @@ async function overpassFetch(query, signal) {
     }
     console.warn(`Proxy Overpass, tentativo ${attempt}/${OVERPASS_PROXY_ATTEMPTS} fallito:`, lastErr?.message || lastErr);
   }
-  throw lastErr;
+  // Ripiego sui mirror pubblici solo se il proxy non risponde proprio.
+  setOsmLoaderState(true, 'Server non disponibile, provo i mirror OSM pubblici...');
+  const controllers = [];
+  try {
+    const requests = OVERPASS_ENDPOINTS.map((endpoint) => {
+      const controller = new AbortController();
+      controllers.push(controller);
+      return fetch(endpoint, { method:'POST', headers, body, signal: AbortSignal.any([controller.signal, signal, AbortSignal.timeout(12000)]) })
+        .then(async (response) => { if (!response.ok) throw new Error(`${endpoint} -> HTTP ${response.status}`); return response.json(); });
+    });
+    return await Promise.any(requests);
+  } catch (directErr) {
+    if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+    console.warn('Anche Overpass diretto fallito:', directErr?.message || directErr);
+    throw lastErr || directErr;
+  } finally {
+    controllers.forEach((c) => c.abort());
+  }
 }
-async function loadOsmData() { if (map.getZoom() < OSM_MIN_ZOOM) { if (osmFetchController) osmFetchController.abort(); setOsmLoaderState(false, `Avvicinati per caricare le vie (zoom ${OSM_MIN_ZOOM} o più)`); return; } const bounds = map.getBounds().pad(0.3); const cacheKey = getViewportCacheKey(bounds, map.getZoom()); if (readViewportCache(cacheKey)) { setOsmLoaderState(false, `Dati in cache (${globalOsmCache.size} totali)`); return; } if (osmFetchController) osmFetchController.abort(); osmFetchController = new AbortController(); const { signal } = osmFetchController; setOsmLoaderState(true, 'Caricamento nuovi dati OSM...'); try { const query = overpassQueryForBounds(bounds); const data = await overpassFetch(query, signal); if (signal.aborted) return; const newFeatures = (data.elements || []).map(overpassToFeature).filter(Boolean); const addedFeatures = []; newFeatures.forEach(feature => { const id = feature.properties._osmId; if (!globalOsmCache.has(id)) { globalOsmCache.set(id, feature); addedFeatures.push(feature); } }); const addedCount = addedFeatures.length; osmFeaturesCache = Array.from(globalOsmCache.values()); writeViewportCache(cacheKey); if (addedCount > 0) { addOsmFeatures(addedFeatures); saveAdminOsmCache(); } setOsmLoaderState(false, `OSM: +${addedCount} nuovi (${globalOsmCache.size} totali)`); } catch (err) { if (err?.name === 'AbortError') return; console.error(err); setOsmLoaderState(false, 'Errore caricamento OSM'); } }
+async function loadOsmData() { if (map.getZoom() < OSM_MIN_ZOOM) { if (osmFetchController) osmFetchController.abort(); setOsmLoaderState(false, `Avvicinati per caricare le vie (zoom ${OSM_MIN_ZOOM} o più)`); return; } const bounds = map.getBounds().pad(0.3); const level = osmQueryLevel(map.getZoom()); if (isViewportLoaded(map.getBounds(), level)) { setOsmLoaderState(false, `Dati in cache (${globalOsmCache.size} totali)`); return; } if (osmFetchController) osmFetchController.abort(); osmFetchController = new AbortController(); const { signal } = osmFetchController; setOsmLoaderState(true, 'Caricamento nuovi dati OSM...'); try { const query = overpassQueryForBounds(bounds); const data = await overpassFetch(query, signal); if (signal.aborted) return; const newFeatures = (data.elements || []).map(overpassToFeature).filter(Boolean); const addedFeatures = []; newFeatures.forEach(feature => { const id = feature.properties._osmId; if (!globalOsmCache.has(id)) { globalOsmCache.set(id, feature); addedFeatures.push(feature); } }); const addedCount = addedFeatures.length; osmFeaturesCache = Array.from(globalOsmCache.values()); markViewportLoaded(bounds, level); if (addedCount > 0) { addOsmFeatures(addedFeatures); saveAdminOsmCache(); } setOsmLoaderState(false, `OSM: +${addedCount} nuovi (${globalOsmCache.size} totali)`); } catch (err) { if (err?.name === 'AbortError') return; console.error(err); setOsmLoaderState(false, 'Errore caricamento OSM'); } }
 function scheduleOsmLoad() { if (!isEditingMode || !map) return; clearTimeout(osmLoadTimer); osmLoadTimer = setTimeout(async () => { try { await loadOsmData(); } catch (err) { if (err?.name === 'AbortError') return; console.error(err); setOsmLoaderState(false, 'Errore caricamento OSM'); } }, 350); }
 function selectOSMFeature(feature) { if (!isEditingMode) return; const normalized = normalizeGeometryForDraft(feature.geometry); if (!normalized) return; const osmId = feature.properties?._osmId; if (!osmId) return; if (selectedOSMIds.has(osmId)) { selectedOSMIds.delete(osmId); selectedOSMFeatures = selectedOSMFeatures.filter((f) => f.properties?._osmId !== osmId); removeTrimHandles(osmId); selectedLineRanges.delete(osmId); } else { selectedOSMIds.add(osmId); selectedOSMFeatures.push(feature); if (normalized.type === 'LineString') initLineRange(feature, normalized); } updateDraftGeometryFromSelection(); drawDraft(); restyleOsmFeature(osmId); setOsmLoaderState(false, `Selezionati: ${selectedOSMFeatures.length}`); }
 function initAdminMap() { window._adminMapInit = true; map = L.map('map', { center:[45.664,11.958], zoom:13, maxZoom:22, zoomControl:false }); L.control.zoom({ position:'bottomright' }).addTo(map); baseTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:22, crossOrigin:true }).addTo(map); draftLayer = L.layerGroup().addTo(map); alertsLayer = L.layerGroup().addTo(map); trimHandlesLayer = L.layerGroup().addTo(map); const osmRenderer = L.canvas({ padding: 0.3 }); osmSourceLayer = L.geoJSON([], { renderer: osmRenderer, style: osmFeatureStyle, pointToLayer: (feature, latlng) => L.circleMarker(latlng, { ...osmFeatureStyle(feature), radius: 10, renderer: osmRenderer }), onEachFeature: (feature, layer) => { const p = feature.properties || {}; if (p._osmId) osmLayerById.set(p._osmId, layer); const name = p.name || p.highway || p.amenity || p.shop || p._osmId; layer.bindTooltip(`OSM: ${name}`); } }).addTo(map);
