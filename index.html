@@ -2597,6 +2597,13 @@ let deferredInstallPrompt = null;
 const ANDROID_APK_URL = 'https://github.com/newscastelfrancoveneto-lab/CastelSafe-APK/releases/latest';
 const IS_ANDROID = /Android/i.test(navigator.userAgent);
 
+// Navigazione: su Android il link geo: fa scegliere all'utente l'app che preferisce; altrove si apre Google Maps nel browser.
+function navAttrs(ll) {
+  return IS_ANDROID
+    ? `href="geo:${ll}?q=${ll}"`
+    : `href="https://www.google.com/maps/dir/?api=1&destination=${ll}" target="_blank" rel="noopener"`;
+}
+
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredInstallPrompt = e;
@@ -3106,13 +3113,12 @@ function loadSedePCFromOSM() {
         Castelfranco Veneto
       </span>
       <div style="margin-top:12px;text-align:center">
-        <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}"
-           target="_blank"
+        <a ${navAttrs(`${lat},${lon}`)}
            style="display:inline-flex;align-items:center;gap:7px;background:#8d021f;color:#fff;
                   padding:8px 15px;border-radius:8px;text-decoration:none;font-size:0.8rem;
                   font-weight:600">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 2.5 19.5 21 12 17.2 4.5 21 12 2.5Z"/></svg>
-          Naviga con Maps
+          Naviga
         </a>
       </div>
     </div>
@@ -4173,12 +4179,11 @@ function renderCPAGeoJSON(geojson) {
         <strong style="color:${style.color};font-size:1rem;">${style.label}</strong>
         ${name ? `<br><span style="font-size:0.8rem;color:#64748b;margin-top:4px;display:block;">${name}</span>` : ''}
         <div style="margin-top:12px;text-align:center;">
-          <a href="https://www.google.com/maps/dir/?api=1&destination=${centroid(feature)}"
-             target="_blank"
+          <a ${navAttrs(centroid(feature))}
              style="display:inline-flex;align-items:center;gap:7px;background:var(--primary);color:#fff;padding:8px 15px;
                     border-radius:8px;text-decoration:none;font-size:0.8rem;font-weight:600;transition:background 0.2s;">
              <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 2.5 19.5 21 12 17.2 4.5 21 12 2.5Z"/></svg>
-             Naviga con Maps
+             Naviga
           </a>
         </div>
       </div>`);
