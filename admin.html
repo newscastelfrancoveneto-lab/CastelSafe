@@ -894,7 +894,7 @@ function drawRaspiChart(){
   const vmax = Math.max(4.4, Math.max(...pts.map(p => p[1])) + 0.05);
   const X = t => L + (t - t0) / (t1 - t0) * (W - L - R);
   const Y = v => T + (vmax - v) / (vmax - vmin) * (H - T - B);
-  const GAP = 180;
+  const GAP = d.gap || 180; // il server riduce i punti: il salto "normale" cresce con l'intervallo
   let bands = '', line = '', cur = [];
   const flush = () => { if (cur.length > 1) line += `<polyline fill="none" stroke="#2563eb" stroke-width="2" stroke-linejoin="round" points="${cur.join(' ')}"/>`; cur = []; };
   pts.forEach((p, i) => {
