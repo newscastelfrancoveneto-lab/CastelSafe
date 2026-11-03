@@ -1275,6 +1275,7 @@
     .allerta-open-label { display: none; }
   }
     .allerta-bollino-wrap { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; color: #fff; }
+    .allerta-ico { width: 18px; height: 18px; flex-shrink: 0; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
     /* Doppio bordo (chiaro + scuro): un bordo di un solo colore sparisce
        quando il pallino ha lo stesso colore della barra (es. giallo su
        giallo, appena percepibile anche con bordo bianco). Il bordo scuro
@@ -1436,6 +1437,46 @@
 	#allerta-help-modal .allerta-section-body a {
 	  word-break: break-word;
 	}
+
+
+	/* ── GUIDA RAPIDA (scelta del rischio, fasi numerate) ── */
+	.guida-112 {
+	  display: flex; align-items: center; gap: 12px;
+	  padding: 12px 14px; margin-bottom: 16px;
+	  background: #fde8e8; border-radius: 14px; color: #7f1d1d;
+	}
+	.guida-112 > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 0.82rem; line-height: 1.4; }
+	.guida-112 strong { font-size: 0.92rem; }
+	.guida-112-btn {
+	  flex-shrink: 0; padding: 9px 14px; border-radius: 999px;
+	  background: var(--primary); color: #fff; font-weight: 700; font-size: 0.85rem; text-decoration: none;
+	}
+	.guida-chips {
+	  display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 14px;
+	  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+	}
+	.guida-chips::-webkit-scrollbar { display: none; }
+	.guida-chip {
+	  flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
+	  padding: 8px 12px; border-radius: 999px; cursor: pointer;
+	  border: 1px solid #cbd5e1; background: #fff; color: var(--text-main);
+	  font: inherit; font-size: 0.82rem; font-weight: 600;
+	  -webkit-tap-highlight-color: transparent;
+	}
+	.guida-chip svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+	.guida-chip.on { background: var(--primary-light); border-color: var(--primary); color: var(--primary-dark); }
+	.guida-titolo { font-size: 1.15rem; font-weight: 800; color: var(--text-main); margin: 4px 0 2px; }
+	.guida-sintesi { font-size: 0.84rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px; }
+	.guida-fase {
+	  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px;
+	  padding: 12px 14px; margin-bottom: 10px;
+	}
+	.guida-fase h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-size: 0.95rem; font-weight: 800; color: var(--text-main); }
+	.guida-fase h4 i { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+	.guida-passo { display: flex; gap: 8px; margin-top: 8px; font-size: 0.9rem; line-height: 1.5; color: var(--text-main); }
+	.guida-passo b { flex: 0 0 20px; color: var(--primary); font-weight: 800; }
+	.guida-fonti { font-size: 0.84rem; margin: 6px 0 0; line-height: 1.7; }
+	.guida-kit { margin: 0 0 4px; padding-left: 20px; font-size: 0.9rem; line-height: 1.6; color: var(--text-main); }
 
 	.risk-accordion {
 	  margin-top: 22px;
@@ -1913,11 +1954,13 @@
 
    <div id="allerta-bar" onclick="document.getElementById('allerta-modal').classList.add('open')">
 	    <div id="allerta-bar-inner">
-	      <div class="allerta-bollino-wrap"><div class="allerta-bollino" id="bar-bollino-idr"></div><span id="bar-label-idr">Idra.</span></div>
-	      <div class="allerta-bollino-wrap"><div class="allerta-bollino" id="bar-bollino-idro"></div><span id="bar-label-idro">Idro.</span></div>
-	      <div class="allerta-bollino-wrap"><div class="allerta-bollino" id="bar-bollino-temp"></div><span id="bar-label-temp">Temp.</span></div>
-	      <div class="allerta-bollino-wrap"><div class="allerta-bollino" id="bar-bollino-vento"></div><span id="bar-label-vento">Vento</span></div>
-	      <div class="allerta-bollino-wrap"><div class="allerta-bollino" id="bar-bollino-calore"></div><span id="bar-label-calore">Calore</span></div>
+	      <div class="allerta-bollino-wrap"><div class="allerta-bollino" id="bar-bollino-idr"></div><svg class="allerta-ico" viewBox="0 0 24 24" role="img" aria-label="Rischio idraulico"><title>Rischio idraulico</title><path d="M2 8c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2M2 13c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2M2 18c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2"/></svg></div>
+	      <div class="allerta-bollino-wrap"><div class="allerta-bollino" id="bar-bollino-idro"></div><svg class="allerta-ico" viewBox="0 0 24 24" role="img" aria-label="Rischio idrogeologico"><title>Rischio idrogeologico</title><path d="M2 20l6-10 4 6 2-3 8 7z"/><circle cx="15" cy="5" r="1.3"/><circle cx="19" cy="8" r="1"/></svg></div>
+	      <div class="allerta-bollino-wrap"><div class="allerta-bollino" id="bar-bollino-temp"></div><svg class="allerta-ico" viewBox="0 0 24 24" role="img" aria-label="Temporali"><title>Temporali</title><path d="M7 16a4 4 0 0 1-.5-7.97A5.5 5.5 0 0 1 17 7.5a4.5 4.5 0 0 1 .5 8.5"/><path d="M12 11l-2.5 4h4L11 20"/></svg></div>
+	      <div class="allerta-bollino-wrap"><div class="allerta-bollino" id="bar-bollino-vento"></div><svg class="allerta-ico" viewBox="0 0 24 24" role="img" aria-label="Vento"><title>Vento</title><path d="M3 8h10a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h7"/></svg></div>
+	      <div class="allerta-bollino-wrap"><div class="allerta-bollino" id="bar-bollino-calore"></div><svg class="allerta-ico" viewBox="0 0 24 24" role="img" aria-label="Ondate di calore"><title>Ondate di calore</title><path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0z"/></svg></div>
+	      <div class="allerta-bollino-wrap"><div class="allerta-bollino" id="bar-bollino-neve"></div><svg class="allerta-ico" viewBox="0 0 24 24" role="img" aria-label="Neve"><title>Neve</title><path d="M12 2v20M4.2 7l15.6 10M4.2 17L19.8 7M9.5 3.5L12 6l2.5-2.5M9.5 20.5L12 18l2.5 2.5"/></svg></div>
+	      <div class="allerta-bollino-wrap"><div class="allerta-bollino" id="bar-bollino-gelo"></div><svg class="allerta-ico" viewBox="0 0 24 24" role="img" aria-label="Ghiaccio al suolo"><title>Ghiaccio al suolo</title><path d="M12 3l7 4v8l-7 4-7-4V7z"/><path d="M12 3v18M5 7l14 8M19 7L5 15"/></svg></div>
 	    </div>
     <!--<span id="allerta-bar-title">Allerta ARPAV</span> -->
     <span id="allerta-bar-chevron">
@@ -1963,209 +2006,68 @@
       aria-label="Chiudi"
     >✕</button>
 
-    <h2>Guida rapida allerta meteo-idro</h2>
+    <h2>Cosa fare in caso di allerta</h2>
 
-    <div class="periodo">
-      Una spiegazione semplice dei colori delle allerte e delle prime regole di comportamento.
+    <div class="periodo">Guida rapida: scegli il rischio e segui i passi.</div>
+
+    <div class="guida-112">
+      <div>
+        <strong>In pericolo?</strong>
+        <span>Chiama subito il 112. Il resto della guida viene dopo.</span>
+      </div>
+      <a class="guida-112-btn" href="tel:112">Chiama 112</a>
     </div>
 
-    <div class="allerta-section-title">Colori delle allerte</div>
-    <div class="allerta-section-body">
-      <p>
-        I colori dell’allerta indicano un livello crescente di criticità attesa sul territorio.
-        La valutazione riguarda i rischi idraulico, idrogeologico e, quando previsto, i temporali.
-        Per il rischio temporali il livello massimo previsto è l’arancione.
-      </p>
+    <div class="guida-chips" id="guida-chips" role="tablist" aria-label="Tipo di rischio"></div>
 
-      <button
-        type="button"
-        class="allerta-img-btn"
-        onclick="openImageLightbox(this)"
-        aria-label="Apri infografica delle allerte a schermo intero"
-      >
-        <img
-          src="./IMG_20260416_132351_139.jpg"
-          alt="Infografica con i colori delle allerte meteo-idro"
-          class="allerta-expandable-img"
+    <div id="guida-body"></div>
+
+    <div class="allerta-section-title">Tieni pronto in casa</div>
+    <ul class="guida-kit">
+      <li>Torcia e radio a pile, con pile di scorta</li>
+      <li>Documenti e contanti in una busta impermeabile</li>
+      <li>Farmaci personali e kit di primo soccorso</li>
+      <li>Acqua e cibo a lunga conservazione per 2–3 giorni</li>
+      <li>Power bank carico e caricabatterie</li>
+      <li>Numeri di emergenza anche su carta</li>
+    </ul>
+
+    <div id="guida-colori" hidden>
+      <div class="allerta-section-title">Colori delle allerte meteo-idro</div>
+      <div class="allerta-section-body">
+        <p>
+          Verde: nessuna criticità. Gialla, arancione e rossa indicano una criticità attesa sempre più grave.
+          Si valutano i rischi idraulico, idrogeologico e, quando previsto, i temporali (per i temporali il massimo è l’arancione).
+        </p>
+
+        <button
+          type="button"
+          class="allerta-img-btn"
+          onclick="openImageLightbox(this)"
+          aria-label="Apri infografica delle allerte a schermo intero"
         >
-        <span class="allerta-img-hint">Tocca per ingrandire</span>
-      </button>
+          <img
+            src="./IMG_20260416_132351_139.jpg"
+            alt="Infografica con i colori delle allerte meteo-idro"
+            class="allerta-expandable-img"
+          >
+          <span class="allerta-img-hint">Tocca per ingrandire</span>
+        </button>
 
-      <p style="margin-top:12px;">
-        Approfondimento ufficiale:
-        <a
-          href="https://rischi.protezionecivile.it/it/meteo-idro/allertamento/tabella-allerte-e-scenari-di-criticita/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Tabella allerte e scenari di criticità
-        </a>
-      </p>
+        <p style="margin-top:12px;">
+          Approfondimento ufficiale:
+          <a
+            href="https://rischi.protezionecivile.it/it/meteo-idro/allertamento/tabella-allerte-e-scenari-di-criticita/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Tabella allerte e scenari di criticità
+          </a>
+        </p>
+      </div>
     </div>
 
-    <div class="risk-accordion">
-
-      <details class="risk-accordion-item" open>
-        <summary>
-          <span class="risk-accordion-label">Rischio idraulico e idrogeologico (alluvione)</span>
-          <span class="risk-accordion-chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
-        </summary>
-        <div class="risk-accordion-body">
-          <div class="allerta-section-title">Durante l’allerta</div>
-          <div class="allerta-section-body">
-            <p>
-              Dopo aver letto attentamente il bollettino regionale, assicurati di aver attivato le notifiche dell’app, per ricevere in tempo reale gli allarmi dei torrenti o delle precipitazioni.
-              <br><br>
-              Consulta le
-              <a href="https://www.comune.castelfrancoveneto.tv.it/wp-content/uploads/2024/09/Procedure-Emergenza.pdf" target="_blank" rel="noopener noreferrer">
-                procedure di emergenza
-              </a>
-              e la
-              <a href="https://www.comune.castelfrancoveneto.tv.it/wp-content/uploads/2024/09/rischio-idrogeologico.pdf" target="_blank" rel="noopener noreferrer">
-                mappa del rischio idrogeologico
-              </a>.
-              <br><br>
-              Segui ogni indicazione ufficiale del Comune.
-              <br><br>
-              <strong>Non</strong> dormire nei piani seminterrati e <strong>non</strong> soggiornarvi.
-              <br><br>
-              Proteggi i locali che si trovano al piano strada, chiudi le porte di cantine, seminterrati o garage <strong>solo se</strong> non ti esponi a pericoli.
-              <br><br>
-              Se devi viaggiare, verifica dall’app se sono presenti chiusure stradali, in modo da evitare zone allagate e traffico inutile.
-              <br><br>
-              Valuta bene se mettere al sicuro l’auto o altri beni: può essere <strong>pericoloso</strong>.
-            </p>
-          </div>
-
-          <div class="allerta-section-title">Durante l’alluvione</div>
-          <div class="allerta-section-body">
-            <p>Se sei in casa, spostati ai piani alti e chiudi porte e finestre. Chiudi il gas, disattiva l'impianto elettrico solo se non rischi di bagnarti. Non usare ascensori né toccare apparecchi elettrici con mani o piedi bagnati.<br><br><strong>Non provare a raggiungere casa</strong> su strade "alternative pulite": anche se sembrano sicure, rischi voragini, correnti o intrappolamento (20-30 cm d'acqua bastano per auto o pedoni). Allontanati dalle zone allagate verso aree elevate o di attesa indicate dal Comune/app.<br><br>Segui solo le autorità. <strong>Non improvvisare!</strong></p>
-          </div>
-
-          <div class="allerta-section-title">Dopo l’alluvione</div>
-          <div class="allerta-section-body">
-            <p>Attendi l'allerta cessato dalle autorità prima di rientrare. Verifica con un tecnico gas, elettricità e acqua: non bere dal rubinetto, getta cibi contaminati dal fango.<br><br>Attento a pericoli residui come voragini, cavi scoperti, detriti o edifici instabili. Non transitare vicino a zone allagate o con fango.<br><br>Segnala danni al Comune e consulta le procedure ufficiali per i rimborsi. <strong>Priorità: sicurezza e comunicazioni ufficiali.</strong></p>
-          </div>
-
-          <p style="margin-top:12px;">
-            Fonte:
-            <a href="https://www.iononrischio.gov.it/it/preparati/alluvione/cosa-fare" target="_blank" rel="noopener noreferrer">
-              Io non rischio - Alluvione
-            </a>
-          </p>
-        </div>
-      </details>
-
-      <details class="risk-accordion-item">
-        <summary>
-          <span class="risk-accordion-label">Temporali forti (fulmini e grandine)</span>
-          <span class="risk-accordion-chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
-        </summary>
-        <div class="risk-accordion-body">
-          <div class="allerta-section-title">Prima</div>
-          <div class="allerta-section-body">
-            <p>Se è prevista allerta per temporali, evita di programmare attività all'aperto (escursioni, sport, lavori in quota) e resta aggiornato sull'evoluzione meteo tramite l'app.</p>
-          </div>
-
-          <div class="allerta-section-title">Durante</div>
-          <div class="allerta-section-body">
-            <p>Se sei all'aperto, cerca riparo in un edificio o in auto con i finestrini chiusi. <strong>Evita</strong> alberi isolati, pali, tralicci, specchi d'acqua e aree aperte esposte ai fulmini; se sei in acqua o in barca, raggiungi subito la riva.<br><br>In casa, chiudi porte e finestre; evita di usare apparecchi elettrici collegati alla rete e, se possibile, scollega le spine dei dispositivi sensibili.<br><br>Presta attenzione alla grandine e alle raffiche improvvise: possono danneggiare vetri, tetti e veicoli in sosta.</p>
-          </div>
-
-          <div class="allerta-section-title">Dopo</div>
-          <div class="allerta-section-body">
-            <p>Segnala eventuali danni al Comune ed evita zone con alberi o rami pericolanti o cavi elettrici a terra.</p>
-          </div>
-        </div>
-      </details>
-
-      <details class="risk-accordion-item">
-        <summary>
-          <span class="risk-accordion-label">Vento forte</span>
-          <span class="risk-accordion-chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
-        </summary>
-        <div class="risk-accordion-body">
-          <div class="allerta-section-title">Prima</div>
-          <div class="allerta-section-body">
-            <p>Metti al sicuro oggetti, ombrelloni, tende e mobili da giardino che potrebbero essere sollevati dal vento; verifica impalcature, coperture provvisorie e grondaie non ben fissate.</p>
-          </div>
-
-          <div class="allerta-section-title">Durante</div>
-          <div class="allerta-section-body">
-            <p>Evita di sostare sotto alberi, impalcature, cartelloni pubblicitari, cornicioni e linee elettriche. Se sei alla guida, modera la velocità (soprattutto su ponti, viadotti e strade esposte) e presta attenzione a rami caduti o detriti sulla carreggiata. Evita spostamenti non necessari.</p>
-          </div>
-
-          <div class="allerta-section-title">Dopo</div>
-          <div class="allerta-section-body">
-            <p>Segnala alberi o rami pericolanti e danni a strutture; non avvicinarti a cavi elettrici caduti a terra.</p>
-          </div>
-        </div>
-      </details>
-
-      <details class="risk-accordion-item">
-        <summary>
-          <span class="risk-accordion-label">Ondate di calore</span>
-          <span class="risk-accordion-chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
-        </summary>
-        <div class="risk-accordion-body">
-          <div class="allerta-section-title">Come comportarsi</div>
-          <div class="allerta-section-body">
-            <p>Evita di uscire ed esporti al sole nelle ore più calde della giornata (indicativamente 12-18). Bevi molta acqua durante il giorno, evita alcolici e bevande molto zuccherate o fredde, indossa abiti leggeri e chiari.<br><br><strong>Non lasciare mai</strong> bambini o animali in auto, nemmeno per pochi minuti.<br><br>Presta attenzione a persone anziane, bambini piccoli e malati cronici: mantieni le abitazioni fresche arieggiandole nelle ore più fresche (mattina presto, sera) e tenendo chiuse tapparelle/tende nelle ore calde.</p>
-          </div>
-
-          <div class="allerta-section-title">In caso di malore</div>
-          <div class="allerta-section-body">
-            <p>Se noti crampi, capogiri, cute calda e secca o confusione in qualcuno, spostalo subito al fresco, bagnalo con acqua fresca e chiama il <strong>112/118</strong>.</p>
-          </div>
-        </div>
-      </details>
-
-      <details class="risk-accordion-item">
-        <summary>
-          <span class="risk-accordion-label">Terremoto</span>
-          <span class="risk-accordion-chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
-        </summary>
-        <div class="risk-accordion-body">
-          <div class="allerta-section-title">Prima</div>
-          <div class="allerta-section-body">
-            <p>Fissa alla parete mobili, librerie e scaffali alti che potrebbero ribaltarsi. Individua in casa i punti più sicuri (sotto architravi robusti o vicino a muri portanti, lontano da vetri e mobili alti) e tieni a portata di mano una torcia e una radio a pile.</p>
-          </div>
-
-          <div class="allerta-section-title">Durante</div>
-          <div class="allerta-section-body">
-            <p>Se sei in casa, ripara sotto un tavolo robusto tenendoti lontano da vetri, finestre e mobili alti; non usare ascensori.<br><br>Se sei all'aperto, allontanati da edifici, alberi e linee elettriche.<br><br>Se sei alla guida, fermati lontano da ponti, gallerie ed edifici.</p>
-          </div>
-
-          <div class="allerta-section-title">Dopo</div>
-          <div class="allerta-section-body">
-            <p>Esci con prudenza controllando che non ci siano crolli o pericoli lungo il percorso. Se senti odore di gas, chiudi subito il rubinetto e non accendere fiamme o interruttori. Allontanati da edifici danneggiati e segui solo le indicazioni ufficiali delle autorità.</p>
-          </div>
-
-          <p style="margin-top:12px;">
-            Fonte:
-            <a href="https://www.iononrischio.gov.it/" target="_blank" rel="noopener noreferrer">
-              Io non rischio
-            </a>
-          </p>
-        </div>
-      </details>
-
-      <details class="risk-accordion-item">
-        <summary>
-          <span class="risk-accordion-label">Rischio industriale</span>
-          <span class="risk-accordion-chevron"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
-        </summary>
-        <div class="risk-accordion-body">
-          <div class="allerta-section-title">In caso di allarme (sirena)</div>
-          <div class="allerta-section-body">
-            <p>Al segnale di allarme (suono continuo), <strong>chiuditi subito</strong> in un edificio: chiudi porte e finestre e spegni impianti di aerazione o condizionamento.<br><br>Ascolta radio, TV locali e le notifiche ufficiali del Comune per le istruzioni specifiche sull'evento in corso.<br><br>Non uscire ed evita di intasare le linee telefoniche, salvo reale pericolo di vita, finché non viene comunicato il <strong>cessato allarme</strong>.<br><br>Segui solo le indicazioni delle autorità competenti: non improvvisare percorsi di fuga autonomi, a meno che non venga esplicitamente disposta l'evacuazione.</p>
-          </div>
-        </div>
-      </details>
-
-    </div>
-
-    <div class="allerta-section-title">Nota</div>
+<div class="allerta-section-title">Nota</div>
     <div class="allerta-section-body allerta-note-box">
       <p>
         Le indicazioni di comportamento presenti in questa sezione sono ispirate ai materiali ufficiali della campagna nazionale <strong>Io non rischio</strong> e alle linee guida di Protezione Civile e hanno finalità esclusivamente informative.
@@ -2176,6 +2078,104 @@
     </div>
   </div>
 </div>
+
+<script>
+// Guida rapida: stessi contenuti dell'app Android (scelta del rischio, fasi numerate)
+(function () {
+  var Y = '#eab308', R = '#ef4444', G = '#10b981';
+  var RISCHI = [
+    { nome: 'Alluvione', ico: '<path d="M2 8c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2M2 13c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2M2 18c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2"/>', idro: true,
+      sintesi: "Fiumi, torrenti e piogge intense: l'acqua può salire in pochi minuti.",
+      fasi: [
+        ['Con l’allerta', Y, ["Tieni attive le notifiche dell'app e controlla il bollettino.", "Non dormire né stare nei piani interrati o seminterrati.", "Metti al sicuro documenti e farmaci ai piani alti.", "Controlla nell'app le strade chiuse prima di partire.", "Non rischiare per salvare l'auto o altri beni."]],
+        ['Durante', R, ["Sali ai piani alti, chiudi porte e finestre.", "Chiudi il gas e stacca la corrente solo se sei all'asciutto.", "Non usare l'ascensore.", "Non attraversare strade allagate: bastano 20–30 cm d'acqua per trascinare auto e persone.", "Raggiungi le aree di attesa indicate dal Comune e segui solo le autorità."]],
+        ['Dopo', G, ["Rientra solo dopo il cessato allarme.", "Fai controllare gas, luce e acqua prima di usarli.", "Non bere l'acqua del rubinetto e butta i cibi bagnati.", "Occhio a voragini, cavi scoperti e detriti.", "Segnala i danni al Comune."]]
+      ],
+      fonti: [['Procedure di emergenza del Comune', 'https://www.comune.castelfrancoveneto.tv.it/wp-content/uploads/2024/09/Procedure-Emergenza.pdf'], ['Mappa del rischio idrogeologico', 'https://www.comune.castelfrancoveneto.tv.it/wp-content/uploads/2024/09/rischio-idrogeologico.pdf'], ['Io non rischio - Alluvione', 'https://www.iononrischio.gov.it/it/preparati/alluvione/cosa-fare']] },
+    { nome: 'Temporali', ico: '<path d="M7 16a4 4 0 0 1-.5-7.97A5.5 5.5 0 0 1 17 7.5a4.5 4.5 0 0 1 .5 8.5"/><path d="M12 11l-2.5 4h4L11 20"/>', idro: true,
+      sintesi: 'Fulmini, grandine e raffiche improvvise.',
+      fasi: [
+        ['Prima', Y, ["Rimanda gite, sport e lavori all'aperto o in quota.", "Segui l'evoluzione del meteo."]],
+        ['Durante', R, ["All'aperto cerca riparo in un edificio o in auto, finestrini chiusi.", "Stai lontano da alberi isolati, pali, tralicci e specchi d'acqua.", "In casa chiudi porte e finestre e scollega gli apparecchi sensibili."]],
+        ['Dopo', G, ["Evita rami pericolanti e cavi elettrici a terra.", "Segnala i danni al Comune."]]
+      ] },
+    { nome: 'Vento forte', ico: '<path d="M3 8h10a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h7"/>', idro: true,
+      sintesi: 'Oggetti che volano e alberi che cadono.',
+      fasi: [
+        ['Prima', Y, ["Metti al sicuro ombrelloni, tende e mobili da giardino.", "Controlla coperture provvisorie e grondaie."]],
+        ['Durante', R, ["Non fermarti sotto alberi, impalcature, cartelloni e cornicioni.", "In auto vai piano su ponti e strade esposte.", "Evita gli spostamenti non necessari."]],
+        ['Dopo', G, ["Segnala alberi pericolanti e danni.", "Non avvicinarti ai cavi elettrici caduti."]]
+      ] },
+    { nome: 'Neve e ghiaccio', ico: '<path d="M12 2v20M4.2 7l15.6 10M4.2 17L19.8 7M9.5 3.5L12 6l2.5-2.5M9.5 20.5L12 18l2.5 2.5"/>',
+      sintesi: "Strade e marciapiedi scivolosi, neve sui tetti. Il bollettino regionale ha per entrambi un'allerta a parte.",
+      fasi: [
+        ['Prima', Y, ["Monta le gomme invernali o tieni a bordo le catene, e prova a montarle prima di averne bisogno.", "Metti scarpe antiscivolo, con suola in gomma."]],
+        ['Durante', R, ["Esci solo se serve.", "In auto vai piano, usa marce basse e freno motore, niente manovre brusche.", "Libera l'auto da tutta la neve, non solo dai vetri.", "A piedi muoviti con cautela: il ghiaccio si forma su strade e marciapiedi.", "Usa il telefono solo se necessario, per non intasare le linee di soccorso."]],
+        ['Dopo', G, ["Dopo la nevicata il ghiaccio resta: prudenza su strade e marciapiedi.", "Attenzione a neve e ghiaccio che cadono da tetti, cornicioni e rami.", "Con tanta neve sul tetto c'è rischio di crollo: fallo controllare."]]
+      ] },
+    { nome: 'Caldo', ico: '<path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0z"/>',
+      sintesi: "È uno dei rischi del bollettino regionale, con i colori dell'allerta. In più il Ministero della Salute pubblica un bollettino a parte per 27 città, con livelli da 0 a 3: il livello 3 scatta dopo 3 giorni di fila a rischio elevato. I più esposti sono anziani, bambini e malati cronici.",
+      fasi: [
+        ['Come comportarti', Y, ["Evita il sole e le uscite tra le 12 e le 18.", "Bevi molta acqua, niente alcolici, vestiti leggeri.", "Non lasciare mai bambini o animali in auto.", "Aiuta chi è più fragile a stare al fresco."]],
+        ['Se qualcuno sta male', R, ["Crampi, capogiri, pelle calda e secca o confusione: portalo al fresco.", "Bagnalo con acqua fresca e chiama il 112."]]
+      ],
+      fonti: [['Bollettini del Ministero della Salute', 'https://www.salute.gov.it/new/it/news-e-media/notizie/estate-2026-dal-25-maggio-disponibili-i-bollettini-sulle-ondate-di-calore/']] },
+    { nome: 'Terremoto', ico: '<path d="M2 20l6-10 4 6 2-3 8 7z"/><circle cx="15" cy="5" r="1.3"/><circle cx="19" cy="8" r="1"/>',
+      sintesi: "Non esiste un'allerta: le scosse non si prevedono. Conta farsi trovare pronti.",
+      fasi: [
+        ['Prima', Y, ["Fissa alla parete mobili e scaffali alti.", "Individua i punti sicuri della casa.", "Tieni a portata di mano torcia e radio a pile."]],
+        ['Durante', R, ["In casa riparati nel vano di una porta in un muro portante, oppure sotto un letto o un tavolo robusto, lontano da vetri e mobili alti.", "Non usare l'ascensore.", "All'aperto allontanati da edifici, alberi e linee elettriche."]],
+        ['Dopo', G, ["Controlla come stanno le persone vicino a te.", "Esci con prudenza e raggiungi le aree di attesa del Comune.", "Usa il telefono il meno possibile, per lasciare libere le linee.", "Se senti odore di gas chiudi il rubinetto, niente fiamme né interruttori.", "Segui solo le indicazioni ufficiali."]]
+      ],
+      fonti: [['Io non rischio', 'https://www.iononrischio.gov.it/']] },
+    { nome: 'Industriale', ico: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/>',
+      sintesi: 'Incidente in uno stabilimento: si avverte con la sirena.',
+      fasi: [
+        ['Al suono della sirena', R, ["Chiuditi in un edificio, chiudi porte e finestre.", "Spegni aerazione e condizionatori.", "Segui radio, TV locali e notifiche del Comune.", "Non uscire e non intasare le linee telefoniche fino al cessato allarme, salvo evacuazione."]]
+      ] }
+  ];
+
+  var chips = document.getElementById('guida-chips');
+  var body = document.getElementById('guida-body');
+  var colori = document.getElementById('guida-colori');
+  if (!chips || !body || !colori) return;
+
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+
+  function mostra(i) {
+    var r = RISCHI[i];
+    Array.prototype.forEach.call(chips.children, function (c, k) {
+      c.classList.toggle('on', k === i);
+      c.setAttribute('aria-selected', k === i ? 'true' : 'false');
+    });
+    var html = '<div class="guida-titolo">' + esc(r.nome) + '</div><div class="guida-sintesi">' + esc(r.sintesi) + '</div>';
+    r.fasi.forEach(function (f) {
+      html += '<div class="guida-fase"><h4><i style="background:' + f[1] + '"></i>' + esc(f[0]) + '</h4>';
+      f[2].forEach(function (p, k) { html += '<div class="guida-passo"><b>' + (k + 1) + '</b><span>' + esc(p) + '</span></div>'; });
+      html += '</div>';
+    });
+    if (r.fonti) {
+      html += '<p class="guida-fonti">' + r.fonti.map(function (f) {
+        return '<a href="' + f[1] + '" target="_blank" rel="noopener noreferrer">' + esc(f[0]) + '</a>';
+      }).join('<br>') + '</p>';
+    }
+    body.innerHTML = html;
+    // l'infografica vale solo per le allerte meteo-idro
+    colori.hidden = !r.idro;
+  }
+
+  RISCHI.forEach(function (r, i) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'guida-chip';
+    b.setAttribute('role', 'tab');
+    b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + r.ico + '</svg>' + esc(r.nome);
+    b.addEventListener('click', function () { mostra(i); });
+    chips.appendChild(b);
+  });
+  mostra(0);
+})();
+</script>
 
 <div id="info-modal" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('open')">
   <div id="info-box" class="modal-box">
@@ -7235,8 +7235,8 @@ const ALLERTA_COLORS = { VERDE: '#10b981', GIALLO: '#eab308', ARANCIONE: '#f9731
 const ALLERTA_LABELS = { VERDE: 'livello verde', GIALLO: 'livello giallo', ARANCIONE: 'livello arancione', ROSSO: 'livello rosso' };
 const ALLERTA_ORDER  = ['VERDE', 'GIALLO', 'ARANCIONE', 'ROSSO'];
 
-function allertaBgColor(idra, idro, temp, vent, calo) {
-  const vals = [idra, idro, temp, vent, calo]
+function allertaBgColor(idra, idro, temp, vent, calo, neve, gelo) {
+  const vals = [idra, idro, temp, vent, calo, neve, gelo]
     .map(v => (v || "VERDE").toUpperCase());
 
   if (vals.includes("ROSSO")) return ALLERTA_COLORS.ROSSO;
@@ -7291,6 +7291,8 @@ function renderAllerta(d) {
     temp: getLvl(giornoBarra, "temp"),
     vent: getLvl(giornoBarra, "vent"),
     calo: getLvl(giornoBarra, "calo"),
+    neve: getLvl(giornoBarra, "neve"),
+    gelo: getLvl(giornoBarra, "gelo"),
   };
 
   const barColor = allertaBgColor(
@@ -7298,7 +7300,9 @@ function renderAllerta(d) {
     barVals.idro,
     barVals.temp,
     barVals.vent,
-    barVals.calo
+    barVals.calo,
+    barVals.neve,
+    barVals.gelo
   );
 
   const bar = document.getElementById("allerta-bar");
@@ -7313,6 +7317,8 @@ function renderAllerta(d) {
     ["temp", barVals.temp],
     ["vento", barVals.vent],
     ["calore", barVals.calo],
+    ["neve", barVals.neve],
+    ["gelo", barVals.gelo],
   ].forEach(([k, v]) => {
     const el = document.getElementById("bar-bollino-" + k);
     if (el) {
@@ -7341,6 +7347,8 @@ function renderAllerta(d) {
       ["Idrogeologico per Temporali", "temp"],
       ["Vento", "vent"],
       ["Ondate di calore", "calo"],
+      ["Neve", "neve"],
+      ["Ghiaccio al suolo", "gelo"],
     ];
 
     const isSecondoGiorno = giornoBarra === domani;
