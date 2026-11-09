@@ -20,6 +20,14 @@
 
 CastelSafe è un progetto civico per i cittadini di Castelfranco Veneto. Riunisce in un'unica app le informazioni di protezione civile che altrimenti sono sparse tra più siti ufficiali: il bollettino di allerta regionale, i livelli dei corsi d'acqua, le piogge, il radar e le strade chiuse. Quando la situazione cambia, avvisa con una notifica.
 
+<div align="center">
+
+| Mappa e allerta | Bollettino regionale | Cosa fare in caso di allerta |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/01-mappa.jpg" width="250" alt="Mappa con chiusure, aree di protezione civile e barra dell'allerta"> | <img src="docs/screenshots/02-bollettino.png" width="250" alt="Bollettino di allerta regionale per la zona E1, con i sette rischi"> | <img src="docs/screenshots/03-guida.png" width="250" alt="Guida rapida con le azioni da fare in caso di alluvione"> |
+
+</div>
+
 ## Cosa fa
 
 | | |
